@@ -1,0 +1,277 @@
+{
+  "version": "1.0.0",
+  "updated": "2025-01-01T00:00:00Z",
+  "description": "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers",
+  "servers": [
+    {
+      "id": "filesystem",
+      "name": "Filesystem MCP Server",
+      "description": "Access local filesystem operations including read, write, and directory management",
+      "category": ["filesystem", "local", "core"],
+      "author": "Anthropic",
+      "repository": "https://github.com/anthropics/mcp-server-filesystem",
+      "documentation": "https://docs.anthropic.com/mcp/servers/filesystem",
+      "versions": {
+        "latest": "1.0.0",
+        "supported": ["1.0.0", "0.9.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "@anthropic/mcp-server-filesystem",
+        "system_dependencies": [],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "filesystem_template.json",
+        "required_params": ["root_path"],
+        "optional_params": ["allowed_extensions", "ignore_patterns"]
+      },
+      "capabilities": ["file_operations", "directory_listing", "file_search", "content_reading"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "sqlite",
+      "name": "SQLite MCP Server", 
+      "description": "SQLite database operations with full SQL query support",
+      "category": ["database", "sqlite", "core"],
+      "author": "Anthropic",
+      "repository": "https://github.com/anthropics/mcp-server-sqlite",
+      "documentation": "https://docs.anthropic.com/mcp/servers/sqlite",
+      "versions": {
+        "latest": "1.0.0",
+        "supported": ["1.0.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "@anthropic/mcp-server-sqlite",
+        "system_dependencies": [],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "sqlite_template.json",
+        "required_params": ["database_path"],
+        "optional_params": ["readonly", "timeout"]
+      },
+      "capabilities": ["database_operations", "sql_queries", "schema_inspection"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "git",
+      "name": "Git MCP Server",
+      "description": "Git repository management and version control operations",
+      "category": ["development", "git", "vcs", "core"],
+      "author": "Anthropic", 
+      "repository": "https://github.com/anthropics/mcp-server-git",
+      "documentation": "https://docs.anthropic.com/mcp/servers/git",
+      "versions": {
+        "latest": "1.0.0",
+        "supported": ["1.0.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "@anthropic/mcp-server-git",
+        "system_dependencies": ["git"],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "git_template.json",
+        "required_params": ["repository_path"],
+        "optional_params": ["branch", "remote"]
+      },
+      "capabilities": ["git_operations", "repository_management", "commit_history", "branch_operations"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "brave-search",
+      "name": "Brave Search MCP Server",
+      "description": "Web search functionality using Brave Search API",
+      "category": ["search", "web", "api", "core"],
+      "author": "Anthropic",
+      "repository": "https://github.com/anthropics/mcp-server-brave-search", 
+      "documentation": "https://docs.anthropic.com/mcp/servers/brave-search",
+      "versions": {
+        "latest": "1.0.0",
+        "supported": ["1.0.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "@anthropic/mcp-server-brave-search",
+        "system_dependencies": [],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "brave_search_template.json",
+        "required_params": ["api_key"],
+        "optional_params": ["safe_search", "country"]
+      },
+      "capabilities": ["web_search", "search_results", "api_integration"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "slack",
+      "name": "Slack MCP Server",
+      "description": "Slack workspace integration for channels and messaging",
+      "category": ["communication", "slack", "api", "core"],
+      "author": "Anthropic",
+      "repository": "https://github.com/anthropics/mcp-server-slack",
+      "documentation": "https://docs.anthropic.com/mcp/servers/slack",
+      "versions": {
+        "latest": "1.0.0", 
+        "supported": ["1.0.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "@anthropic/mcp-server-slack",
+        "system_dependencies": [],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "slack_template.json",
+        "required_params": ["bot_token"],
+        "optional_params": ["default_channel"]
+      },
+      "capabilities": ["slack_messaging", "channel_operations", "user_management"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "github",
+      "name": "GitHub MCP Server",
+      "description": "GitHub repository and API integration for issues, PRs, and repository management",
+      "category": ["development", "github", "api", "community"],
+      "author": "Community",
+      "repository": "https://github.com/mcp-community/mcp-server-github",
+      "documentation": "https://github.com/mcp-community/mcp-server-github/blob/main/README.md",
+      "versions": {
+        "latest": "2.1.0",
+        "supported": ["2.1.0", "2.0.0"]
+      },
+      "installation": {
+        "method": "npm",
+        "package": "mcp-server-github",
+        "system_dependencies": [],
+        "python_dependencies": []
+      },
+      "configuration": {
+        "template": "github_template.json",
+        "required_params": ["access_token"],
+        "optional_params": ["default_org", "default_repo"]
+      },
+      "capabilities": ["github_api", "repository_operations", "issue_management", "pull_requests"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL MCP Server",
+      "description": "PostgreSQL database operations with advanced SQL support",
+      "category": ["database", "postgresql", "community"],
+      "author": "Community",
+      "repository": "https://github.com/mcp-community/mcp-server-postgres",
+      "documentation": "https://github.com/mcp-community/mcp-server-postgres/blob/main/README.md",
+      "versions": {
+        "latest": "1.5.0",
+        "supported": ["1.5.0", "1.4.0"]
+      },
+      "installation": {
+        "method": "pip",
+        "package": "mcp-server-postgres",
+        "system_dependencies": ["postgresql-client"],
+        "python_dependencies": ["psycopg2-binary"]
+      },
+      "configuration": {
+        "template": "postgres_template.json",
+        "required_params": ["connection_string"],
+        "optional_params": ["schema", "readonly", "pool_size"]
+      },
+      "capabilities": ["database_operations", "sql_queries", "schema_management", "connection_pooling"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "redis",
+      "name": "Redis MCP Server",
+      "description": "Redis data structure operations and caching",
+      "category": ["database", "redis", "cache", "community"],
+      "author": "Community",
+      "repository": "https://github.com/mcp-community/mcp-server-redis",
+      "documentation": "https://github.com/mcp-community/mcp-server-redis/blob/main/README.md",
+      "versions": {
+        "latest": "1.2.0",
+        "supported": ["1.2.0", "1.1.0"]
+      },
+      "installation": {
+        "method": "pip",
+        "package": "mcp-server-redis",
+        "system_dependencies": [],
+        "python_dependencies": ["redis"]
+      },
+      "configuration": {
+        "template": "redis_template.json",
+        "required_params": ["host"],
+        "optional_params": ["port", "password", "database"]
+      },
+      "capabilities": ["redis_operations", "data_structures", "caching", "pub_sub"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "docker",
+      "name": "Docker MCP Server", 
+      "description": "Docker container management and operations",
+      "category": ["containerization", "docker", "development", "community"],
+      "author": "Community",
+      "repository": "https://github.com/mcp-community/mcp-server-docker",
+      "documentation": "https://github.com/mcp-community/mcp-server-docker/blob/main/README.md",
+      "versions": {
+        "latest": "0.8.0",
+        "supported": ["0.8.0"]
+      },
+      "installation": {
+        "method": "pip",
+        "package": "mcp-server-docker",
+        "system_dependencies": ["docker"],
+        "python_dependencies": ["docker"]
+      },
+      "configuration": {
+        "template": "docker_template.json",
+        "required_params": [],
+        "optional_params": ["socket_path", "api_version"]
+      },
+      "capabilities": ["container_management", "image_operations", "docker_compose", "system_monitoring"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "MIT"
+    },
+    {
+      "id": "aws-s3",
+      "name": "AWS S3 MCP Server",
+      "description": "Amazon S3 bucket operations and file management", 
+      "category": ["cloud", "aws", "storage", "community"],
+      "author": "Community",
+      "repository": "https://github.com/mcp-community/mcp-server-aws-s3",
+      "documentation": "https://github.com/mcp-community/mcp-server-aws-s3/blob/main/README.md",
+      "versions": {
+        "latest": "1.3.0",
+        "supported": ["1.3.0", "1.2.0"]
+      },
+      "installation": {
+        "method": "pip",
+        "package": "mcp-server-aws-s3",
+        "system_dependencies": [],
+        "python_dependencies": ["boto3"]
+      },
+      "configuration": {
+        "template": "aws_s3_template.json",
+        "required_params": ["bucket_name", "access_key_id", "secret_access_key"],
+        "optional_params": ["region", "endpoint_url"]
+      },
+      "capabilities": ["s3_operations", "file_upload", "file_download", "bucket_management"],
+      "platforms": ["linux", "darwin", "windows"],
+      "license": "Apache-2.0"
+    }
+  ]
+}
