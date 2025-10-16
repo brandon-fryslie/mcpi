@@ -1,6 +1,7 @@
 """Claude Code specific MCP server installer."""
 
 import json
+import os
 import platform
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -9,6 +10,10 @@ from mcpi.installer.npm import NPMInstaller
 from mcpi.installer.python import PythonInstaller
 from mcpi.installer.git import GitInstaller
 from mcpi.registry.catalog import MCPServer, InstallationMethod
+
+
+# Configuration constants
+MCP_SERVERS_KEY = "mcpServers"
 
 
 class ClaudeCodeInstaller(BaseInstaller):
@@ -24,7 +29,7 @@ class ClaudeCodeInstaller(BaseInstaller):
         if config_path is None:
             config_path = self._find_claude_code_config()
         
-        super().__init__(config_path, dry_run)
+        super().__init__(config_path=config_path, dry_run=dry_run)
         
         # Initialize method-specific installers
         self.npm_installer = NPMInstaller(dry_run=dry_run)
@@ -44,8 +49,7 @@ class ClaudeCodeInstaller(BaseInstaller):
         elif system == "Linux":
             config_path = Path.home() / ".config" / "claude" / "mcp_servers.json"
         elif system == "Windows":
-            import os
-            appdata = Path(os.environ.get("APPDATA", ""))
+            appdata = Path(os.environ.get("APPDATA", str(Path.home())))
             config_path = appdata / "claude" / "mcp_servers.json"
         else:
             # Fallback to home directory
@@ -60,13 +64,13 @@ class ClaudeCodeInstaller(BaseInstaller):
             Configuration dictionary
         """
         if not self.config_path.exists():
-            return {"mcpServers": {}}
+            return {MCP_SERVERS_KEY: {}}
         
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
-            return {"mcpServers": {}}
+            return {MCP_SERVERS_KEY: {}}
     
     def _save_config(self, config: Dict[str, Any]) -> bool:
         """Save Claude Code MCP configuration.
@@ -135,7 +139,7 @@ class ClaudeCodeInstaller(BaseInstaller):
         server_config = self._generate_server_config(server, config_params, package_result.details)
         
         # Add server to configuration
-        config["mcpServers"][server.id] = server_config
+        config[MCP_SERVERS_KEY][server.id] = server_config
         
         # Save updated configuration
         if not self._save_config(config):
@@ -274,8 +278,8 @@ class ClaudeCodeInstaller(BaseInstaller):
         config = self._load_config()
         
         # Remove server from configuration
-        if server_id in config.get("mcpServers", {}):
-            del config["mcpServers"][server_id]
+        if server_id in config.get(MCP_SERVERS_KEY, {}):
+            del config[MCP_SERVERS_KEY][server_id]
         
         # Save updated configuration
         if not self._save_config(config):
@@ -302,7 +306,7 @@ class ClaudeCodeInstaller(BaseInstaller):
             True if installed, False otherwise
         """
         config = self._load_config()
-        return server_id in config.get("mcpServers", {})
+        return server_id in config.get(MCP_SERVERS_KEY, {})
     
     def get_installed_servers(self) -> List[str]:
         """Get list of installed server IDs.
@@ -311,7 +315,7 @@ class ClaudeCodeInstaller(BaseInstaller):
             List of installed server IDs
         """
         config = self._load_config()
-        return list(config.get("mcpServers", {}).keys())
+        return list(config.get(MCP_SERVERS_KEY, {}).keys())
     
     def get_server_config(self, server_id: str) -> Optional[Dict[str, Any]]:
         """Get configuration for installed server.
@@ -323,7 +327,7 @@ class ClaudeCodeInstaller(BaseInstaller):
             Server configuration or None if not found
         """
         config = self._load_config()
-        return config.get("mcpServers", {}).get(server_id)
+        return config.get(MCP_SERVERS_KEY, {}).get(server_id)
     
     def update_server_config(self, server_id: str, new_config: Dict[str, Any]) -> bool:
         """Update configuration for installed server.
@@ -339,7 +343,7 @@ class ClaudeCodeInstaller(BaseInstaller):
             return False
         
         config = self._load_config()
-        config["mcpServers"][server_id] = new_config
+        config[MCP_SERVERS_KEY][server_id] = new_config
         
         return self._save_config(config)
     
@@ -357,11 +361,11 @@ class ClaudeCodeInstaller(BaseInstaller):
         
         config = self._load_config()
         
-        if "mcpServers" not in config:
-            errors.append("Configuration missing 'mcpServers' section")
+        if MCP_SERVERS_KEY not in config:
+            errors.append(f"Configuration missing '{MCP_SERVERS_KEY}' section")
             return errors
         
-        for server_id, server_config in config["mcpServers"].items():
+        for server_id, server_config in config[MCP_SERVERS_KEY].items():
             if not isinstance(server_config, dict):
                 errors.append(f"Server {server_id}: Configuration must be an object")
                 continue
