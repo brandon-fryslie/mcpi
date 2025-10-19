@@ -76,7 +76,7 @@ def is_executable(path: Path) -> bool:
         True if file is executable, False otherwise
     """
     try:
-        return path.exists() and path.is_file() and path.stat().st_mode & 0o111
+        return path.exists() and path.is_file() and bool(path.stat().st_mode & 0o111)
     except (OSError, PermissionError):
         return False
 

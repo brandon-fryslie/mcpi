@@ -200,8 +200,14 @@ class TestServerCatalog:
         results = catalog.search_servers("filesystem")
         assert len(results) > 0
         
-        # Results should be ordered by relevance
-        filesystem_server = results[0]
+        # Results should be ordered by relevance and be tuples of (server, score)
+        server_tuple = results[0]
+        assert isinstance(server_tuple, tuple)
+        assert len(server_tuple) == 2
+        
+        filesystem_server, score = server_tuple
+        assert isinstance(filesystem_server, MCPServer)
+        assert isinstance(score, (int, float))
         assert "filesystem" in filesystem_server.name.lower()
     
     def test_get_categories(self, tmp_path):

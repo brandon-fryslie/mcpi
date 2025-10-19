@@ -57,7 +57,18 @@ def validate_server_id(server_id: str) -> bool:
     if not server_id or not isinstance(server_id, str):
         return False
     
-    # Server ID should be lowercase alphanumeric with hyphens and underscores
+    # Server ID can be:
+    # 1. Simple alphanumeric with hyphens/underscores: my-server, my_server_123
+    # 2. Domain-style with slashes and dots: mcpmarket.com/screenshot-9, github.com/user/repo
+    
+    # Check if it's a domain-style ID (contains dots and/or slashes)
+    if '.' in server_id or '/' in server_id:
+        # Allow domain-style IDs with dots and slashes
+        # Pattern: allows letters, numbers, dots, slashes, hyphens, underscores
+        pattern = r'^[a-z0-9][a-z0-9._/-]*[a-z0-9]$'
+        return bool(re.match(pattern, server_id))
+    
+    # Standard server ID format
     pattern = r'^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$'
     return bool(re.match(pattern, server_id))
 
@@ -145,7 +156,7 @@ def validate_license(license_name: str) -> bool:
     common_licenses = {
         "MIT", "Apache-2.0", "GPL-3.0", "GPL-2.0", "BSD-3-Clause", 
         "BSD-2-Clause", "ISC", "MPL-2.0", "LGPL-3.0", "LGPL-2.1",
-        "CC0-1.0", "Unlicense", "Proprietary", "Commercial"
+        "CC0-1.0", "Unlicense", "Proprietary", "Commercial", "None"
     }
     
     # Check exact match or reasonable pattern

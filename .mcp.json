@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {}
+    },
+    "example-name": {
+      "command": "example-cmd",
+      "args": [
+        "--arg1",
+        "arg2"
+      ],
+      "env": {
+        "EXAMPLE_ENV_VAR": "EXAMPLE_ENV_VAR_VALUE",
+        "EXAMPLE_ENV_VAR2": "EXAMPLE_ENV_VAR_VALUE2"
+      }
+    }
+  }
+}

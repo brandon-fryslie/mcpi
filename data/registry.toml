@@ -1,0 +1,79 @@
+[metadata]
+version = "1.0.0"
+description = "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers"
+updated = "2025-01-01T00:00:00Z"
+
+[servers.screenshot]
+name = "Screenshot"
+description = "Streamline your macOS screenshot workflow with 'Screenshot'. Capture desktop, windows, or areas using natural language commands via Claude Desktop. Enjoy automatic organization and easy management of all your captures."
+author = "github.com"
+license = "Unknown"
+category = [ "utilities",]
+capabilities = [ "general",]
+platforms = [ "linux", "darwin", "windows",]
+repository = "https://github.com/yushinna"
+tags = []
+
+[servers.search-code-repositories-users-issues-pull-requests]
+name = "Search Code, Repositories, Users, Issues, Pull Requests..."
+description = "Visual Studio Code"
+author = "microsoft"
+license = "Unknown"
+category = [ "utilities",]
+capabilities = [ "general",]
+platforms = [ "linux", "darwin", "windows",]
+repository = "https://github.com/microsoft/vscode"
+tags = []
+
+[servers."mcpmarket.com/screenshot-9"]
+name = "Screenshot"
+description = "Streamline your macOS screenshot workflow with 'Screenshot'. Capture desktop, windows, or areas using natural language commands via Claude Desktop. Enjoy automatic organization and easy management of all your captures."
+author = "github.com"
+license = "Unknown"
+category = [ "utilities",]
+capabilities = [ "general",]
+platforms = [ "linux", "darwin", "windows",]
+repository = "https://github.com/yushinna"
+tags = []
+
+[servers.screenshot.installation]
+method = "unknown"
+package = "unknown"
+system_dependencies = []
+python_dependencies = []
+
+[servers.screenshot.configuration]
+required_params = []
+optional_params = []
+
+[servers.screenshot.versions]
+latest = "1.0.0"
+supported = [ "1.0.0",]
+
+[servers.search-code-repositories-users-issues-pull-requests.installation]
+method = "unknown"
+package = "unknown"
+system_dependencies = []
+python_dependencies = []
+
+[servers.search-code-repositories-users-issues-pull-requests.configuration]
+required_params = []
+optional_params = []
+
+[servers.search-code-repositories-users-issues-pull-requests.versions]
+latest = "1.0.0"
+supported = [ "1.0.0",]
+
+[servers."mcpmarket.com/screenshot-9".installation]
+method = "git"
+package = "https://github.com/yushinna"
+system_dependencies = []
+python_dependencies = []
+
+[servers."mcpmarket.com/screenshot-9".configuration]
+required_params = []
+optional_params = []
+
+[servers."mcpmarket.com/screenshot-9".versions]
+latest = "1.0.0"
+supported = [ "1.0.0",]

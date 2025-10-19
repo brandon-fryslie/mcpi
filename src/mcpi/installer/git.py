@@ -7,6 +7,12 @@ from typing import Dict, List, Optional, Any
 from mcpi.installer.base import BaseInstaller, InstallationResult
 from mcpi.registry.catalog import MCPServer, InstallationMethod
 
+# Configuration constants
+DEFAULT_INSTALL_DIR = ".mcpi/servers"
+GIT_TIMEOUT = 300  # 5 minutes for git operations
+GIT_VERSION_TIMEOUT = 10  # 10 seconds for git version check
+DEPENDENCY_TIMEOUT = 300  # 5 minutes for dependency installation
+
 
 class GitInstaller(BaseInstaller):
     """Installer for Git-based MCP servers."""
@@ -20,7 +26,7 @@ class GitInstaller(BaseInstaller):
         """
         super().__init__(dry_run=dry_run)
         if install_dir is None:
-            install_dir = Path.home() / ".mcpi" / "servers"
+            install_dir = Path.home() / DEFAULT_INSTALL_DIR
         self.install_dir = install_dir
     
     def install(self, server: MCPServer, config_params: Optional[Dict[str, Any]] = None) -> InstallationResult:
@@ -339,7 +345,7 @@ class GitInstaller(BaseInstaller):
                         check=True,
                         capture_output=True,
                         text=True,
-                        timeout=300
+                        timeout=DEPENDENCY_TIMEOUT
                     )
                 return InstallationResult(
                     status="success",
@@ -364,7 +370,7 @@ class GitInstaller(BaseInstaller):
                         check=True,
                         capture_output=True,
                         text=True,
-                        timeout=300
+                        timeout=DEPENDENCY_TIMEOUT
                     )
                 return InstallationResult(
                     status="success",
@@ -434,7 +440,7 @@ class GitInstaller(BaseInstaller):
                 ["git", "--version"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=GIT_VERSION_TIMEOUT
             )
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
@@ -463,7 +469,7 @@ class GitInstaller(BaseInstaller):
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=GIT_TIMEOUT
         )
     
     def _supports_method(self, method: str) -> bool:

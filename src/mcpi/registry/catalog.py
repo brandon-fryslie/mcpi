@@ -1,17 +1,31 @@
-"""MCP server catalog management."""
+"""MCP Server Registry Catalog and Models."""
 
 import json
 import yaml
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union, Tuple
-from pydantic import BaseModel, Field, HttpUrl
+from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
-import httpx
-import asyncio
+from pydantic import BaseModel, Field, ConfigDict
+
+# Handle tomllib import for Python 3.11+ or fallback to tomli
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        # Fallback to using toml for reading as well
+        tomllib = None
+
+import toml
 
 from mcpi.utils.validation import (
-    validate_url, validate_server_id, validate_package_name, 
-    validate_version, validate_license
+    validate_server_id,
+    validate_package_name,
+    validate_url,
+    validate_license,
+    validate_version
 )
 
 
@@ -21,6 +35,7 @@ class InstallationMethod(str, Enum):
     PIP = "pip"
     GIT = "git"
     BINARY = "binary"
+    UNKNOWN = "unknown"
 
 
 class Platform(str, Enum):
@@ -32,13 +47,12 @@ class Platform(str, Enum):
 
 class ServerInstallation(BaseModel):
     """Installation configuration for an MCP server."""
+    model_config = ConfigDict(use_enum_values=True)
+    
     method: InstallationMethod
     package: str
     system_dependencies: List[str] = Field(default_factory=list)
     python_dependencies: List[str] = Field(default_factory=list)
-    
-    class Config:
-        use_enum_values = True
 
 
 class ServerConfiguration(BaseModel):
@@ -54,580 +68,434 @@ class ServerVersions(BaseModel):
     supported: List[str] = Field(default_factory=list)
 
 
+class RunConfig(BaseModel):
+    """Runtime configuration for MCP server execution."""
+    command: str
+    args: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
+
+
 class MCPServer(BaseModel):
     """Complete MCP server registry entry."""
-    id: str = Field(description="Unique identifier for the server")
-    name: str = Field(description="Human-readable name")
-    description: str = Field(description="Brief description of functionality")
-    category: List[str] = Field(default_factory=list, description="Server categories")
-    author: str = Field(description="Author or organization")
-    repository: Optional[HttpUrl] = Field(default=None, description="Source repository URL")
-    documentation: Optional[HttpUrl] = Field(default=None, description="Documentation URL")
-    versions: ServerVersions = Field(description="Version information")
-    installation: ServerInstallation = Field(description="Installation configuration")
-    configuration: ServerConfiguration = Field(default_factory=ServerConfiguration)
-    capabilities: List[str] = Field(default_factory=list, description="Server capabilities")
-    platforms: List[Platform] = Field(default_factory=list, description="Supported platforms")
-    license: str = Field(description="Software license")
+    model_config = ConfigDict(use_enum_values=True)
     
-    class Config:
-        use_enum_values = True
+    id: str
+    name: str
+    description: str
+    author: str
+    license: str = "Unknown"
+    category: List[str] = Field(default_factory=list)
+    capabilities: List[str] = Field(default_factory=list)
+    
+    installation: ServerInstallation
+    configuration: ServerConfiguration = Field(default_factory=ServerConfiguration)
+    platforms: List[str] = Field(default_factory=lambda: ["linux", "darwin", "windows"])
+    versions: ServerVersions = Field(default_factory=lambda: ServerVersions(latest="1.0.0", supported=["1.0.0"]))
+    
+    repository: Optional[str] = None
+    documentation: Optional[str] = None
+    homepage: Optional[str] = None
+    
+    # New RunConfig field for MCP server execution
+    run_config: Optional[RunConfig] = None
+    
+    tags: List[str] = Field(default_factory=list)
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+def get_method_string(method):
+    """Get method as string, handling both enum and string values."""
+    if hasattr(method, 'value'):
+        return method.value
+    return str(method)
 
 
 class ServerCatalog:
-    """Manages the MCP server catalog and registry operations."""
+    """Central catalog for MCP servers with search and filtering capabilities."""
     
-    DEFAULT_REGISTRY_URL = "https://registry.mcpi.dev/v1/servers.yaml"
-    
-    def __init__(self, registry_path: Optional[Path] = None, registry_url: Optional[str] = None):
-        """Initialize the server catalog.
-        
-        Args:
-            registry_path: Local path to registry file. If None, uses default data directory.
-            registry_url: URL for remote registry updates. If None, uses default.
-        """
-        self.registry_url = registry_url or self.DEFAULT_REGISTRY_URL
-        
+    def __init__(self, registry_path: Optional[Path] = None):
+        """Initialize the catalog with optional custom registry path."""
         if registry_path is None:
-            # Get data directory relative to package
+            # Default to package data directory
             package_dir = Path(__file__).parent.parent.parent.parent
-            # Try YAML first, then JSON for backward compatibility
-            yaml_path = package_dir / "data" / "registry.yaml"
-            json_path = package_dir / "data" / "registry.json"
-            
-            if yaml_path.exists():
-                self.registry_path = yaml_path
-            else:
-                self.registry_path = json_path
-        else:
-            self.registry_path = registry_path
-            
+            registry_path = package_dir / "data" / "mcp_servers.json"
+        
+        self.registry_path = registry_path
         self._servers: Dict[str, MCPServer] = {}
-        self._categories: Dict[str, List[str]] = {}
+        self._category_index: Dict[str, List[str]] = {}
         self._loaded = False
-    
+        
     def load_registry(self) -> None:
-        """Load the registry from local file."""
+        """Load servers from registry file."""
         if not self.registry_path.exists():
-            self._create_default_registry()
-            
+            # Try alternative formats if specified file doesn't exist
+            if self.registry_path.suffix == '.json':
+                # Try TOML and YAML alternatives
+                toml_path = self.registry_path.with_suffix('.toml')
+                yaml_path = self.registry_path.with_suffix('.yaml')
+                
+                if toml_path.exists():
+                    self._load_toml_registry(toml_path)
+                elif yaml_path.exists():
+                    self._load_yaml_registry(yaml_path)
+                else:
+                    # Start with empty registry if no file exists
+                    pass
+            else:
+                # Start with empty registry if specified file doesn't exist
+                pass
+        else:
+            # Load based on file extension
+            if self.registry_path.suffix.lower() == '.toml':
+                self._load_toml_registry(self.registry_path)
+            elif self.registry_path.suffix.lower() in ['.yaml', '.yml']:
+                self._load_yaml_registry(self.registry_path)
+            else:
+                # Default to JSON
+                self._load_json_registry()
+        
+        self._build_category_index()
+        self._loaded = True
+    
+    def _load_json_registry(self) -> None:
+        """Load registry from JSON format."""
         try:
             with open(self.registry_path, 'r', encoding='utf-8') as f:
-                if self.registry_path.suffix.lower() == '.yaml' or self.registry_path.suffix.lower() == '.yml':
-                    data = yaml.safe_load(f)
-                else:
-                    data = json.load(f)
-                
+                data = json.load(f)
+            
+            # Clear existing servers
             self._servers = {}
             
-            # Handle both new YAML format (dict of servers) and old JSON format (list of servers)
-            if 'servers' in data:
-                servers_data = data['servers']
-                if isinstance(servers_data, dict):
-                    # New YAML format: servers is a dict with server_id as keys
-                    for server_id, server_data in servers_data.items():
-                        server_data['id'] = server_id  # Ensure ID is set
+            # Load servers from different possible structures
+            if "servers" in data:
+                # New structured format
+                for server_id, server_data in data["servers"].items():
+                    server_data["id"] = server_id
+                    server = MCPServer(**server_data)
+                    self._servers[server.id] = server
+            else:
+                # Legacy format - assume data is direct server list
+                if isinstance(data, list):
+                    for server_data in data:
                         server = MCPServer(**server_data)
                         self._servers[server.id] = server
-                elif isinstance(servers_data, list):
-                    # Old JSON format: servers is a list
-                    for server_data in servers_data:
+                elif isinstance(data, dict):
+                    # Assume it's server_id -> server_data mapping
+                    for server_id, server_data in data.items():
+                        server_data["id"] = server_id
                         server = MCPServer(**server_data)
                         self._servers[server.id] = server
-            
-            self._build_category_index()
-            self._loaded = True
-            
-        except (json.JSONDecodeError, yaml.YAMLError, KeyError, TypeError) as e:
-            raise ValueError(f"Invalid registry format: {e}")
+                        
+        except (json.JSONDecodeError, FileNotFoundError, KeyError, TypeError) as e:
+            raise RuntimeError(f"Failed to load registry from {self.registry_path}: {e}")
     
-    def save_registry(self) -> bool:
-        """Save the current registry to file.
-        
-        Returns:
-            True if save successful, False otherwise
-        """
+    def _load_toml_registry(self, toml_path: Path) -> None:
+        """Load registry from TOML format."""
         try:
-            # Build registry data structure
-            servers_dict = {}
-            for server_id, server in self._servers.items():
-                server_data = server.model_dump()
-                # Remove the ID from the data since it's the key
-                server_data.pop('id', None)
-                servers_dict[server_id] = server_data
+            if tomllib is not None:
+                # Use tomllib for Python 3.11+ or tomli for older versions
+                with open(toml_path, 'rb') as f:
+                    data = tomllib.load(f)
+            else:
+                # Fallback to toml library
+                with open(toml_path, 'r', encoding='utf-8') as f:
+                    data = toml.load(f)
             
-            registry_data = {
-                "version": "1.0.0",
-                "updated": "2025-01-01T00:00:00Z",
-                "description": "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers",
-                "servers": servers_dict
-            }
+            # Clear existing servers
+            self._servers = {}
             
-            # Ensure directory exists
-            self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(self.registry_path, 'w', encoding='utf-8') as f:
-                if self.registry_path.suffix.lower() in ['.yaml', '.yml']:
-                    yaml.dump(registry_data, f, default_flow_style=False, sort_keys=False, indent=2)
-                else:
-                    json.dump(registry_data, f, indent=2, default=str)
-            
-            return True
-            
-        except Exception:
-            return False
+            # Load servers from TOML format
+            servers_data = data.get('servers', {})
+            for server_id, server_data in servers_data.items():
+                server_data['id'] = server_id  # Add ID back
+                server = MCPServer(**server_data)
+                self._servers[server.id] = server
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to load TOML registry from {toml_path}: {e}")
     
-    def add_server(self, server: Union[MCPServer, Dict[str, Any]], validate: bool = True) -> Tuple[bool, List[str]]:
-        """Add a server to the registry.
+    def _load_yaml_registry(self, yaml_path: Path) -> None:
+        """Load registry from YAML format."""
+        try:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            
+            # Clear existing servers
+            self._servers = {}
+            
+            # Load servers from YAML format
+            servers_data = data.get('servers', {})
+            for server_id, server_data in servers_data.items():
+                server_data['id'] = server_id
+                server = MCPServer(**server_data)
+                self._servers[server.id] = server
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to load YAML registry from {yaml_path}: {e}")
+    
+    def _build_category_index(self) -> None:
+        """Build category index for faster filtering."""
+        self._category_index = {}
+        for server_id, server in self._servers.items():
+            for category in server.category:
+                if category not in self._category_index:
+                    self._category_index[category] = []
+                self._category_index[category].append(server_id)
+    
+    def list_servers(self, category: Optional[str] = None) -> List[MCPServer]:
+        """List all servers, optionally filtered by category."""
+        if not self._loaded:
+            self.load_registry()
+        
+        servers = list(self._servers.values())
+        
+        if category:
+            servers = [s for s in servers if category.lower() in [c.lower() for c in s.category]]
+        
+        return sorted(servers, key=lambda x: x.name)
+    
+    def get_server(self, server_id: str) -> Optional[MCPServer]:
+        """Get server by ID."""
+        if not self._loaded:
+            self.load_registry()
+        
+        return self._servers.get(server_id)
+    
+    def search_servers(self, query: str) -> List[Tuple[MCPServer, float]]:
+        """Search servers by query string with relevance scoring."""
+        if not self._loaded:
+            self.load_registry()
+        
+        query_lower = query.lower()
+        results = []
+        
+        for server in self._servers.values():
+            score = 0.0
+            
+            # Exact name match gets highest score
+            if query_lower == server.name.lower():
+                score = 100.0
+            # Name contains query
+            elif query_lower in server.name.lower():
+                score = 80.0
+            # ID contains query
+            elif query_lower in server.id.lower():
+                score = 70.0
+            # Description contains query
+            elif query_lower in server.description.lower():
+                score = 50.0
+            # Category match
+            elif any(query_lower in cat.lower() for cat in server.category):
+                score = 60.0
+            # Capability match
+            elif any(query_lower in cap.lower() for cap in server.capabilities):
+                score = 40.0
+            # Author match
+            elif query_lower in server.author.lower():
+                score = 30.0
+            
+            if score > 0:
+                results.append((server, score))
+        
+        # Sort by score descending, then by name
+        results.sort(key=lambda x: (-x[1], x[0].name))
+        return results
+    
+    def get_categories(self) -> List[str]:
+        """Get all available categories."""
+        if not self._loaded:
+            self.load_registry()
+        
+        return sorted(self._category_index.keys())
+    
+    def add_server(self, server: MCPServer, validate: bool = True) -> Tuple[bool, List[str]]:
+        """Add a server to the catalog.
         
         Args:
-            server: MCPServer instance or dictionary with server data
-            validate: Whether to validate the server before adding
+            server: Server to add
+            validate: Whether to validate the server data
             
         Returns:
             Tuple of (success, error_messages)
         """
         errors = []
         
-        try:
-            if isinstance(server, dict):
-                server = MCPServer(**server)
+        if validate:
+            # Validate server ID format
+            if not validate_server_id(server.id):
+                errors.append(f"Invalid server ID format: {server.id}")
             
+            # Check for duplicate ID
             if server.id in self._servers:
-                return False, [f"Server with ID '{server.id}' already exists"]
+                errors.append(f"Server with ID '{server.id}' already exists")
             
-            # Validate server if requested
-            if validate:
-                is_valid, validation_errors = self.validate_server(server)
-                if not is_valid:
-                    return False, validation_errors
+            # Validate package name if installation method is known
+            method_str = get_method_string(server.installation.method)
+            if (method_str != "unknown" and
+                not validate_package_name(server.installation.package, method_str)):
+                errors.append(f"Invalid package name for {method_str}: {server.installation.package}")
             
-            self._servers[server.id] = server
-            self._build_category_index()
+            # Validate URLs
+            if server.repository and not validate_url(server.repository):
+                errors.append(f"Invalid repository URL: {server.repository}")
             
-            return True, []
+            if server.documentation and not validate_url(server.documentation):
+                errors.append(f"Invalid documentation URL: {server.documentation}")
             
-        except Exception as e:
-            return False, [f"Failed to add server: {str(e)}"]
-    
-    def update_server(self, server_id: str, server: Union[MCPServer, Dict[str, Any]], validate: bool = True) -> Tuple[bool, List[str]]:
-        """Update an existing server in the registry.
+            if server.homepage and not validate_url(server.homepage):
+                errors.append(f"Invalid homepage URL: {server.homepage}")
+            
+            # Validate license format
+            if not validate_license(server.license):
+                errors.append(f"Invalid license format: {server.license}")
+            
+            # Validate version format
+            if not validate_version(server.versions.latest):
+                errors.append(f"Invalid version format: {server.versions.latest}")
         
-        Args:
-            server_id: ID of server to update
-            server: Updated server data
-            validate: Whether to validate the server before updating
-            
-        Returns:
-            Tuple of (success, error_messages)
-        """
-        errors = []
+        if errors:
+            return False, errors
         
-        try:
-            if isinstance(server, dict):
-                server = MCPServer(**server)
-            
-            if server_id not in self._servers:
-                return False, [f"Server with ID '{server_id}' does not exist"]
-            
-            # Ensure ID matches
-            if server.id != server_id:
-                return False, [f"Server ID mismatch: {server_id} != {server.id}"]
-            
-            # Validate server if requested
-            if validate:
-                is_valid, validation_errors = self.validate_server(server)
-                if not is_valid:
-                    return False, validation_errors
-            
-            self._servers[server_id] = server
-            self._build_category_index()
-            
-            return True, []
-            
-        except Exception as e:
-            return False, [f"Failed to update server: {str(e)}"]
+        # Add to catalog
+        self._servers[server.id] = server
+        
+        # Update category index
+        for category in server.category:
+            if category not in self._category_index:
+                self._category_index[category] = []
+            if server.id not in self._category_index[category]:
+                self._category_index[category].append(server.id)
+        
+        return True, []
     
     def remove_server(self, server_id: str) -> bool:
-        """Remove a server from the registry.
+        """Remove a server from the catalog.
         
         Args:
             server_id: ID of server to remove
             
         Returns:
-            True if server was removed successfully, False otherwise
+            True if server was removed, False if not found
         """
         if server_id not in self._servers:
             return False
         
+        server = self._servers[server_id]
+        
+        # Remove from category index
+        for category in server.category:
+            if category in self._category_index and server_id in self._category_index[category]:
+                self._category_index[category].remove(server_id)
+                if not self._category_index[category]:
+                    del self._category_index[category]
+        
+        # Remove from servers
         del self._servers[server_id]
-        self._build_category_index()
         return True
     
-    def _create_default_registry(self) -> None:
-        """Create default registry with core servers."""
-        default_servers = {
-            "filesystem": {
-                "name": "Filesystem MCP Server",
-                "description": "Access local filesystem operations",
-                "category": ["filesystem", "local", "core"],
-                "author": "Anthropic",
-                "repository": "https://github.com/anthropics/mcp-server-filesystem",
-                "documentation": "https://docs.anthropic.com/mcp/servers/filesystem",
-                "versions": {
-                    "latest": "1.0.0",
-                    "supported": ["1.0.0"]
-                },
-                "installation": {
-                    "method": "npm",
-                    "package": "@anthropic/mcp-server-filesystem",
-                    "system_dependencies": [],
-                    "python_dependencies": []
-                },
-                "configuration": {
-                    "template": "filesystem_template.json",
-                    "required_params": ["root_path"],
-                    "optional_params": ["allowed_extensions"]
-                },
-                "capabilities": ["file_operations", "directory_listing"],
-                "platforms": ["linux", "darwin", "windows"],
-                "license": "MIT"
-            },
-            "sqlite": {
-                "name": "SQLite MCP Server",
-                "description": "SQLite database operations",
-                "category": ["database", "sqlite", "core"],
-                "author": "Anthropic",
-                "repository": "https://github.com/anthropics/mcp-server-sqlite",
-                "documentation": "https://docs.anthropic.com/mcp/servers/sqlite",
-                "versions": {
-                    "latest": "1.0.0",
-                    "supported": ["1.0.0"]
-                },
-                "installation": {
-                    "method": "npm",
-                    "package": "@anthropic/mcp-server-sqlite",
-                    "system_dependencies": [],
-                    "python_dependencies": []
-                },
-                "configuration": {
-                    "template": "sqlite_template.json",
-                    "required_params": ["database_path"],
-                    "optional_params": ["readonly"]
-                },
-                "capabilities": ["database_operations", "sql_queries"],
-                "platforms": ["linux", "darwin", "windows"],
-                "license": "MIT"
-            }
-        }
-        
-        registry_data = {
-            "version": "1.0.0",
-            "updated": "2025-01-01T00:00:00Z",
-            "servers": default_servers
-        }
-        
-        # Ensure directory exists
-        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(self.registry_path, 'w', encoding='utf-8') as f:
-            if self.registry_path.suffix.lower() in ['.yaml', '.yml']:
-                yaml.dump(registry_data, f, default_flow_style=False, sort_keys=False, indent=2)
-            else:
-                json.dump(registry_data, f, indent=2, default=str)
-    
-    def _build_category_index(self) -> None:
-        """Build category index for faster lookups."""
-        self._categories = {}
-        for server in self._servers.values():
-            for category in server.category:
-                if category not in self._categories:
-                    self._categories[category] = []
-                self._categories[category].append(server.id)
-    
-    def _ensure_loaded(self) -> None:
-        """Ensure registry is loaded."""
-        if not self._loaded:
-            self.load_registry()
-    
-    def get_server(self, server_id: str) -> Optional[MCPServer]:
-        """Get server by ID.
+    def save_registry(self, format_type: str = "json") -> bool:
+        """Save registry to file.
         
         Args:
-            server_id: Server identifier
+            format_type: Format to save in ("json", "toml", "yaml")
             
         Returns:
-            MCPServer instance or None if not found
-        """
-        self._ensure_loaded()
-        return self._servers.get(server_id)
-    
-    def list_servers(self, category: Optional[str] = None, platform: Optional[str] = None) -> List[MCPServer]:
-        """List available servers with optional filtering.
-        
-        Args:
-            category: Filter by category
-            platform: Filter by platform
-            
-        Returns:
-            List of matching servers
-        """
-        self._ensure_loaded()
-        servers = list(self._servers.values())
-        
-        if category:
-            servers = [s for s in servers if category in s.category]
-            
-        if platform:
-            servers = [s for s in servers if platform in s.platforms]
-            
-        return sorted(servers, key=lambda x: x.name)
-    
-    def search_servers(self, query: str) -> List[MCPServer]:
-        """Search servers by name, description, or capabilities.
-        
-        Args:
-            query: Search query string
-            
-        Returns:
-            List of matching servers
-        """
-        self._ensure_loaded()
-        query_lower = query.lower()
-        matches = []
-        
-        for server in self._servers.values():
-            # Check name
-            if query_lower in server.name.lower():
-                matches.append((server, 3))  # High priority for name matches
-                continue
-                
-            # Check description
-            if query_lower in server.description.lower():
-                matches.append((server, 2))  # Medium priority for description
-                continue
-                
-            # Check capabilities
-            if any(query_lower in cap.lower() for cap in server.capabilities):
-                matches.append((server, 1))  # Lower priority for capability matches
-                continue
-                
-            # Check categories
-            if any(query_lower in cat.lower() for cat in server.category):
-                matches.append((server, 1))
-        
-        # Sort by relevance (priority) and then by name
-        matches.sort(key=lambda x: (-x[1], x[0].name))
-        return [match[0] for match in matches]
-    
-    def get_categories(self) -> List[str]:
-        """Get all available categories.
-        
-        Returns:
-            Sorted list of category names
-        """
-        self._ensure_loaded()
-        return sorted(self._categories.keys())
-    
-    def get_servers_by_category(self, category: str) -> List[MCPServer]:
-        """Get all servers in a specific category.
-        
-        Args:
-            category: Category name
-            
-        Returns:
-            List of servers in the category
-        """
-        self._ensure_loaded()
-        if category not in self._categories:
-            return []
-            
-        server_ids = self._categories[category]
-        return [self._servers[sid] for sid in server_ids]
-    
-    async def update_registry(self) -> bool:
-        """Update registry from remote source.
-        
-        Returns:
-            True if update successful, False otherwise
+            True if successful, False otherwise
         """
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(self.registry_url, timeout=30.0)
-                response.raise_for_status()
-                
-                # Determine format from URL or content type
-                content_type = response.headers.get('content-type', '')
-                if 'yaml' in content_type or self.registry_url.endswith(('.yaml', '.yml')):
-                    data = yaml.safe_load(response.text)
-                else:
-                    data = response.json()
-                
-                # Validate the downloaded registry
-                if 'servers' in data:
-                    servers_data = data['servers']
-                    if isinstance(servers_data, dict):
-                        for server_id, server_data in servers_data.items():
-                            server_data['id'] = server_id
-                            MCPServer(**server_data)  # Validate
-                    elif isinstance(servers_data, list):
-                        for server_data in servers_data:
-                            MCPServer(**server_data)  # Validate
-                
-                # Backup current registry
-                backup_path = self.registry_path.with_suffix('.backup')
-                if self.registry_path.exists():
-                    import shutil
-                    shutil.copy2(self.registry_path, backup_path)
-                
-                # Write new registry
-                with open(self.registry_path, 'w', encoding='utf-8') as f:
-                    if self.registry_path.suffix.lower() in ['.yaml', '.yml']:
-                        yaml.dump(data, f, default_flow_style=False, sort_keys=False, indent=2)
-                    else:
-                        json.dump(data, f, indent=2, default=str)
-                
-                # Reload the registry
-                self.load_registry()
-                return True
-                
-        except (httpx.RequestError, httpx.HTTPStatusError, json.JSONDecodeError, yaml.YAMLError, ValueError):
+            # Ensure directory exists
+            self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            if format_type == "toml":
+                return self._save_toml_registry()
+            elif format_type == "yaml":
+                return self._save_yaml_registry()
+            else:
+                return self._save_json_registry()
+        except Exception as e:
+            print(f"Error saving registry: {e}")
             return False
     
-    def validate_server(self, server: MCPServer) -> Tuple[bool, List[str]]:
-        """Validate a single server for comprehensive correctness.
-        
-        Args:
-            server: Server to validate
+    def _save_json_registry(self) -> bool:
+        """Save registry in JSON format."""
+        try:
+            registry_data = {
+                "metadata": {
+                    "version": "1.0.0",
+                    "description": "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers"
+                },
+                "servers": {}
+            }
             
-        Returns:
-            Tuple of (is_valid, error_messages)
-        """
-        errors = []
-        
-        # Validate server ID
-        if not validate_server_id(server.id):
-            errors.append(f"Invalid server ID format: '{server.id}'. Must be lowercase alphanumeric with hyphens/underscores.")
-        
-        # Validate required fields are not empty/None
-        if not server.name or not server.name.strip():
-            errors.append("Server name cannot be empty")
-        elif len(server.name) > 100:
-            errors.append("Server name too long (max 100 characters)")
-        
-        if not server.description or not server.description.strip():
-            errors.append("Server description cannot be empty")
-        elif len(server.description) > 500:
-            errors.append("Server description too long (max 500 characters)")
-        
-        if not server.author or not server.author.strip():
-            errors.append("Server author cannot be empty")
-        elif len(server.author) > 100:
-            errors.append("Server author too long (max 100 characters)")
-        
-        # Validate installation configuration
-        if not server.installation.package or not server.installation.package.strip():
-            errors.append("Installation package cannot be empty")
-        elif not validate_package_name(server.installation.package, server.installation.method):
-            errors.append(f"Invalid package name '{server.installation.package}' for method '{server.installation.method}'")
-        
-        # Validate installation method
-        valid_methods = ["npm", "pip", "git"]
-        if server.installation.method not in valid_methods:
-            errors.append(f"Invalid installation method '{server.installation.method}'. Must be one of: {', '.join(valid_methods)}")
-        
-        # Validate version information
-        if not validate_version(server.versions.latest):
-            errors.append(f"Invalid latest version format: '{server.versions.latest}'")
-        
-        for version in server.versions.supported:
-            if not validate_version(version):
-                errors.append(f"Invalid supported version format: '{version}'")
-        
-        # Validate platforms
-        valid_platforms = ["linux", "darwin", "windows"]
-        if not server.platforms:
-            errors.append("At least one platform must be specified")
-        else:
-            invalid_platforms = [p for p in server.platforms if p not in valid_platforms]
-            if invalid_platforms:
-                errors.append(f"Invalid platforms: {', '.join(invalid_platforms)}. Valid platforms: {', '.join(valid_platforms)}")
-        
-        # Validate license
-        if not validate_license(server.license):
-            errors.append(f"Invalid license format: '{server.license}'")
-        
-        # Validate URLs if present
-        if server.repository and not validate_url(str(server.repository)):
-            errors.append(f"Invalid repository URL: '{server.repository}'")
-        
-        if server.documentation and not validate_url(str(server.documentation)):
-            errors.append(f"Invalid documentation URL: '{server.documentation}'")
-        
-        # Validate categories
-        if not server.category:
-            errors.append("At least one category must be specified")
-        else:
-            for category in server.category:
-                if not category or not category.strip():
-                    errors.append("Category names cannot be empty")
-                elif len(category) > 50:
-                    errors.append(f"Category name too long: '{category}' (max 50 characters)")
-        
-        # Validate capabilities
-        for capability in server.capabilities:
-            if not capability or not capability.strip():
-                errors.append("Capability names cannot be empty")
-            elif len(capability) > 100:
-                errors.append(f"Capability name too long: '{capability}' (max 100 characters)")
-        
-        # Validate system dependencies
-        for dep in server.installation.system_dependencies:
-            if not dep or not dep.strip():
-                errors.append("System dependency names cannot be empty")
-            elif len(dep) > 100:
-                errors.append(f"System dependency name too long: '{dep}' (max 100 characters)")
-        
-        # Validate python dependencies
-        for dep in server.installation.python_dependencies:
-            if not dep or not dep.strip():
-                errors.append("Python dependency names cannot be empty")
-            elif not validate_package_name(dep, "pip"):
-                errors.append(f"Invalid Python dependency name: '{dep}'")
-        
-        # Validate configuration parameters
-        for param in server.configuration.required_params:
-            if not param or not param.strip():
-                errors.append("Required parameter names cannot be empty")
-            elif len(param) > 100:
-                errors.append(f"Required parameter name too long: '{param}' (max 100 characters)")
-        
-        for param in server.configuration.optional_params:
-            if not param or not param.strip():
-                errors.append("Optional parameter names cannot be empty")
-            elif len(param) > 100:
-                errors.append(f"Optional parameter name too long: '{param}' (max 100 characters)")
-        
-        return len(errors) == 0, errors
+            for server_id, server in self._servers.items():
+                server_data = server.model_dump()
+                # Remove the ID from the data since it's the key
+                server_data.pop('id', None)
+                registry_data["servers"][server_id] = server_data
+            
+            with open(self.registry_path, 'w', encoding='utf-8') as f:
+                json.dump(registry_data, f, indent=2, ensure_ascii=False)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving JSON registry: {e}")
+            return False
     
-    def validate_registry(self) -> List[str]:
-        """Validate the current registry for errors.
-        
-        Returns:
-            List of validation error messages
-        """
-        errors = []
-        self._ensure_loaded()
-        
-        for server_id, server in self._servers.items():
-            # Check for duplicate IDs (shouldn't happen with dict, but good to verify)
-            if server.id != server_id:
-                errors.append(f"Server ID mismatch: {server_id} != {server.id}")
+    def _save_toml_registry(self) -> bool:
+        """Save registry in TOML format."""
+        try:
+            registry_data = {
+                "metadata": {
+                    "version": "1.0.0",
+                    "description": "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers"
+                },
+                "servers": {}
+            }
             
-            # Validate each server comprehensively
-            is_valid, server_errors = self.validate_server(server)
-            if not is_valid:
-                for error in server_errors:
-                    errors.append(f"Server {server_id}: {error}")
-        
-        return errors
+            for server_id, server in self._servers.items():
+                server_data = server.model_dump()
+                # Remove the ID from the data since it's the key
+                server_data.pop('id', None)
+                registry_data["servers"][server_id] = server_data
+            
+            toml_path = self.registry_path.with_suffix('.toml')
+            with open(toml_path, 'w', encoding='utf-8') as f:
+                toml.dump(registry_data, f)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving TOML registry: {e}")
+            return False
+    
+    def _save_yaml_registry(self) -> bool:
+        """Save registry in YAML format."""
+        try:
+            registry_data = {
+                "metadata": {
+                    "version": "1.0.0",
+                    "description": "MCP Server Registry - Comprehensive catalog of Model Context Protocol servers"
+                },
+                "servers": {}
+            }
+            
+            for server_id, server in self._servers.items():
+                server_data = server.model_dump()
+                # Remove the ID from the data since it's the key
+                server_data.pop('id', None)
+                registry_data["servers"][server_id] = server_data
+            
+            yaml_path = self.registry_path.with_suffix('.yaml')
+            with open(yaml_path, 'w', encoding='utf-8') as f:
+                yaml.dump(registry_data, f, default_flow_style=False, allow_unicode=True)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving YAML registry: {e}")
+            return False
+    
+    def update_registry(self) -> bool:
+        """Update registry from remote source (placeholder for future implementation)."""
+        # This would fetch updates from a remote registry
+        # For now, just return True as a no-op
+        return True

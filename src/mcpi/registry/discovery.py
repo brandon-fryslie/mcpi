@@ -5,6 +5,23 @@ from typing import List, Optional, Dict, Any
 from mcpi.registry.catalog import MCPServer, Platform
 
 
+# Constants
+ESSENTIAL_CATEGORIES = ["filesystem", "database", "development"]
+SERVERS_PER_CATEGORY = 2
+DEFAULT_RECOMMENDATION_LIMIT = 5
+
+# Complexity scoring constants
+COMPLEXITY_MEDIUM_THRESHOLD = 3
+COMPLEXITY_LOW = "low"
+COMPLEXITY_MEDIUM = "medium"
+COMPLEXITY_HIGH = "high"
+
+# Recommendation scoring constants
+CATEGORY_MATCH_SCORE = 3
+CAPABILITY_MATCH_SCORE = 2
+DESCRIPTION_MATCH_SCORE = 1
+
+
 class ServerDiscovery:
     """Utilities for discovering and filtering MCP servers."""
     
@@ -80,7 +97,7 @@ class ServerDiscovery:
     def get_server_recommendations(
         servers: List[MCPServer], 
         use_case: Optional[str] = None,
-        limit: int = 5
+        limit: int = DEFAULT_RECOMMENDATION_LIMIT
     ) -> List[MCPServer]:
         """Get server recommendations based on use case.
         
@@ -94,16 +111,15 @@ class ServerDiscovery:
         """
         if not use_case:
             # Return most popular/essential servers
-            essential_categories = ["filesystem", "database", "development"]
             recommendations = []
             
-            for category in essential_categories:
+            for category in ESSENTIAL_CATEGORIES:
                 category_servers = [
                     s for s in servers 
                     if category in s.category and ServerDiscovery.is_platform_compatible(s)
                 ]
                 if category_servers:
-                    recommendations.extend(category_servers[:2])  # Top 2 from each category
+                    recommendations.extend(category_servers[:SERVERS_PER_CATEGORY])
                     
             return recommendations[:limit]
         
@@ -115,19 +131,19 @@ class ServerDiscovery:
         for server in servers:
             if any(cat.lower() in use_case_lower for cat in server.category):
                 if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, 3))  # High score
+                    recommendations.append((server, CATEGORY_MATCH_SCORE))
         
         # Capability matches
         for server in servers:
             if any(cap.lower() in use_case_lower for cap in server.capabilities):
                 if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, 2))  # Medium score
+                    recommendations.append((server, CAPABILITY_MATCH_SCORE))
         
         # Description matches
         for server in servers:
             if any(word in server.description.lower() for word in use_case_lower.split()):
                 if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, 1))  # Low score
+                    recommendations.append((server, DESCRIPTION_MATCH_SCORE))
         
         # Remove duplicates and sort by score
         seen_ids = set()
@@ -157,10 +173,10 @@ class ServerDiscovery:
             "has_python_dependencies": bool(server.installation.python_dependencies),
             "python_dependencies": server.installation.python_dependencies,
             "requires_configuration": bool(server.configuration.required_params),
-            "complexity": "low"
+            "complexity": COMPLEXITY_LOW
         }
         
-        # Determine complexity
+        # Determine complexity based on total dependency count
         complexity_score = 0
         if analysis["has_system_dependencies"]:
             complexity_score += len(server.installation.system_dependencies)
@@ -170,10 +186,10 @@ class ServerDiscovery:
             complexity_score += len(server.configuration.required_params)
         
         if complexity_score == 0:
-            analysis["complexity"] = "low"
-        elif complexity_score <= 3:
-            analysis["complexity"] = "medium"
+            analysis["complexity"] = COMPLEXITY_LOW
+        elif complexity_score <= COMPLEXITY_MEDIUM_THRESHOLD:
+            analysis["complexity"] = COMPLEXITY_MEDIUM
         else:
-            analysis["complexity"] = "high"
+            analysis["complexity"] = COMPLEXITY_HIGH
         
         return analysis

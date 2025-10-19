@@ -1,257 +1,124 @@
 # CLAUDE.md
 
-## Project Setup Detection
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**PRIORITY CHECK**: If `PROJECT_SETUP.md` exists in the project root, IMMEDIATELY begin the interactive project setup wizard defined in that file. Do not proceed with any other tasks until the wizard is complete and the file is deleted.
+## Development Commands
 
-## Agent Workflow Overview
+### Environment Setup
+```bash
+# Development installation
+uv sync
+source .venv/bin/activate
 
-Repeat until `.agent_planning/TODO.md` or initiative-specific TODO.md files are empty:
-
-1. Plan → `/plan-next-step` selects highest-priority backlog task.
-2. Implement → `/implement-item` implements selected task.
-3. Test → `/retest` runs tests, identifies and fixes regressions.
-4. Refactor → `/refactor` simplifies code, improves tests, reduces complexity.
-5. Validate UX → `/validate-ux` ensures intuitive documented user flows.
-6. Track → `/status` updates project STATUS.md and repository-level milestones.
-
-Switch to Stabilization Mode if stability KPI falls below threshold:
-- Prioritize regression fixes, test failures, and complexity reduction.
-
-## Requirements Analysis Protocol
-
-**CRITICAL**: Before implementing any feature request, ALWAYS follow this protocol to prevent requirements misalignment:
-
-### 1. Requirements Conflict Detection
-When encountering a request, check for these common conflict patterns:
-
-**Pattern A: Existing vs. Specified**
-- User says: "implement [feature]" or "make [component] functional"
-- Existing code already exists for that component
-- **STOP**: Existing code may use different architecture/approach than what's actually wanted
-
-**Pattern B: General vs. Specific**
-- Requirements contain both vague language ("make it functional") AND detailed technical specs
-- **STOP**: These often represent different approaches
-
-**Pattern C: Technology Stack Mismatches**
-- Existing code uses one tech stack (custom CSS, vanilla JS)
-- Requirements specify different tech stack (Tailwind, specific libraries)
-- **STOP**: Don't substitute technologies without explicit permission
-
-### 2. Mandatory Clarification Questions
-When ANY of the above patterns detected, MUST ask before proceeding:
-
-```
-I see [specific conflict]. Before implementing, I need to clarify:
-
-Option A: Enhance existing [component] with [current approach]
-Option B: Replace with [specified requirements approach]
-
-Which approach should I take?
-
-Also, I notice [technology/architecture differences]. Should I:
-- Use existing [current tech] OR specified [required tech]?
-- Keep existing positioning/layout OR implement exact specifications?
+# Install development dependencies
+uv sync --dev
 ```
 
-### 3. Specification Priority Rules
-When detailed technical specifications exist:
+### Testing
+```bash
+# Run all tests
+pytest
 
-1. **Specifications are AUTHORITATIVE** - implement exactly as written
-2. **Don't rationalize alternatives** - follow specs even if existing code seems "better"
-3. **Don't add enhancements** during initial implementation
-4. **Match ALL specified technologies** - don't substitute
+# Run with coverage
+pytest --cov=src/mcpi
 
-### 4. Implementation Validation Checkpoints
-Before major implementation decisions:
+# Run specific test file
+pytest tests/test_registry.py
 
-```
-CHECKPOINT 1 - Requirements Understanding:
-"Based on specs, I understand you want [X]. Is this correct?"
-
-CHECKPOINT 2 - Approach Clarification:
-"I see existing code does [Y], but specs call for [X]. Should I replace existing?"
-
-CHECKPOINT 3 - Technology Stack:
-"Requirements specify [tech stack]. Should I use this instead of existing [other stack]?"
+# Run tests with verbose output
+pytest -v
 ```
 
-### 5. User Prompting Guidance
-Help users provide clearer requirements by suggesting:
+### Code Quality
+```bash
+# Format code
+black src/ tests/
 
-**When user says "make X functional":**
-```
-I see X exists but isn't working as expected. To help me understand what you need:
+# Lint code
+ruff check src/ tests/ --fix
 
-- Should I enhance the existing X approach?
-- Or do you have specific requirements for how X should work?
-- Are there any technical constraints (positioning, technologies, etc.)?
-```
+# Type checking
+mypy src/
 
-**When user provides detailed specs:**
-```
-I see detailed technical specifications. To confirm:
-- These specifications should be followed exactly? 
-- Should I replace any existing similar functionality?
-- Are the specified technologies (CSS framework, libraries) required?
+# Run all quality checks
+black src/ tests/ && ruff check src/ tests/ --fix && mypy src/
 ```
 
-### 6. Implementation Order - Spec Compliance First
+### Application Commands
+```bash
+# Run the CLI tool
+python -m mcpi.cli --help
 
-**ALWAYS follow this sequence**:
-
-1. **Minimal Viable Specification**: Build exactly what's specified, nothing more
-2. **Validation**: Confirm with user that basic spec is met
-3. **Enhancement**: Only add features if explicitly requested
-
-**Never assume** that additional features are wanted, even if they seem "obviously useful."
-
-### 7. Recognizing User Intent Mismatches
-
-**Red Flags that indicate user might not realize they're requesting different approaches:**
-
-- User says "make functional" but existing code is partially functional
-- User provides detailed specs but doesn't explicitly say "replace existing"
-- User asks for "refinement" but specs describe completely different architecture
-- User doesn't mention existing code when requesting features
-
-**Response**: Explicitly surface the potential mismatch rather than making assumptions.
-
-### 8. Debugging Communication Failures
-
-**When user says implementation is wrong, immediately check:**
-
-1. **Did I follow specifications exactly?** (Most common failure)
-2. **Did I ask clarifying questions when conflicts were detected?**
-3. **Did I assume enhancements were wanted?**
-4. **Did I substitute technologies without permission?**
-5. **Did I prioritize existing code over specifications?**
-
-**Recovery Process:**
-1. Acknowledge the specific mismatch
-2. Explain why the wrong choice was made
-3. Offer to implement the correct solution
-4. Update CLAUDE.md with lessons learned
-
-### 9. User Education - Helping Users Give Better Requirements
-
-**Proactively help users by:**
-
-- Identifying when requirements are ambiguous
-- Suggesting more specific language
-- Pointing out potential conflicts between existing code and new requirements
-- Offering templates for common request types
-
-**Example Helpful Response:**
-```
-I notice you want to "implement the log panel." I see existing LogsBar code and detailed specifications in PROJECT.md. 
-
-To ensure I build what you actually want:
-- Should I enhance the existing LogsBar approach?
-- Or implement the fixed-bottom panel specified in PROJECT.md?
-
-The two approaches have different positioning, technology stacks, and user interactions.
+# Or use the installed script
+mcpi --help
 ```
 
-## Repository-Level Files
+## Project Architecture
 
-- `PROJECT.md`: HIGH LEVEL architecture, goals, dependencies for the entire project.
-- `.agent_planning/BACKLOG.md`: Project roadmap (names/descriptions only).
-- `.agent_planning/TODO.md`: Active TODO list
-- `.agent_planning/PROGRESS.md`: Cross-project milestones, stability metrics, architectural health.
-- `.agent_planning/DEPRECATED.md`: Auto-updated list of deprecated components.
+MCPI (Model Context Protocol Interface) is a command-line tool and Python library for managing MCP servers. The architecture follows a modular design with clear separation of concerns:
 
-## Initiative-Level Files (`.agent_planning/initiatives/<initiative>/`)
+### Core Modules
 
-- `PROJECT.md`: Goals, features, requirements for a single initiative
-- `BACKLOG.md`: Story backlog.
-- `TODO.md`: Task backlog.
-- `STATUS.md`: Completion log, notes, test results, complexity metrics.
-- `RFCs.md`: when work is completed, update RFCs.md with architectural designs for future reference.
+**Registry System (`mcpi.registry/`)**
+- `catalog.py`: Server catalog management with Pydantic models (MCPServer, InstallationConfig)
+- `discovery.py`: Server discovery and search functionality
+- `doc_parser.py`: Documentation parsing and extraction
+- `validation.py`: Registry data validation
 
-**CRITICAL**: When creating new initiatives, ALWAYS copy from `.agent_planning/initiatives/_template` and modify the copy. NEVER modify files in the `_template` directory directly.
+**Installation Engine (`mcpi.installer/`)**
+- `base.py`: Abstract base installer with InstallationResult dataclass
+- `claude_code.py`: Claude Code-specific installer (primary target)
+- `npm.py`: NPM package installer
+- `python.py`: Python/pip package installer  
+- `git.py`: Git repository installer
 
-Clean up low level details after completion of work. Save important info in RFCs and a summary in STATUS.md.
+**Configuration Management (`mcpi.config/`)**
+- `manager.py`: Main ConfigManager class with profile support
+- `profiles.py`: Profile creation and switching
+- `templates.py`: Configuration templates and validation
 
-## Extended Loop Automation & Self-Correction
+**CLI Interface (`mcpi.cli`)**
+- Click-based command structure with lazy initialization
+- Rich console output for enhanced user experience
+- Commands organized by: discovery (list, search, info), installation (install, uninstall, update), management (status, config)
 
-Automated "Signal Collector" generates backlog tasks:
+### Key Design Patterns
 
-- **Test & Stability Monitoring**
-    - Runs pytest suite, logs failures, flags recurring issues.
+**Lazy Initialization**: CLI uses lazy loading for ServerCatalog and ConfigManager to improve startup performance
 
-- **Dead-Code & Deprecation Detection**
-    - Detect unused/deprecated code; updates DEPRECATED.md.
+**Enum-based Configuration**: Uses Pydantic enums for InstallationMethod, Platform, and InstallationStatus to ensure type safety
 
-- **Documentation Drift Detection**
-    - Detect mismatches between documentation and implementation.
+**Profile-based Configuration**: Supports multiple configuration profiles for different environments (development, production)
 
-- **Telemetry-Based UX Monitoring**
-    - Analyze usage/error logs; flags underused/confusing features.
+**Template System**: Pre-built configuration templates for common MCP server setups
 
-- **Architectural Integrity Tests**
-    - Verify defined architectural boundaries.
+### Data Flow
 
-## Priority Escalation Rules
+1. **Registry Loading**: JSON/YAML registry files loaded into Pydantic models
+2. **Server Discovery**: Search and filtering through catalog metadata
+3. **Installation**: Method-specific installers handle package management
+4. **Configuration**: Profile-aware config management updates target tool configs
+5. **Validation**: Multi-layer validation from Pydantic models to custom validators
 
-- Tasks failing ≥3 cycles escalate to high priority.
-- Stabilization Mode triggered by KPI thresholds:
-    - Test pass rate < 95%
-    - UX violations detected
-    - Complexity trends negatively
+### Configuration Structure
 
-## Testing & Quality Assurance Standards
+The project uses TOML configuration with profile support:
+- Default profile targets Claude Code (`~/.claude/mcp_servers.json`)
+- Support for generic MCP clients
+- Platform-specific path resolution (Darwin, Linux, Windows)
 
-- Behavior-driven tests auto-generated from documentation.
-- Use pytest with parameterization and fixtures.
-- Integration tests confirm realistic interactions.
-- No tautological mocks.
+### Testing Strategy
 
-Follow `.agent_planning/TESTING.md` for execution instructions if it exists.
+Comprehensive test suite with:
+- Unit tests for each module
+- Integration tests for installation workflows
+- Mock-based testing for external dependencies
+- Coverage reporting with 95% target minimum
 
-## Python Environment Management
+### Key Dependencies
 
-- Use `uv` for virtual environments and dependency management.
-- Explicitly use `python3`.
-- Activate via `source .venv/bin/activate`.
-
-## Simulated Functionality Rule
-
-- Placeholder functionality permitted for scaffolding only.
-- Replace with production implementations before marking complete.
-- Flag any "Simulated" or "TODO: implement" code as incomplete.
-
-## Fake Demo Data Prohibition
-
-**NEVER create fake demo data for production features:**
-
-- ❌ **Prohibited**: Fake sample logs, mock API responses, dummy data arrays
-- ❌ **Prohibited**: setTimeout intervals generating fake data
-- ❌ **Prohibited**: Hardcoded sample content for real application features
-- ✅ **Required**: Use actual application data sources
-- ✅ **Required**: Integrate with existing backend APIs and data flows
-- ✅ **Required**: If no data exists, show proper empty states
-
-**Examples of violations:**
-```typescript
-// ❌ WRONG - Fake demo data
-const [logs, setLogs] = useState(['Sample log 1', 'Sample log 2']);
-setInterval(() => addLog('Fake message'), 5000);
-
-// ✅ CORRECT - Real data sources  
-const logs = useBackendLogs(); // From actual backend
-const logs = applicationState.logEntries; // From real app state
-```
-
-**When implementing features that display data:**
-1. Identify the real data source first
-2. If data source doesn't exist, create it properly
-3. Connect to actual backend APIs or application state
-4. Show appropriate loading/empty states for real scenarios
-
-## Code Quality Standards
-
-Refer to `.agent_planning/CONVENTIONS.md`.
-
-## Directory Structure
+- **Pydantic**: Data validation and settings management
+- **Click**: CLI framework with rich help system
+- **Rich**: Enhanced console output and tables
+- **httpx**: Async HTTP client for registry updates
+- **platformdirs**: Cross-platform directory management
