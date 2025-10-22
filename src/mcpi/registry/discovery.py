@@ -1,195 +1,140 @@
 """MCP server discovery utilities."""
 
-import platform
 from typing import List, Optional, Dict, Any
-from mcpi.registry.catalog import MCPServer, Platform
-
-
-# Constants
-ESSENTIAL_CATEGORIES = ["filesystem", "database", "development"]
-SERVERS_PER_CATEGORY = 2
-DEFAULT_RECOMMENDATION_LIMIT = 5
-
-# Complexity scoring constants
-COMPLEXITY_MEDIUM_THRESHOLD = 3
-COMPLEXITY_LOW = "low"
-COMPLEXITY_MEDIUM = "medium"
-COMPLEXITY_HIGH = "high"
-
-# Recommendation scoring constants
-CATEGORY_MATCH_SCORE = 3
-CAPABILITY_MATCH_SCORE = 2
-DESCRIPTION_MATCH_SCORE = 1
+from mcpi.registry.catalog import MCPServer, ServerCatalog
 
 
 class ServerDiscovery:
     """Utilities for discovering and filtering MCP servers."""
     
-    @staticmethod
-    def get_current_platform() -> Platform:
-        """Get the current platform.
-        
-        Returns:
-            Platform enum value for current system
-        """
-        system = platform.system().lower()
-        
-        if system == "linux":
-            return Platform.LINUX
-        elif system == "darwin":
-            return Platform.DARWIN
-        elif system == "windows":
-            return Platform.WINDOWS
-        else:
-            # Default to Linux for unknown platforms
-            return Platform.LINUX
-    
-    @staticmethod
-    def is_platform_compatible(server: MCPServer) -> bool:
-        """Check if server is compatible with current platform.
+    def __init__(self, catalog: Optional[ServerCatalog] = None):
+        """Initialize discovery with a catalog.
         
         Args:
-            server: MCP server to check
-            
-        Returns:
-            True if compatible, False otherwise
+            catalog: Optional ServerCatalog instance
         """
-        current_platform = ServerDiscovery.get_current_platform()
-        return current_platform in server.platforms
+        self.catalog = catalog or ServerCatalog()
+        if not self.catalog._loaded:
+            self.catalog.load_registry()
     
-    @staticmethod
-    def filter_compatible_servers(servers: List[MCPServer]) -> List[MCPServer]:
-        """Filter servers compatible with current platform.
+    def get_verified_servers(self) -> List[MCPServer]:
+        """Get all verified servers.
+        
+        Returns:
+            List of verified servers
+        """
+        return self.catalog.list_servers(verified_only=True)
+    
+    def get_servers_by_category(self, category: str) -> List[MCPServer]:
+        """Get servers in a specific category.
         
         Args:
-            servers: List of servers to filter
+            category: Category name
             
         Returns:
-            List of compatible servers
+            List of servers in the category
         """
-        return [s for s in servers if ServerDiscovery.is_platform_compatible(s)]
+        return self.catalog.list_servers(category=category)
     
-    @staticmethod
-    def group_servers_by_category(servers: List[MCPServer]) -> Dict[str, List[MCPServer]]:
-        """Group servers by their categories.
+    def get_core_servers(self) -> List[MCPServer]:
+        """Get core/essential servers.
+        
+        Returns:
+            List of core servers
+        """
+        return self.catalog.list_servers(category="core")
+    
+    def search(self, query: str) -> List[MCPServer]:
+        """Search for servers.
         
         Args:
-            servers: List of servers to group
+            query: Search query
             
         Returns:
-            Dictionary mapping category names to server lists
+            List of matching servers
         """
-        categories: Dict[str, List[MCPServer]] = {}
-        
-        for server in servers:
-            for category in server.category:
-                if category not in categories:
-                    categories[category] = []
-                categories[category].append(server)
-        
-        # Sort servers within each category
-        for category in categories:
-            categories[category].sort(key=lambda x: x.name)
-        
-        return categories
+        return self.catalog.search_servers(query)
     
-    @staticmethod
-    def get_server_recommendations(
-        servers: List[MCPServer], 
-        use_case: Optional[str] = None,
-        limit: int = DEFAULT_RECOMMENDATION_LIMIT
-    ) -> List[MCPServer]:
+    def get_recommendations(self, use_case: Optional[str] = None) -> List[MCPServer]:
         """Get server recommendations based on use case.
         
         Args:
-            servers: Available servers to choose from
-            use_case: Use case description for recommendations
-            limit: Maximum number of recommendations
+            use_case: Optional use case description
             
         Returns:
             List of recommended servers
         """
         if not use_case:
-            # Return most popular/essential servers
-            recommendations = []
-            
-            for category in ESSENTIAL_CATEGORIES:
-                category_servers = [
-                    s for s in servers 
-                    if category in s.category and ServerDiscovery.is_platform_compatible(s)
-                ]
-                if category_servers:
-                    recommendations.extend(category_servers[:SERVERS_PER_CATEGORY])
-                    
-            return recommendations[:limit]
+            # Return verified core servers as default recommendations
+            return self.get_verified_servers()[:5]
         
-        # Simple keyword-based recommendations
-        use_case_lower = use_case.lower()
-        recommendations = []
+        # Search for servers matching the use case
+        results = self.search(use_case)
         
-        # Direct category matches
-        for server in servers:
-            if any(cat.lower() in use_case_lower for cat in server.category):
-                if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, CATEGORY_MATCH_SCORE))
+        # Prioritize verified servers
+        verified = [s for s in results if s.verified]
+        unverified = [s for s in results if not s.verified]
         
-        # Capability matches
-        for server in servers:
-            if any(cap.lower() in use_case_lower for cap in server.capabilities):
-                if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, CAPABILITY_MATCH_SCORE))
-        
-        # Description matches
-        for server in servers:
-            if any(word in server.description.lower() for word in use_case_lower.split()):
-                if ServerDiscovery.is_platform_compatible(server):
-                    recommendations.append((server, DESCRIPTION_MATCH_SCORE))
-        
-        # Remove duplicates and sort by score
-        seen_ids = set()
-        unique_recommendations = []
-        for server, score in recommendations:
-            if server.id not in seen_ids:
-                unique_recommendations.append((server, score))
-                seen_ids.add(server.id)
-        
-        unique_recommendations.sort(key=lambda x: (-x[1], x[0].name))
-        return [rec[0] for rec in unique_recommendations[:limit]]
+        return (verified + unverified)[:5]
     
-    @staticmethod
-    def analyze_server_dependencies(server: MCPServer) -> Dict[str, Any]:
-        """Analyze server dependencies and requirements.
+    def get_categories(self) -> List[str]:
+        """Get all available categories.
+        
+        Returns:
+            List of category names
+        """
+        categories = set()
+        for server in self.catalog.list_servers():
+            categories.update(server.categories)
+        return sorted(categories)
+    
+    def get_server_info(self, server_id: str) -> Optional[MCPServer]:
+        """Get detailed information about a server.
         
         Args:
-            server: Server to analyze
+            server_id: Server ID
             
         Returns:
-            Dictionary with dependency analysis
+            Server information or None if not found
         """
-        analysis = {
-            "installation_method": server.installation.method,
-            "has_system_dependencies": bool(server.installation.system_dependencies),
-            "system_dependencies": server.installation.system_dependencies,
-            "has_python_dependencies": bool(server.installation.python_dependencies),
-            "python_dependencies": server.installation.python_dependencies,
-            "requires_configuration": bool(server.configuration.required_params),
-            "complexity": COMPLEXITY_LOW
-        }
+        return self.catalog.get_server(server_id)
+    
+    def group_by_category(self) -> Dict[str, List[MCPServer]]:
+        """Group all servers by their categories.
         
-        # Determine complexity based on total dependency count
-        complexity_score = 0
-        if analysis["has_system_dependencies"]:
-            complexity_score += len(server.installation.system_dependencies)
-        if analysis["has_python_dependencies"]:
-            complexity_score += len(server.installation.python_dependencies)
-        if analysis["requires_configuration"]:
-            complexity_score += len(server.configuration.required_params)
+        Returns:
+            Dictionary mapping category names to server lists
+        """
+        grouped: Dict[str, List[MCPServer]] = {}
         
-        if complexity_score == 0:
-            analysis["complexity"] = COMPLEXITY_LOW
-        elif complexity_score <= COMPLEXITY_MEDIUM_THRESHOLD:
-            analysis["complexity"] = COMPLEXITY_MEDIUM
-        else:
-            analysis["complexity"] = COMPLEXITY_HIGH
+        for server in self.catalog.list_servers():
+            for category in server.categories:
+                if category not in grouped:
+                    grouped[category] = []
+                grouped[category].append(server)
         
-        return analysis
+        # Sort servers within each category
+        for category in grouped:
+            grouped[category].sort(key=lambda x: (not x.verified, x.name))
+        
+        return grouped
+    
+    def get_installation_command(self, server_id: str, config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Get the installation command for a server.
+        
+        Args:
+            server_id: Server ID
+            config: Optional configuration parameters
+            
+        Returns:
+            Installation command dict or None if server not found
+        """
+        server = self.catalog.get_server(server_id)
+        if not server:
+            return None
+        
+        try:
+            return server.get_run_command(config)
+        except ValueError as e:
+            # Missing required config
+            return None

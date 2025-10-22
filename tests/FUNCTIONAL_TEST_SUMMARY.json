@@ -1,0 +1,159 @@
+{
+  "test_file": "tests/test_functional_rescope_prerequisites.py",
+  "tests_added": [
+    "test_get_server_config_api_exists_on_scope_handler",
+    "test_get_server_config_returns_full_config_dict",
+    "test_get_server_config_raises_error_on_missing_server",
+    "test_get_server_config_works_across_all_scope_types",
+    "test_get_server_config_with_complex_config",
+    "test_cli_status_command_works",
+    "test_cli_list_shows_servers",
+    "test_cli_help_command_works",
+    "test_scope_handler_can_add_server_to_file",
+    "test_scope_handler_can_remove_server_from_file",
+    "test_rescope_command_exists_in_cli",
+    "test_rescope_moves_server_between_scopes_via_cli",
+    "test_rescope_preserves_complex_config_fields",
+    "test_rescope_rollback_on_failure"
+  ],
+  "total_tests": 14,
+  "test_status": {
+    "passing": 5,
+    "failing": 5,
+    "skipped": 4
+  },
+  "workflows_covered": [
+    "get_server_config() API existence and functionality",
+    "CLI status command execution",
+    "CLI list command execution",
+    "CLI help system",
+    "Scope handler add server operation",
+    "Scope handler remove server operation",
+    "Rescope command (TDD - future)",
+    "Rescope server move workflow (TDD - future)",
+    "Rescope config preservation (TDD - future)",
+    "Rescope rollback on failure (TDD - future)"
+  ],
+  "initial_status": {
+    "P0_2_get_server_config": "failing (expected - not implemented)",
+    "P0_4_core_cli": "passing (core workflows functional)",
+    "P1_1_rescope": "skipped (TDD approach - future feature)"
+  },
+  "gaming_resistance": "high",
+  "gaming_resistance_mechanisms": [
+    "Real CLI execution via subprocess (bin/mcpi)",
+    "Real file I/O operations with verification",
+    "Multiple side effect validation per test",
+    "Complete end-to-end workflow testing",
+    "Data equality checks (not just type checks)",
+    "Independent file reading for verification",
+    "Error path validation",
+    "No mocking of tested functionality"
+  ],
+  "status_gaps_addressed": [
+    "Missing get_server_config() method (STATUS line 27, 98-118)",
+    "Cannot verify CLI workflows (STATUS line 282-283)",
+    "Untested add/remove operations (STATUS line 283)",
+    "Rescope feature readiness: BLOCKED (STATUS line 15)"
+  ],
+  "plan_items_validated": [
+    "P0-2: Implement Missing get_server_config() API (5 tests)",
+    "P0-4: Validate core functionality works (5 tests)",
+    "P1-1: Rescope feature implementation (4 tests - TDD)"
+  ],
+  "traceability": {
+    "P0-2": {
+      "priority": "CRITICAL",
+      "status": "FAILING (expected)",
+      "tests": 5,
+      "blocks": "P1-1 rescope feature",
+      "status_reference": "STATUS-2025-10-21-225033.md line 27, 98-118",
+      "plan_reference": "PLAN-2025-10-21-225314.md P0-2"
+    },
+    "P0-4": {
+      "priority": "HIGH",
+      "status": "PASSING",
+      "tests": 5,
+      "validates": "Core CLI and scope operations functional",
+      "status_reference": "STATUS-2025-10-21-225033.md line 282-283",
+      "plan_reference": "PLAN-2025-10-21-225314.md P0-4"
+    },
+    "P1-1": {
+      "priority": "P1 (FUTURE)",
+      "status": "SKIPPED (TDD)",
+      "tests": 4,
+      "depends_on": "P0-2 completion",
+      "feature_spec": ".agent_planning/BACKLOG.md rescope feature",
+      "plan_reference": "PLAN-2025-10-21-225314.md P1-1"
+    }
+  },
+  "expected_progression": {
+    "phase_1_p0_2_implementation": {
+      "duration": "4 hours",
+      "action": "Implement ScopeHandler.get_server_config()",
+      "expected_result": "5 tests go from FAIL → PASS",
+      "coverage_impact": "Significant increase in scope handler coverage"
+    },
+    "phase_2_p1_1_implementation": {
+      "duration": "2-3 days",
+      "action": "Implement bin/mcpi rescope command",
+      "expected_result": "4 tests go from SKIP → PASS",
+      "coverage_impact": "Complete rescope feature validated"
+    },
+    "final_state": {
+      "total_tests": 14,
+      "passing": 14,
+      "failing": 0,
+      "skipped": 0,
+      "status": "All critical user workflows validated"
+    }
+  },
+  "test_design_principles": {
+    "tdd_approach": true,
+    "anti_gaming": true,
+    "real_workflows": true,
+    "multiple_assertions": true,
+    "file_based_validation": true,
+    "cli_subprocess_testing": true
+  },
+  "files_created": [
+    "tests/test_functional_rescope_prerequisites.py",
+    "tests/FUNCTIONAL_TESTS_README.md",
+    "tests/FUNCTIONAL_TEST_SUMMARY.json"
+  ],
+  "files_modified": [
+    "pyproject.toml (added 'tests' to pythonpath)"
+  ],
+  "next_steps": [
+    "Implement ScopeHandler.get_server_config() method (P0-2)",
+    "Verify 5 P0-2 tests pass after implementation",
+    "When ready for rescope: remove @pytest.mark.skip from P1-1 tests",
+    "Implement bin/mcpi rescope command (P1-1)",
+    "Verify all 14 tests pass when rescope complete"
+  ],
+  "validation_commands": {
+    "run_all": "pytest tests/test_functional_rescope_prerequisites.py -v",
+    "run_p0_2": "pytest tests/test_functional_rescope_prerequisites.py::TestP0_2_GetServerConfigAPI -v",
+    "run_p0_4": "pytest tests/test_functional_rescope_prerequisites.py::TestP0_4_CoreCLIWorkflows -v",
+    "run_p1_1": "pytest tests/test_functional_rescope_prerequisites.py::TestP1_1_RescopeFeature_TDD -v"
+  },
+  "success_criteria": {
+    "p0_2_complete": [
+      "All 5 P0-2 tests passing",
+      "get_server_config() works across all scope types",
+      "Method properly integrated in base class"
+    ],
+    "p1_1_complete": [
+      "All 4 P1-1 tests passing (un-skipped)",
+      "bin/mcpi rescope command functional",
+      "Server config moves between scopes correctly",
+      "Rollback mechanism tested and working"
+    ],
+    "overall_complete": [
+      "14/14 tests passing",
+      "0 tests skipped",
+      "All critical user workflows validated",
+      "No gaming possible - tests verify real functionality"
+    ]
+  }
+}

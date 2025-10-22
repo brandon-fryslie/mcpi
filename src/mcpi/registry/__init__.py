@@ -1,7 +1,19 @@
-"""Registry module for MCP server catalog management."""
+"""MCP Server Registry."""
 
-from mcpi.registry.catalog import ServerCatalog
-from mcpi.registry.discovery import ServerDiscovery
+from mcpi.registry.catalog import (
+    MCPServer,
+    ServerRegistry,
+    ServerCatalog,
+    InstallationMethod,
+)
 from mcpi.registry.validation import RegistryValidator
+from mcpi.registry.discovery import ServerDiscovery
 
-__all__ = ["ServerCatalog", "ServerDiscovery", "RegistryValidator"]
+__all__ = [
+    "MCPServer",
+    "ServerRegistry", 
+    "ServerCatalog",
+    "InstallationMethod",
+    "RegistryValidator",
+    "ServerDiscovery",
+]

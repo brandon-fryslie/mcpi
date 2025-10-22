@@ -126,6 +126,19 @@ class ClientRegistry:
         
         return self._instances[client_name]
     
+    def inject_client_instance(self, client_name: str, instance: MCPClientPlugin) -> None:
+        """Inject a custom client instance (useful for testing).
+        
+        Args:
+            client_name: Name of the client
+            instance: Client instance to inject
+        """
+        self._instances[client_name] = instance
+        # Also register the class if not already registered
+        if client_name not in self._plugins:
+            self._plugins[client_name] = type(instance)
+        logger.debug(f"Injected custom instance for client '{client_name}'")
+    
     def list_all_servers(self, client_name: Optional[str] = None) -> Dict[str, ServerInfo]:
         """List servers from all or specific clients.
         

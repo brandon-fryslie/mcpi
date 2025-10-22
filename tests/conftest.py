@@ -3,8 +3,13 @@
 import pytest
 from pathlib import Path
 from unittest.mock import Mock
-from mcpi.config.manager import ConfigManager, ProfileConfig, MCPIConfig
-from mcpi.registry.catalog import MCPServer, ServerInstallation, ServerConfiguration
+try:
+    from mcpi.config.manager import ConfigManager, ProfileConfig, MCPIConfig
+except ImportError:
+    # These may not exist in the new structure
+    ConfigManager = ProfileConfig = MCPIConfig = None
+
+from mcpi.registry.catalog import MCPServer
 
 
 @pytest.fixture
@@ -40,18 +45,17 @@ def mock_mcp_server():
     """Create a mock MCPServer with common setup."""
     server = Mock(spec=MCPServer)
     
-    # Mock installation info
-    installation = Mock(spec=ServerInstallation)
-    installation.method = "npm"
-    installation.package = "test-package"
-    server.installation = installation
-    
-    # Mock configuration info
-    configuration = Mock(spec=ServerConfiguration)
-    configuration.required_params = []
-    configuration.optional_params = []
-    configuration.template = None
-    server.configuration = configuration
+    # New structure fields
+    server.id = "test-server"
+    server.name = "Test Server"
+    server.description = "Test description"
+    server.command = "npx"
+    server.package = "test-package"
+    server.args = []
+    server.env = {}
+    server.install_method = "npx"
+    server.required_config = []
+    server.optional_config = {}
     
     return server
 
@@ -74,21 +78,20 @@ def create_mock_profile(**overrides):
     return profile
 
 
-def create_mock_server(method="npm", package="test-package", required_params=None, optional_params=None, template=None):
+def create_mock_server(method="npx", package="test-package", required_config=None, optional_config=None):
     """Create a mock MCP server with specified configuration."""
     server = Mock()
     
-    # Installation info
-    installation = Mock()
-    installation.method = method
-    installation.package = package
-    server.installation = installation
-    
-    # Configuration info
-    configuration = Mock()
-    configuration.required_params = required_params or []
-    configuration.optional_params = optional_params or []
-    configuration.template = template
-    server.configuration = configuration
+    # New structure
+    server.id = "test-server"
+    server.name = "Test Server"
+    server.description = "Test description"
+    server.command = "npx" if method == "npx" else "python"
+    server.package = package
+    server.args = []
+    server.env = {}
+    server.install_method = method
+    server.required_config = required_config or []
+    server.optional_config = optional_config or {}
     
     return server

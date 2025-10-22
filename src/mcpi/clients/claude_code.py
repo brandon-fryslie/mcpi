@@ -12,6 +12,27 @@ from .types import ServerInfo, ServerConfig, ServerState, ScopeConfig, Operation
 class ClaudeCodePlugin(MCPClientPlugin):
     """Claude Code MCP client plugin."""
     
+    def __init__(self, path_overrides: Optional[Dict[str, Path]] = None):
+        """Initialize Claude Code plugin.
+        
+        Args:
+            path_overrides: Optional dictionary to override default paths for testing
+        """
+        self._path_overrides = path_overrides or {}
+        super().__init__()
+    
+    def _get_scope_path(self, scope_name: str, default_path: Path) -> Path:
+        """Get the path for a scope, with override support.
+        
+        Args:
+            scope_name: Name of the scope
+            default_path: Default path if not overridden
+            
+        Returns:
+            Path to use for the scope
+        """
+        return self._path_overrides.get(scope_name, default_path)
+    
     def _get_name(self) -> str:
         """Return the client name."""
         return "claude-code"
@@ -29,7 +50,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="project-mcp",
                 description="Project-level MCP configuration (.mcp.json)",
                 priority=1,
-                path=Path.cwd() / ".mcp.json",
+                path=self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json"),
                 is_project_level=True
             ),
             reader=JSONFileReader(),
@@ -44,7 +65,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="project-local",
                 description="Project-local Claude settings (.claude/settings.local.json)",
                 priority=2,
-                path=Path.cwd() / ".claude" / "settings.local.json",
+                path=self._get_scope_path("project-local", Path.cwd() / ".claude" / "settings.local.json"),
                 is_project_level=True
             ),
             reader=JSONFileReader(),
@@ -59,7 +80,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="user-local",
                 description="User-local Claude settings (~/.claude/settings.local.json)",
                 priority=3,
-                path=Path.home() / ".claude" / "settings.local.json",
+                path=self._get_scope_path("user-local", Path.home() / ".claude" / "settings.local.json"),
                 is_user_level=True
             ),
             reader=JSONFileReader(),
@@ -74,7 +95,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="user-global",
                 description="User-global Claude settings (~/.claude/settings.json)",
                 priority=4,
-                path=Path.home() / ".claude" / "settings.json",
+                path=self._get_scope_path("user-global", Path.home() / ".claude" / "settings.json"),
                 is_user_level=True
             ),
             reader=JSONFileReader(),
@@ -89,7 +110,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="user-internal",
                 description="User internal Claude configuration (~/.claude.json)",
                 priority=5,
-                path=Path.home() / ".claude.json",
+                path=self._get_scope_path("user-internal", Path.home() / ".claude.json"),
                 is_user_level=True
             ),
             reader=JSONFileReader(),
@@ -104,7 +125,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 name="user-mcp",
                 description="User MCP servers configuration (~/.claude/mcp_servers.json)",
                 priority=6,
-                path=Path.home() / ".claude" / "mcp_servers.json",
+                path=self._get_scope_path("user-mcp", Path.home() / ".claude" / "mcp_servers.json"),
                 is_user_level=True
             ),
             reader=JSONFileReader(),

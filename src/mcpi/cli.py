@@ -11,12 +11,45 @@ from rich.table import Table
 from rich.prompt import Confirm, Prompt
 from rich.panel import Panel
 from rich.text import Text
+from rich import box
 
 from mcpi.clients import MCPManager, ServerConfig, ServerState
-from mcpi.registry.catalog import ServerCatalog, get_method_string
-from mcpi.registry.manager import RegistryManager
+from mcpi.registry.catalog import ServerCatalog
 
 console = Console()
+
+
+def shorten_path(path: Optional[str]) -> str:
+    """Shorten a path for display by replacing home and current directory.
+
+    Args:
+        path: The path to shorten
+
+    Returns:
+        Shortened path with ~ for home and . for current directory
+    """
+    if not path:
+        return "N/A"
+
+    path_obj = Path(path)
+    home = Path.home()
+    cwd = Path.cwd()
+
+    try:
+        # Try to make it relative to current directory first
+        relative_to_cwd = path_obj.relative_to(cwd)
+        # If it's the current directory itself, return "."
+        if str(relative_to_cwd) == ".":
+            return "."
+        return f"./{relative_to_cwd}"
+    except ValueError:
+        # Not relative to cwd, try home directory
+        try:
+            relative_to_home = path_obj.relative_to(home)
+            return f"~/{relative_to_home}"
+        except ValueError:
+            # Not relative to home either, return as-is
+            return str(path)
 
 
 def get_mcp_manager(ctx: click.Context) -> MCPManager:
@@ -39,10 +72,9 @@ def get_catalog(ctx: click.Context) -> ServerCatalog:
     """Lazy initialization of ServerCatalog."""
     if 'catalog' not in ctx.obj:
         try:
-            # Use the same path logic as RegistryManager
-            package_dir = Path(__file__).parent.parent.parent
-            toml_registry_path = package_dir / "data" / "registry.toml"
-            ctx.obj['catalog'] = ServerCatalog(registry_path=toml_registry_path)
+            # Use the default registry path
+            ctx.obj['catalog'] = ServerCatalog()
+            ctx.obj['catalog'].load_registry()
         except Exception as e:
             if ctx.obj.get('verbose', False):
                 console.print(f"[red]Catalog initialization error: {e}[/red]")
@@ -54,20 +86,116 @@ def get_catalog(ctx: click.Context) -> ServerCatalog:
     return ctx.obj['catalog']
 
 
-def get_registry_manager(ctx: click.Context) -> RegistryManager:
-    """Lazy initialization of RegistryManager."""
-    if 'registry_manager' not in ctx.obj:
-        try:
-            ctx.obj['registry_manager'] = RegistryManager()
-        except Exception as e:
-            if ctx.obj.get('verbose', False):
-                console.print(f"[red]Registry manager initialization error: {e}[/red]")
-                import traceback
-                console.print(traceback.format_exc())
-            else:
-                console.print(f"[red]Failed to initialize registry manager: {e}[/red]")
-            sys.exit(1)
-    return ctx.obj['registry_manager']
+def get_registry_manager(ctx: click.Context) -> ServerCatalog:
+    """Get the server catalog (backward compat alias)."""
+    return get_catalog(ctx)
+
+
+def get_available_scopes(ctx: click.Context, client_name: Optional[str] = None) -> List[str]:
+    """Get available scope names for a client.
+    
+    Args:
+        ctx: Click context
+        client_name: Optional client name (uses default if not specified)
+        
+    Returns:
+        List of available scope names
+    """
+    try:
+        manager = get_mcp_manager(ctx)
+        scopes_info = manager.get_scopes_for_client(client_name)
+        return [scope['name'] for scope in scopes_info]
+    except Exception:
+        # Return common default scopes if we can't get them dynamically
+        return ['user', 'user-internal', 'project', 'project-mcp']
+
+
+class DynamicScopeType(click.ParamType):
+    """Dynamic parameter type for scopes that validates based on the client."""
+    
+    name = "scope"
+    
+    def get_metavar(self, param, ctx=None):
+        """Get metavar for help text."""
+        # Show common examples, but indicate it varies by client
+        return '[varies by client: e.g., user|project|workspace]'
+    
+    def convert(self, value, param, ctx):
+        """Convert and validate the scope value."""
+        if value is None:
+            return None
+        
+        # Try to get the client from context or command parameters
+        client_name = None
+        if ctx and ctx.params:
+            client_name = ctx.params.get('client')
+        
+        # If we have a client, validate against its available scopes
+        if ctx and ctx.obj:
+            try:
+                # Try to get available scopes for validation
+                manager = ctx.obj.get('mcp_manager')
+                if manager:
+                    # If no client specified, use the default
+                    if not client_name:
+                        client_name = manager.default_client
+                    
+                    scopes_info = manager.get_scopes_for_client(client_name)
+                    available_scopes = [scope['name'] for scope in scopes_info]
+                    
+                    if available_scopes and value not in available_scopes:
+                        self.fail(
+                            f"'{value}' is not a valid scope for client '{client_name}'. "
+                            f"Available scopes: {', '.join(available_scopes)}",
+                            param,
+                            ctx
+                        )
+            except click.exceptions.BadParameter:
+                # Re-raise validation errors
+                raise
+            except Exception:
+                # If we can't validate due to other errors, just accept the value
+                pass
+        
+        return value
+    
+    def shell_complete(self, ctx, param, incomplete):
+        """Provide shell completion for scopes."""
+        from click.shell_completion import CompletionItem
+        
+        completions = []
+        
+        # Try to get available scopes for the current client
+        if ctx and ctx.obj:
+            try:
+                manager = ctx.obj.get('mcp_manager')
+                client_name = ctx.params.get('client') if ctx.params else None
+                if manager:
+                    scopes_info = manager.get_scopes_for_client(client_name)
+                    scopes = [scope['name'] for scope in scopes_info]
+                    completions = [
+                        CompletionItem(scope)
+                        for scope in scopes
+                        if scope.startswith(incomplete)
+                    ]
+            except Exception:
+                # If we can't get scopes from manager, use defaults
+                default_scopes = ['user', 'user-internal', 'project', 'project-mcp', 'workspace', 'global']
+                completions = [
+                    CompletionItem(scope)
+                    for scope in default_scopes
+                    if scope.startswith(incomplete)
+                ]
+        else:
+            # No context available, use default scopes
+            default_scopes = ['user', 'user-internal', 'project', 'project-mcp', 'workspace', 'global']
+            completions = [
+                CompletionItem(scope)
+                for scope in default_scopes
+                if scope.startswith(incomplete)
+            ]
+        
+        return completions
 
 
 @click.group()
@@ -216,25 +344,35 @@ def list_scopes(ctx: click.Context, client: Optional[str]) -> None:
     try:
         manager = get_mcp_manager(ctx)
         scopes = manager.get_scopes_for_client(client)
-        
+
         if not scopes:
             client_name = client or manager.default_client
             console.print(f"[yellow]No scopes available for client '{client_name}'[/yellow]")
             return
-        
-        table = Table(title=f"Configuration Scopes: {client or manager.default_client}")
+
+        # Build caption with current directory
+        cwd = Path.cwd()
+        caption_text = Text()
+        caption_text.append("Current Directory: ", style="cyan bold")
+        caption_text.append(str(cwd), style="yellow")
+
+        table = Table(
+            title=f"Configuration Scopes: {client or manager.default_client}",
+            caption=caption_text,
+            caption_justify="left"
+        )
         table.add_column("Name", style="cyan", no_wrap=True)
         table.add_column("Type", style="blue")
         table.add_column("Priority", style="magenta")
         table.add_column("Path", style="yellow")
         table.add_column("Exists", style="green")
         table.add_column("Description", style="white")
-        
+
         for scope in scopes:
             scope_type = "User" if scope['is_user_level'] else "Project"
             exists = "✓" if scope['exists'] else "✗"
-            path = scope['path'] or "N/A"
-            
+            path = shorten_path(scope['path'])
+
             table.add_row(
                 scope['name'],
                 scope_type,
@@ -243,9 +381,9 @@ def list_scopes(ctx: click.Context, client: Optional[str]) -> None:
                 exists,
                 scope['description']
             )
-        
+
         console.print(table)
-        
+
     except Exception as e:
         console.print(f"[red]Error listing scopes: {e}[/red]")
 
@@ -254,7 +392,7 @@ def list_scopes(ctx: click.Context, client: Optional[str]) -> None:
 
 @main.command()
 @click.option('--client', help='Filter by client (uses default if not specified)')
-@click.option('--scope', help='Filter by scope')
+@click.option('--scope', type=DynamicScopeType(), help='Filter by scope (available scopes depend on client)')
 @click.option('--state', type=click.Choice(['enabled', 'disabled', 'not_installed']), help='Filter by state')
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed information')
 @click.pass_context
@@ -325,7 +463,7 @@ def list(ctx: click.Context, client: Optional[str], scope: Optional[str], state:
 @main.command()
 @click.argument('server_id')
 @click.option('--client', help='Target client (uses default if not specified)')
-@click.option('--scope', help='Target scope (uses primary scope if not specified)')
+@click.option('--scope', type=DynamicScopeType(), help='Target scope (available scopes depend on client, uses primary scope if not specified)')
 @click.option('--dry-run', is_flag=True, help='Show what would be done without making changes')
 @click.pass_context
 def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Optional[str], dry_run: bool) -> None:
@@ -347,24 +485,48 @@ def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Option
             console.print(f"[red]Server '{server_id}' not found in registry[/red]")
             return
         
-        # Use default scope if not specified
+        # If no scope specified, show interactive menu (unless in dry-run mode)
         if not scope:
-            if client:
-                # Get client to find primary scope
-                client_obj = manager.registry.get_client(client)
-                if hasattr(client_obj, 'get_primary_scope'):
-                    scope = client_obj.get_primary_scope()
+            # Get available scopes for the target client
+            target_client = client or manager.default_client
+            scopes_info = manager.get_scopes_for_client(target_client)
+            
+            if not scopes_info:
+                console.print(f"[red]No scopes available for client '{target_client}'[/red]")
+                ctx.exit(1)
+            
+            # In dry-run mode, just use the first available scope
+            if ctx.obj.get('dry_run', False):
+                scope = scopes_info[0]['name']
+                console.print(f"[dim]Dry-run: Would use scope '{scope}'[/dim]")
             else:
-                # Use primary scope of default client
-                default_client = manager.default_client
-                if default_client:
-                    client_obj = manager.registry.get_client(default_client)
-                    if hasattr(client_obj, 'get_primary_scope'):
-                        scope = client_obj.get_primary_scope()
-        
-        if not scope:
-            console.print("[red]No scope specified and unable to determine default scope[/red]")
-            return
+                # Build a list of scope choices with descriptions
+                console.print(f"\n[bold cyan]Select a scope for '{server.name}':[/bold cyan]")
+                console.print(f"[dim]Client: {target_client}[/dim]\n")
+                
+                # Display scope options
+                scope_choices = []
+                for i, scope_info in enumerate(scopes_info, 1):
+                    scope_name = scope_info['name']
+                    scope_desc = scope_info['description']
+                    scope_type = "User" if scope_info['is_user_level'] else "Project"
+                    exists = "✓" if scope_info['exists'] else "✗"
+                    
+                    # Show the option
+                    console.print(f"  [{i}] [cyan]{scope_name}[/cyan] - {scope_type} scope {exists}")
+                    console.print(f"      [dim]{scope_desc}[/dim]")
+                    scope_choices.append(scope_name)
+                
+                # Get user's choice
+                console.print()
+                choice = Prompt.ask(
+                    "Enter the number of your choice",
+                    choices=[str(i) for i in range(1, len(scope_choices) + 1)],
+                    default="1"
+                )
+                
+                scope = scope_choices[int(choice) - 1]
+                console.print(f"[green]Selected scope: {scope}[/green]\n")
         
         # Check if server already exists
         existing_info = manager.get_server_info(server_id, client)
@@ -372,11 +534,11 @@ def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Option
             console.print(f"[yellow]Server '{server_id}' already exists (state: {existing_info.state.name})[/yellow]")
             return
         
-        # Create server configuration
+        # Create server configuration from the new structure
         config = ServerConfig(
-            command=server.installation.package,  # This might need adjustment based on installation method
-            args=server.installation.args if hasattr(server.installation, 'args') else [],
-            env=server.installation.env if hasattr(server.installation, 'env') else {},
+            command=server.command,
+            args=[server.package] + server.args,
+            env=server.env,
             type="stdio"
         )
         
@@ -384,7 +546,7 @@ def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Option
         if not ctx.obj.get('dry_run', False):
             console.print(f"\n[bold]Server:[/bold] {server.name}")
             console.print(f"[bold]Description:[/bold] {server.description}")
-            console.print(f"[bold]Installation Method:[/bold] {get_method_string(server.installation.method)}")
+            console.print(f"[bold]Installation Method:[/bold] {server.install_method}")
             console.print(f"[bold]Target Client:[/bold] {client or manager.default_client}")
             console.print(f"[bold]Target Scope:[/bold] {scope}")
             
@@ -410,6 +572,9 @@ def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Option
                     for error in result.errors:
                         console.print(f"  [red]{error}[/red]")
                 
+    except (SystemExit, click.exceptions.Exit):
+        # Re-raise exit exceptions to preserve exit codes
+        raise
     except Exception as e:
         if verbose:
             console.print(f"[red]Error adding {server_id}: {e}[/red]")
@@ -422,7 +587,7 @@ def add(ctx: click.Context, server_id: str, client: Optional[str], scope: Option
 @main.command()
 @click.argument('server_id')
 @click.option('--client', help='Target client (uses default if not specified)')
-@click.option('--scope', help='Source scope (auto-detected if not specified)')
+@click.option('--scope', type=DynamicScopeType(), help='Source scope (available scopes depend on client, auto-detected if not specified)')
 @click.option('--dry-run', is_flag=True, help='Show what would be done without making changes')
 @click.pass_context
 def remove(ctx: click.Context, server_id: str, client: Optional[str], scope: Optional[str], dry_run: bool) -> None:
@@ -660,18 +825,11 @@ def list_registry(ctx: click.Context) -> None:
         table.add_column("Description", style="white")
         
         for server in servers:
-            # Handle both dict and object formats
-            if isinstance(server, dict):
-                server_id = server.get('id', 'unknown')
-                name = server.get('name', 'Unknown')
-                method = server.get('installation', {}).get('method', 'unknown')
-                description = server.get('description', '')
-            else:
-                server_id = getattr(server, 'id', 'unknown')
-                name = getattr(server, 'name', 'Unknown')
-                installation = getattr(server, 'installation', None)
-                method = getattr(installation, 'method', 'unknown') if installation else 'unknown'
-                description = getattr(server, 'description', '')
+            # Use the new MCPServer structure
+            server_id = server.id
+            name = server.name
+            method = server.install_method
+            description = server.description
             
             table.add_row(
                 server_id,
@@ -706,11 +864,11 @@ def search(ctx: click.Context, query: Optional[str], method: Optional[str], limi
                 s for s in servers 
                 if query_lower in s.name.lower() or 
                    query_lower in s.description.lower() or
-                   any(query_lower in tag.lower() for tag in s.tags)
+                   any(query_lower in kw.lower() for kw in s.keywords)
             ]
         
         if method:
-            servers = [s for s in servers if get_method_string(s.installation.method).lower() == method.lower()]
+            servers = [s for s in servers if s.install_method.lower() == method.lower()]
         
         # Limit results
         servers = servers[:limit]
@@ -729,7 +887,7 @@ def search(ctx: click.Context, query: Optional[str], method: Optional[str], limi
             table.add_row(
                 server.id,
                 server.name,
-                get_method_string(server.installation.method),
+                server.install_method,
                 server.description[:80] + "..." if len(server.description) > 80 else server.description
             )
         
@@ -746,49 +904,29 @@ def registry_info(ctx: click.Context, server_id: str) -> None:
     """Show detailed information about a server from the registry."""
     try:
         registry_manager = get_registry_manager(ctx)
-        server_info = registry_manager.get_server_info(server_id)
+        server_info = registry_manager.get_server(server_id)
         
         if not server_info:
             console.print(f"[red]Server '{server_id}' not found in registry[/red]")
             return
         
-        # Handle both dict and object formats
-        if isinstance(server_info, dict):
-            info_text = f"[bold]ID:[/bold] {server_info.get('id', server_id)}\n"
-            info_text += f"[bold]Name:[/bold] {server_info.get('name', 'Unknown')}\n"
-            info_text += f"[bold]Description:[/bold] {server_info.get('description', 'No description')}\n"
-            info_text += f"[bold]Author:[/bold] {server_info.get('author', 'Unknown')}\n"
-            
-            installation = server_info.get('installation', {})
-            info_text += f"[bold]Installation Method:[/bold] {installation.get('method', 'unknown')}\n"
-            info_text += f"[bold]Package:[/bold] {installation.get('package', 'N/A')}\n"
-            
-            versions = server_info.get('versions', {})
-            if versions:
-                info_text += f"[bold]Latest Version:[/bold] {versions.get('latest', 'N/A')}\n"
-            
-            categories = server_info.get('category', [])
-            if categories:
-                info_text += f"[bold]Categories:[/bold] {', '.join(categories)}\n"
-        else:
-            info_text = f"[bold]ID:[/bold] {getattr(server_info, 'id', server_id)}\n"
-            info_text += f"[bold]Name:[/bold] {getattr(server_info, 'name', 'Unknown')}\n"
-            info_text += f"[bold]Description:[/bold] {getattr(server_info, 'description', 'No description')}\n"
-            info_text += f"[bold]Author:[/bold] {getattr(server_info, 'author', 'Unknown')}\n"
-            
-            installation = getattr(server_info, 'installation', None)
-            if installation:
-                info_text += f"[bold]Installation Method:[/bold] {getattr(installation, 'method', 'unknown')}\n"
-                info_text += f"[bold]Package:[/bold] {getattr(installation, 'package', 'N/A')}\n"
-            
-            versions = getattr(server_info, 'versions', {})
-            if versions:
-                latest = versions.get('latest') if isinstance(versions, dict) else getattr(versions, 'latest', None)
-                info_text += f"[bold]Latest Version:[/bold] {latest or 'N/A'}\n"
-            
-            categories = getattr(server_info, 'category', [])
-            if categories:
-                info_text += f"[bold]Categories:[/bold] {', '.join(categories)}\n"
+        # Display MCPServer object information
+        info_text = f"[bold]ID:[/bold] {server_info.id}\n"
+        info_text += f"[bold]Name:[/bold] {server_info.name}\n"
+        info_text += f"[bold]Description:[/bold] {server_info.description}\n"
+        info_text += f"[bold]Author:[/bold] {server_info.author or 'Unknown'}\n"
+        
+        info_text += f"[bold]Installation Method:[/bold] {server_info.install_method}\n"
+        info_text += f"[bold]Command:[/bold] {server_info.command} {server_info.package}\n"
+        
+        if server_info.version:
+            info_text += f"[bold]Version:[/bold] {server_info.version}\n"
+        
+        if server_info.categories:
+            info_text += f"[bold]Categories:[/bold] {', '.join(server_info.categories)}\n"
+        
+        if server_info.verified:
+            info_text += f"[bold]Status:[/bold] ✓ Verified\n"
         
         console.print(Panel(info_text, title=f"Registry Information: {server_id}"))
         
