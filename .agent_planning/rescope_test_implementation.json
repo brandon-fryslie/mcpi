@@ -1,0 +1,177 @@
+{
+  "tests_added": [
+    "test_rescope_project_to_user_scope",
+    "test_rescope_user_to_project_scope",
+    "test_rescope_args_server_first",
+    "test_rescope_args_from_first",
+    "test_rescope_args_to_first",
+    "test_rescope_args_mixed_order",
+    "test_rescope_server_not_in_source",
+    "test_rescope_server_exists_in_destination",
+    "test_rescope_invalid_source_scope",
+    "test_rescope_invalid_destination_scope",
+    "test_rescope_same_source_and_destination",
+    "test_rescope_dry_run_no_changes",
+    "test_rescope_dry_run_shows_operation_details",
+    "test_rescope_rollback_on_remove_failure",
+    "test_rescope_atomic_operation",
+    "test_rescope_preserves_complex_config",
+    "test_rescope_preserves_minimal_config",
+    "test_rescope_preserves_empty_env",
+    "test_rescope_requires_valid_client_scopes",
+    "test_rescope_explicit_client_parameter",
+    "test_rescope_success_message",
+    "test_rescope_error_message_helpful",
+    "test_workflow_project_testing_to_user_promotion",
+    "test_workflow_user_to_project_customization",
+    "test_rescope_with_special_characters_in_server_name",
+    "test_rescope_between_all_scope_combinations",
+    "test_rescope_with_empty_source_scope_file",
+    "test_rescope_creates_destination_file_if_missing"
+  ],
+  "workflows_covered": [
+    "Move server from project scope to user scope for reuse across projects",
+    "Move server from user scope to project scope for project-specific customization",
+    "Rescope with position-independent argument ordering",
+    "Graceful error handling when server doesn't exist in source",
+    "Prevent data loss when server already exists in destination",
+    "Validate scope names against client's available scopes",
+    "Dry-run mode to preview rescope operation without changes",
+    "Transaction rollback when remove operation fails",
+    "Preserve all configuration fields during rescope",
+    "Real developer workflow: test at project level, promote to user level",
+    "Real developer workflow: customize user-level server for specific project"
+  ],
+  "initial_status": "failing",
+  "expected_failure_reason": "No such command 'rescope' - command not yet implemented",
+  "commit": "pending",
+  "gaming_resistance": "high",
+  "test_file": "tests/test_cli_rescope.py",
+  "documentation_file": "tests/TEST_RESCOPE.md",
+  "summary_file": ".agent_planning/RESCOPE_TEST_SUMMARY.md",
+  "test_count": 28,
+  "test_classes": 10,
+  "lines_of_code": 755,
+  "status_gaps_addressed": [
+    "Missing rescope functionality (tests define complete specification)",
+    "Transaction safety for data operations (rollback tests)",
+    "Error handling for edge cases (comprehensive error tests)",
+    "Real user workflow validation (integration scenario tests)"
+  ],
+  "plan_items_validated": [
+    "BACKLOG: MCP Server Rescope Command - Move server from one scope to another",
+    "BACKLOG: Position-independent arguments (all orderings tested)",
+    "BACKLOG: Server not in source error (graceful failure)",
+    "BACKLOG: Server exists in destination error (data loss prevention)",
+    "BACKLOG: Invalid scope names (clear validation errors)",
+    "BACKLOG: Same source/dest error (prevent no-op)",
+    "BACKLOG: Dry-run mode (preview without changes)",
+    "BACKLOG: Transaction safety with rollback (atomic operations)",
+    "BACKLOG: Configuration preservation (all fields exact)",
+    "BACKLOG: Client scope validation (per-client scopes)"
+  ],
+  "ungameable_properties": [
+    "Real file I/O operations via MCPTestHarness (no mocked file operations)",
+    "Multiple verification points per test (source removal AND destination addition)",
+    "Observable file system outcomes (validates actual JSON content)",
+    "Transaction safety validation (simulates failures, validates rollback)",
+    "Configuration preservation (field-by-field comparison)",
+    "Side effect verification (file creation, deletion, modification)",
+    "State verification (server counts, file existence, content equality)",
+    "Idempotency checks (atomic operations, server in exactly one scope)",
+    "Negative cases (verifies proper error handling, no state corruption)",
+    "Integration scenarios (real developer workflows, multi-step operations)"
+  ],
+  "test_categories": {
+    "basic_flow": 2,
+    "position_independence": 4,
+    "error_handling": 5,
+    "dry_run": 2,
+    "transaction_safety": 2,
+    "configuration_preservation": 3,
+    "multi_client": 2,
+    "cli_output": 2,
+    "integration_scenarios": 2,
+    "edge_cases": 4
+  },
+  "coverage_goals": {
+    "line_coverage": "≥95%",
+    "branch_coverage": "≥90%",
+    "error_path_coverage": "100%",
+    "integration_coverage": "100%"
+  },
+  "implementation_requirements": {
+    "new_cli_command": "rescope",
+    "required_options": ["--from", "--to", "--client", "--dry-run"],
+    "required_argument": "server_name",
+    "position_independence": "all argument orderings must work",
+    "transaction_safety": "rollback on failure required",
+    "error_messages": "clear and actionable",
+    "scope_validation": "DynamicScopeType for per-client validation"
+  },
+  "existing_methods_used": [
+    "ScopeHandler.get_server_config(server_id)",
+    "ScopeHandler.add_server(server_id, config)",
+    "ScopeHandler.remove_server(server_id)",
+    "ScopeHandler.has_server(server_id)",
+    "MCPClientPlugin.get_scope_handler(scope)",
+    "MCPManager.get_scopes_for_client(client_name)"
+  ],
+  "new_methods_required": [
+    "cli.rescope() - Main CLI command handler"
+  ],
+  "test_infrastructure": {
+    "fixtures": [
+      "mcp_test_dir",
+      "mcp_harness",
+      "mcp_manager_with_harness",
+      "prepopulated_harness"
+    ],
+    "harness_capabilities": [
+      "Real file I/O in temporary directory",
+      "Path override injection into client plugins",
+      "Server existence assertions",
+      "JSON structure validation",
+      "Configuration comparison",
+      "Server counting"
+    ]
+  },
+  "traceability": {
+    "backlog_requirements": 10,
+    "tests_covering_requirements": 28,
+    "requirements_coverage": "100%",
+    "status_gaps_addressed": 4,
+    "plan_items_validated": 10
+  },
+  "next_steps": [
+    "Implement rescope command in src/mcpi/cli.py",
+    "Add transaction logic with rollback",
+    "Implement all error handling",
+    "Add dry-run mode",
+    "Run test suite to verify implementation",
+    "Achieve ≥95% test coverage",
+    "Update README.md with examples",
+    "Update CHANGELOG.md with feature",
+    "Commit with message: 'test(mcpi): add comprehensive functional tests for rescope command'"
+  ],
+  "files_created": [
+    "tests/test_cli_rescope.py",
+    "tests/TEST_RESCOPE.md",
+    ".agent_planning/RESCOPE_TEST_SUMMARY.md",
+    ".agent_planning/rescope_test_implementation.json"
+  ],
+  "files_to_modify": [
+    "src/mcpi/cli.py",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "estimated_implementation_effort": "4-6 hours",
+  "test_execution_time": "<5 seconds for full suite",
+  "maintenance_notes": [
+    "Run full test suite before commits",
+    "Update tests when requirements change",
+    "Keep documentation in sync",
+    "Add new edge cases as discovered",
+    "Monitor test execution time"
+  ]
+}
