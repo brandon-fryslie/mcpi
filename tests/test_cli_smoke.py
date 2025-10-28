@@ -38,17 +38,18 @@ class TestCliSmoke:
         """Test that mcpi status works without crashing."""
         code, stdout, stderr = run_cli_command(["status"])
         assert code == 0
-        # Should show either "No MCP servers installed" or a table
-        assert "MCP servers" in stdout or "No MCP" in stdout
+        # Should show MCPI Status panel
+        assert "MCPI Status" in stdout or "Default Client" in stdout
 
     def test_status_json(self):
         """Test that mcpi status --json works."""
         code, stdout, stderr = run_cli_command(["status", "--json"])
         assert code == 0
-        # Should be valid JSON (empty array if no servers)
+        # Should be valid JSON dict with status summary
         try:
             data = json.loads(stdout)
-            assert isinstance(data, list)
+            assert isinstance(data, dict)
+            assert "total_servers" in data or "default_client" in data
         except json.JSONDecodeError:
             pytest.fail("status --json did not output valid JSON")
 

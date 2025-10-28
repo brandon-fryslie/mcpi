@@ -1317,14 +1317,21 @@ def list_categories(ctx: click.Context) -> None:
 # STATUS COMMAND
 
 @main.command()
+@click.option('--json', 'output_json', is_flag=True, help='Output in JSON format')
 @click.pass_context
-def status(ctx: click.Context) -> None:
+def status(ctx: click.Context, output_json: bool) -> None:
     """Show system status and summary information."""
     try:
         manager = get_mcp_manager(ctx)
 
         # Get system status
         status_summary = manager.get_status_summary()
+
+        if output_json:
+            # Output as JSON
+            import json
+            print(json.dumps(status_summary, indent=2, default=str))
+            return
 
         status_text = f"[bold]Default Client:[/bold] {status_summary.get('default_client', 'None')}\n"
         status_text += f"[bold]Available Clients:[/bold] {', '.join(status_summary.get('available_clients', []))}\n"
@@ -1349,6 +1356,8 @@ def status(ctx: click.Context) -> None:
 
     except Exception as e:
         console.print(f"[red]Error getting status: {e}[/red]")
+
+
 
 
 # COMPLETION COMMAND
