@@ -1,7 +1,8 @@
 """Test package for mcpi."""
 
 # Export test harness components for easy import
-from .test_harness import (
+# noqa comment prevents Black from removing these "unused" imports
+from .test_harness import (  # noqa: F401
     MCPTestHarness,
     mcp_harness,
     mcp_manager_with_harness,

@@ -14,7 +14,15 @@ except ImportError:
 
 from mcpi.registry.catalog import MCPServer
 
-# Import test harness fixtures
+# Import test harness fixtures - pytest uses these via dependency injection
+# noqa comments prevent Black from removing these "unused" imports
+from tests.test_harness import (  # noqa: F401
+    MCPTestHarness,
+    mcp_harness,
+    mcp_manager_with_harness,
+    mcp_test_dir,
+    prepopulated_harness,
+)
 
 # =============================================================================
 # CRITICAL SAFETY: Prevent tests from modifying real user files

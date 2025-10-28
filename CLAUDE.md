@@ -53,6 +53,37 @@ mypy src/
 black src/ tests/ && ruff check src/ tests/ --fix && mypy src/
 ```
 
+**IMPORTANT: Black + Pytest Best Practice**
+
+When formatting test code, Black may remove imports that appear unused to static analysis but are actually pytest fixtures used via dependency injection. To prevent this:
+
+1. **Always add `# noqa: F401` to fixture imports**:
+   ```python
+   # In conftest.py or test module __init__.py
+   from tests.test_harness import (  # noqa: F401
+       mcp_harness,
+       mcp_test_dir,
+       prepopulated_harness,
+   )
+   ```
+
+2. **Always run tests after formatting**:
+   ```bash
+   black src/ tests/ && pytest --tb=no -q
+   ```
+
+3. **Watch for these patterns in diffs**:
+   - Lines starting with `-from tests.` (fixture imports being removed)
+   - Lines starting with `-from .conftest import` (fixture imports being removed)
+
+4. **If Black removes fixture imports**:
+   - Restore the import
+   - Add `# noqa: F401` comment
+   - Re-run Black to verify it preserves the import
+   - Run tests to verify fixtures work
+
+This is a known limitation when formatting pytest code - fixtures appear unused because they're injected by pytest's dependency injection system, not explicitly called in code.
+
 ### Application Commands
 ```bash
 # Run the CLI tool
@@ -131,6 +162,9 @@ mypy src/
 # Fix issues
 black src/ tests/
 ruff check src/ tests/ --fix
+
+# IMPORTANT: Always verify tests pass after formatting
+pytest --tb=no -q
 ```
 
 ### Viewing CI Results
