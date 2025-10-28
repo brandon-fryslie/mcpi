@@ -2,20 +2,20 @@
 
 ## Overview
 
-MCP Manager (mcpi) is a comprehensive command-line tool and Python library for managing Model Context Protocol (MCP) servers. It provides an exhaustive registry of known MCP servers and abstracts the installation logic to seamlessly integrate them with Claude Code and other compatible tools.
+MCP Manager (mcpi) is a comprehensive command-line tool and Python library for managing Model Context Protocol (MCP) servers. It provides an exhaustive registry of known MCP servers and uses a scope-based plugin architecture to seamlessly integrate them with Claude Code and other compatible MCP clients.
 
 ## Goals
 
 ### Primary Goals
 - **Centralized MCP Server Registry**: Maintain a comprehensive, up-to-date catalog of all known MCP servers
-- **Universal Installation**: Abstract installation complexity across different tools (Claude Code, other MCP clients)
-- **Configuration Management**: Simplify MCP server configuration and dependency management
+- **Universal Installation**: Abstract installation complexity across different MCP clients (Claude Code, Cursor, VS Code)
+- **Scope-Based Configuration Management**: Manage servers across multiple hierarchical configuration scopes
 - **Developer Experience**: Provide intuitive CLI and programmatic interfaces
 
 ### Secondary Goals
 - **Discovery**: Help users find relevant MCP servers for their use cases
 - **Validation**: Ensure MCP servers are properly configured and functional
-- **Updates**: Manage MCP server updates and version compatibility
+- **Multi-Client Support**: Support multiple MCP clients through plugin architecture
 - **Documentation**: Provide comprehensive documentation for each MCP server
 
 ## Architecture
@@ -25,58 +25,82 @@ MCP Manager (mcpi) is a comprehensive command-line tool and Python library for m
 #### 1. MCP Server Registry (`mcpi.registry`)
 - **Server Catalog**: JSON-based registry of all known MCP servers
 - **Metadata Management**: Server descriptions, capabilities, dependencies, installation methods
-- **Version Tracking**: Support for multiple versions and compatibility matrices
-- **Category Organization**: Servers organized by functionality (file systems, databases, APIs, etc.)
+- **Category Organization**: Servers organized by functionality (filesystem, databases, APIs, etc.)
+- **Pydantic Models**: Strong type validation using `MCPServer` and `ServerRegistry` models
 
-#### 2. Installation Engine (`mcpi.installer`)
-- **Multi-Target Support**: Install to Claude Code, other MCP clients
-- **Dependency Resolution**: Handle Python packages, system dependencies, configuration files
-- **Installation Methods**: Support npm, pip/uv, git, binary downloads
-- **Rollback Capability**: Safe installation with rollback on failure
+#### 2. Plugin-Based Client System (`mcpi.clients`)
+- **MCPClientPlugin Protocol**: Abstract interface for implementing MCP client support
+- **Scope-Based Configuration**: Each client defines multiple configuration scopes with priorities
+- **File-Based Implementation**: Most scopes use JSON/YAML configuration files
+- **Schema Validation**: Configuration validated against client-specific YAML schemas
+- **Client Registry**: Dynamic client detection and plugin loading
 
-#### 3. Configuration Manager (`mcpi.config`)
-- **Profile Management**: Different configuration profiles for different tools
-- **Template System**: Pre-built configuration templates for common setups
-- **Validation**: Validate configurations before deployment
-- **Backup/Restore**: Configuration backup and restore functionality
+##### Key Classes
+- `MCPClientPlugin`: Abstract base class for client plugins
+- `ScopeHandler`: Abstract base class for scope implementations
+- `FileBasedScope`: Reusable file-based scope implementation
+- `ClaudeCodePlugin`: Reference implementation for Claude Code
+- `MCPManager`: Orchestrates all client plugins
 
-#### 4. CLI Interface (`mcpi.cli`)
-- **Discovery Commands**: Search, list, info commands
-- **Installation Commands**: Install, uninstall, update commands
-- **Management Commands**: Status, validate, config commands
-- **Interactive Mode**: Guided installation and configuration
+#### 3. Scope Hierarchy System
+Each client plugin defines multiple configuration scopes with different priorities:
+
+**Example: Claude Code Scopes**
+| Scope Name | Type | Priority | Path | Description |
+|------------|------|----------|------|-------------|
+| `project-mcp` | Project | 1 | `.mcp.json` | Project-level MCP configuration (highest) |
+| `project-local` | Project | 2 | `.claude/settings.local.json` | Project-local Claude settings |
+| `user-local` | User | 3 | `~/.claude/settings.local.json` | User-local Claude settings |
+| `user-global` | User | 4 | `~/.claude/settings.json` | User-global Claude settings |
+| `user-internal` | User | 5 | `~/.claude.json` | User internal configuration |
+| `user-mcp` | User | 6 | `~/.claude/mcp_servers.json` | User MCP servers (lowest) |
+
+**Priority System**: Lower priority numbers override higher. Project-level scopes override user-level.
+
+#### 4. Installation Engine (`mcpi.installer`)
+- **Multi-Method Support**: npm/npx, pip/uv, git, docker
+- **Method-Specific Installers**: Separate installer for each installation method
+- **Dependency Resolution**: Handle package managers, system dependencies
+- **Stateful Installation**: Track installation state and support rollback
+
+#### 5. CLI Interface (`mcpi.cli`)
+- **Click Framework**: Command-line interface with rich help
+- **Lazy Initialization**: Fast startup with lazy-loaded components
+- **Rich Console Output**: Enhanced tables and formatting
+- **Dynamic Scope Type**: Validates scope names based on selected client
+- **Tab Completion**: Shell completion for bash, zsh, fish
 
 ### Data Structures
 
-#### Server Registry Entry
+#### Server Registry Entry (`MCPServer`)
 ```python
 {
-    "id": "filesystem",
-    "name": "Filesystem MCP Server",
     "description": "Access local filesystem operations",
-    "category": ["filesystem", "local"],
-    "author": "Anthropic",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-filesystem", "/path/to/allowed/files"],
     "repository": "https://github.com/anthropics/mcp-server-filesystem",
-    "documentation": "https://docs.anthropic.com/mcp/servers/filesystem",
-    "versions": {
-        "latest": "1.0.0",
-        "supported": ["1.0.0", "0.9.0"]
-    },
-    "installation": {
-        "method": "npm",
-        "package": "@anthropic/mcp-server-filesystem",
-        "system_dependencies": [],
-        "python_dependencies": []
-    },
-    "configuration": {
-        "template": "filesystem_template.json",
-        "required_params": ["root_path"],
-        "optional_params": ["allowed_extensions"]
-    },
-    "capabilities": ["file_operations", "directory_listing"],
-    "platforms": ["linux", "darwin", "windows"],
-    "license": "MIT"
+    "categories": ["filesystem", "local"]
 }
+```
+
+#### Scope Configuration (`ScopeConfig`)
+```python
+ScopeConfig(
+    name="project-mcp",
+    description="Project-level MCP configuration",
+    priority=1,
+    path=Path(".mcp.json"),
+    is_project_level=True
+)
+```
+
+#### Server Configuration (`ServerConfig`)
+```python
+ServerConfig(
+    command="npx",
+    args=["-y", "@anthropic/mcp-server-filesystem"],
+    env={"ALLOWED_PATH": "/path/to/files"}
+)
 ```
 
 ## Technical Implementation
@@ -85,33 +109,40 @@ MCP Manager (mcpi) is a comprehensive command-line tool and Python library for m
 - **Language**: Python 3.9+
 - **Package Manager**: uv for dependency management
 - **CLI Framework**: Click for command-line interface
-- **Configuration**: TOML/JSON for configuration files
-- **HTTP Client**: httpx for web requests
-- **JSON Handling**: Pydantic for data validation
+- **Console Output**: Rich for enhanced formatting
+- **Data Validation**: Pydantic for type validation
+- **Schema Validation**: jsonschema with YAML schemas
+- **Configuration**: JSON for runtime config, YAML for schemas
 
 ### Project Structure
 ```
 mcpi/
 ├── src/mcpi/
 │   ├── __init__.py
-│   ├── cli.py              # CLI entry point
+│   ├── cli.py              # CLI entry point (Click-based commands)
+│   ├── clients/
+│   │   ├── __init__.py
+│   │   ├── base.py         # MCPClientPlugin, ScopeHandler protocols
+│   │   ├── file_based.py   # FileBasedScope implementation
+│   │   ├── claude_code.py  # Claude Code plugin implementation
+│   │   ├── manager.py      # MCPManager orchestration
+│   │   ├── registry.py     # Client plugin registry
+│   │   ├── protocols.py    # Protocol definitions
+│   │   ├── types.py        # Shared type definitions
+│   │   └── schemas/        # YAML schema files
 │   ├── registry/
 │   │   ├── __init__.py
-│   │   ├── catalog.py      # Server catalog management
-│   │   ├── discovery.py    # Server discovery logic
-│   │   └── validation.py   # Registry validation
+│   │   ├── catalog.py      # ServerCatalog, MCPServer models
+│   │   ├── discovery.py    # Server search and discovery
+│   │   ├── validation.py   # Registry validation
+│   │   └── cue_validator.py # CUE schema validation
 │   ├── installer/
 │   │   ├── __init__.py
 │   │   ├── base.py         # Base installer interface
-│   │   ├── claude_code.py  # Claude Code specific installer
-│   │   ├── npm.py          # NPM package installer
-│   │   ├── python.py       # Python package installer
+│   │   ├── npm.py          # NPM/npx installer
+│   │   ├── python.py       # pip/uv installer
 │   │   └── git.py          # Git repository installer
-│   ├── config/
-│   │   ├── __init__.py
-│   │   ├── manager.py      # Configuration management
-│   │   ├── profiles.py     # Profile management
-│   │   └── templates.py    # Configuration templates
+│   ├── config/             # Legacy modules (mostly unused)
 │   └── utils/
 │       ├── __init__.py
 │       ├── filesystem.py   # File system utilities
@@ -119,17 +150,19 @@ mcpi/
 │       └── logging.py      # Logging setup
 ├── data/
 │   ├── registry.json       # MCP server registry
-│   └── templates/          # Configuration templates
+│   └── registry.cue        # CUE schema for registry
 ├── tests/
 │   ├── __init__.py
-│   ├── test_registry.py
-│   ├── test_installer.py
-│   ├── test_config.py
-│   └── test_cli.py
+│   ├── conftest.py         # Shared fixtures
+│   ├── test_harness.py     # Test harness for complex scenarios
+│   ├── test_registry_*.py  # Registry tests
+│   ├── test_clients_*.py   # Client plugin tests
+│   ├── test_cli_*.py       # CLI command tests
+│   └── test_functional_*.py # Functional workflow tests
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
-└── CHANGELOG.md
+└── PROJECT_SPEC.md (this file)
 ```
 
 ## Features
@@ -137,128 +170,194 @@ mcpi/
 ### Core Features
 
 #### Registry Management
-- `mcpi list`: List all available MCP servers
-- `mcpi search <query>`: Search servers by name, description, or capability
-- `mcpi info <server>`: Show detailed information about a server
-- `mcpi categories`: List server categories
+- `mcpi registry list`: List all available MCP servers
+- `mcpi registry search <query>`: Search servers by name, description, or capability
+- `mcpi registry info <server>`: Show detailed information about a server
+- `mcpi registry categories`: List all server categories
 
-#### Installation Management
-- `mcpi install <server>`: Install MCP server
-- `mcpi uninstall <server>`: Remove MCP server
-- `mcpi update <server>`: Update MCP server to latest version
-- `mcpi status`: Show status of installed servers
+#### Server Management
+- `mcpi list`: List installed servers across all scopes
+- `mcpi add <server>`: Install MCP server to a scope
+- `mcpi remove <server>`: Remove MCP server from a scope
+- `mcpi enable <server>`: Enable a disabled server
+- `mcpi disable <server>`: Disable a server without removing
+- `mcpi status`: Show system status and installed servers
 
-#### Configuration Management
-- `mcpi config init`: Initialize configuration
-- `mcpi config profile create <name>`: Create new profile
-- `mcpi config profile switch <name>`: Switch active profile
-- `mcpi config validate`: Validate current configuration
+#### Scope Management
+- `mcpi scope list`: List available configuration scopes for current client
+- `mcpi scope show <scope>`: Show details about a specific scope
+- `mcpi rescope <server> --from <scope> --to <scope>`: Move server between scopes
 
-#### Advanced Features
-- `mcpi doctor`: Diagnose installation and configuration issues
-- `mcpi backup`: Backup current configuration
-- `mcpi restore <backup>`: Restore from backup
-- `mcpi sync`: Sync with remote registry updates
+#### Client Management
+- `mcpi client list`: List detected MCP clients
+- `mcpi client info <client>`: Show information about a specific client
+- `mcpi client set-default <client>`: Set default client
 
-### Integration Features
+#### Shell Integration
+- `mcpi completion --shell bash`: Install bash completion
+- `mcpi completion --shell zsh`: Install zsh completion
+- `mcpi completion --shell fish`: Install fish completion
 
-#### Claude Code Integration
-- Automatic detection of Claude Code installation
-- Direct integration with Claude Code configuration files
-- Support for Claude Code-specific features and settings
+### Deferred Features (Post-1.0)
 
-#### Generic MCP Client Support
-- Plugin architecture for supporting additional MCP clients
-- Generic configuration templates
-- Standard MCP protocol compliance
+#### Not Yet Implemented
+- `mcpi update <server>`: Update MCP server to latest version (1.1)
+- `mcpi doctor`: Diagnose installation and configuration issues (1.1)
+- `mcpi backup`: Backup current configuration (1.1)
+- `mcpi restore <backup>`: Restore from backup (1.1)
+- `mcpi sync`: Sync with remote registry updates (1.2)
 
 ## Dependencies
 
 ### Runtime Dependencies
 - `click`: CLI framework
 - `pydantic`: Data validation and settings management
-- `httpx`: HTTP client for registry updates
-- `toml`: TOML configuration parsing
 - `jsonschema`: JSON schema validation
 - `rich`: Rich text and beautiful formatting for CLI
+- `pyyaml`: YAML parsing for schemas
 
 ### Development Dependencies
 - `pytest`: Testing framework
-- `pytest-asyncio`: Async testing support
 - `black`: Code formatting
 - `ruff`: Linting
 - `mypy`: Type checking
-- `coverage`: Test coverage
 
 ## Quality Standards
 
 ### Code Quality
 - Type hints for all public APIs
-- 95% test coverage minimum
 - Comprehensive error handling
 - Structured logging throughout
+- Plugin architecture for extensibility
 
 ### Documentation
-- Complete API documentation
-- Usage examples for all CLI commands
-- Server registry contribution guidelines
-- Installation troubleshooting guides
+- Complete README with accurate examples
+- CLI help text for all commands
+- Docstrings for all public functions
+- PROJECT_SPEC aligned with implementation
 
 ### Testing Strategy
-- Unit tests for all core functionality
+- Unit tests for individual components
 - Integration tests for installation workflows
-- CLI command testing
-- Mock external dependencies appropriately
+- Functional tests for CLI commands
+- Test harness pattern for complex scenarios
+- Current test pass rate: 85.3%
 
 ## Security Considerations
 
 ### Installation Security
-- Verify package signatures where available
-- Sandbox installation processes
 - Validate configuration parameters
-- Secure handling of credentials and API keys
+- Secure handling of environment variables
+- Test mode protection to prevent touching real files
+- Schema validation before writing configuration
 
 ### Registry Security
-- Cryptographic verification of registry updates
-- Malware scanning integration hooks
-- Community reporting mechanisms for malicious packages
+- CUE schema validation for registry data
+- Pydantic model validation for type safety
+- Manual review of registry entries
+- Community contribution guidelines
 
 ## Deployment & Distribution
 
 ### Package Distribution
-- PyPI package distribution
-- GitHub releases with binaries
-- Docker container support
-- Homebrew formula for macOS
+- PyPI package distribution (planned)
+- GitHub releases
+- Development installation via uv
 
 ### Installation Methods
 ```bash
+# Via uvx (recommended)
+uvx mcpi
+
 # Via uv
-uv add mcpi
-
-# Via pip
-pip install mcpi
-
-# Via homebrew
-brew install mcpi
+uv tool install mcpi
 
 # Development installation
 git clone https://github.com/user/mcpi
 cd mcpi
 uv sync
+source .venv/bin/activate
 ```
+
+## Architecture Design Patterns
+
+### Plugin Pattern
+- `MCPClientPlugin` protocol defines client interface
+- Each client is an independent plugin
+- Plugins register themselves via `ClientRegistry`
+- Easy to add new client support
+
+### Scope-Based Configuration
+- Hierarchical configuration with priority system
+- Lower priority numbers override higher
+- Scopes isolated by file paths
+- Project-level vs user-level separation
+
+### File-Based Storage
+- Configuration stored in JSON files
+- YAML schemas for validation
+- Direct file manipulation (no database)
+- Human-readable configuration
+
+### Dependency Injection
+- Protocols define interfaces (`ConfigReader`, `ConfigWriter`)
+- Dependencies injected for testability
+- Test harness provides safe overrides
+- No global state or singletons
+
+### Lazy Initialization
+- CLI commands lazy-load components
+- Fast startup time
+- Only load what's needed
+- Efficient for quick operations
+
+## Implementation Notes
+
+### Design Evolution
+The current implementation evolved from an earlier profile-based design to a more flexible scope-based architecture:
+
+**Old Approach (Deprecated)**:
+- Profile-based configuration (`ProfileManager`)
+- Template system for configuration
+- Separate config manager layer
+
+**Current Approach (Implemented)**:
+- Scope-based plugin architecture
+- Direct file manipulation with validation
+- Each client defines its own scopes
+- No template layer (configuration in files)
+
+### Why Scope-Based Is Better
+1. **More Flexible**: Clients define their own scope structure
+2. **Less Abstraction**: Direct file manipulation is simpler
+3. **Extensible**: Easy to add new clients with different scope models
+4. **Standard-Aligned**: Matches how MCP clients actually work
+5. **Test-Friendly**: Scope handlers easy to isolate and test
+
+### Key Lessons Learned
+- **Delete Over Fix**: Removing obsolete code faster than fixing
+- **Documentation Matters**: Accurate docs more valuable than features
+- **Test Infrastructure First**: Healthy tests enable fast development
+- **Architecture Pays Off**: Good design makes features quick to add
 
 ## Future Enhancements
 
-### Planned Features
+### Planned for 1.1
+- `mcpi update` command for updating servers
+- `mcpi doctor` for diagnostics
+- Test coverage improvements to 90%+
+- CLI refactoring (modularize 1,381-line cli.py)
+- Additional integration tests
+
+### Planned for 1.2+
+- Additional client plugins (Cursor, VS Code)
 - Web dashboard for registry management
-- Plugin system for custom installers
-- Integration with package managers (Homebrew, APT)
-- Automated server compatibility testing
+- Configuration backup/restore
+- Remote registry sync
 - Community server submission system
 
 ### Integration Opportunities
 - VS Code extension integration
 - GitHub Actions for CI/CD workflows
-- Docker Compose template generation
-- Kubernetes deployment manifests
+- Homebrew formula for macOS
+- Docker container support
