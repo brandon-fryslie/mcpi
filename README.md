@@ -1,5 +1,9 @@
 # MCP Manager (mcpi)
 
+[![Test](https://github.com/user/mcpi/actions/workflows/test.yml/badge.svg)](https://github.com/user/mcpi/actions/workflows/test.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A command-line tool for managing Model Context Protocol (MCP) servers across different MCP-compatible clients. Discover, install, and configure MCP servers for Claude Code and other compatible tools with ease.
 
 ## Features

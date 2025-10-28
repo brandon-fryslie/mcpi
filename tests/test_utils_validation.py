@@ -4,17 +4,15 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from mcpi.utils.validation import (
-    validate_url,
-    validate_path,
-    validate_server_id,
-    validate_package_name,
-    validate_version,
+    sanitize_filename,
     validate_email,
     validate_license,
-    sanitize_filename,
+    validate_package_name,
+    validate_path,
+    validate_server_id,
+    validate_url,
+    validate_version,
 )
 
 
@@ -61,13 +59,13 @@ class TestValidationUtils:
         result = validate_url(None)
         assert result is False
 
-    @patch('mcpi.utils.validation.urlparse')
+    @patch("mcpi.utils.validation.urlparse")
     def test_validate_url_exception_handling(self, mock_urlparse):
         """Test validate_url handles exceptions."""
         mock_urlparse.side_effect = ValueError("Invalid URL")
-        
+
         result = validate_url("malformed-url")
-        
+
         assert result is False
 
     def test_validate_path_valid_existing_file(self):
@@ -107,22 +105,22 @@ class TestValidationUtils:
         # Should not raise exception and return reasonable result
         assert isinstance(result, bool)
 
-    @patch('pathlib.Path.expanduser')
+    @patch("pathlib.Path.expanduser")
     def test_validate_path_os_error(self, mock_expanduser):
         """Test validate_path handles OS errors."""
         mock_expanduser.side_effect = OSError("System error")
-        
+
         result = validate_path("/some/path")
-        
+
         assert result is False
 
-    @patch('pathlib.Path.expanduser')
+    @patch("pathlib.Path.expanduser")
     def test_validate_path_value_error(self, mock_expanduser):
         """Test validate_path handles value errors."""
         mock_expanduser.side_effect = ValueError("Invalid path")
-        
+
         result = validate_path("invalid\\path")
-        
+
         assert result is False
 
     def test_validate_server_id_valid_single_char(self):
@@ -422,9 +420,9 @@ class TestValidationUtils:
         long_name = "a" * 250
         extension = ".txt"
         long_filename = long_name + extension
-        
+
         result = sanitize_filename(long_filename)
-        
+
         assert len(result) <= 255
         assert result.endswith(extension)
 

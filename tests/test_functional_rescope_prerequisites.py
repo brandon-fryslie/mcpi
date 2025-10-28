@@ -80,20 +80,13 @@ Expected behavior:
 - P1-1 tests: WILL FAIL (rescope not implemented yet - TDD approach)
 """
 
-import json
 import subprocess
-import tempfile
 from pathlib import Path
-from typing import Dict, Any
+
 import pytest
 
 from mcpi.clients.claude_code import ClaudeCodePlugin
-from mcpi.clients.manager import MCPManager
-from mcpi.clients.registry import ClientRegistry
-from mcpi.clients.types import ServerConfig, OperationResult
-
-from test_harness import MCPTestHarness, mcp_test_dir, mcp_harness, prepopulated_harness
-
+from mcpi.clients.types import ServerConfig
 
 # Absolute path to bin/mcpi
 BIN_MCPI = Path(__file__).parent.parent / "bin" / "mcpi"
@@ -142,13 +135,13 @@ class TestP0_2_GetServerConfigAPI:
         scope_handler = plugin.get_scope_handler("user-global")
 
         # CRITICAL CHECK: Method must exist
-        assert hasattr(scope_handler, 'get_server_config'), \
-            "PLAN P0-2 BLOCKED: ScopeHandler.get_server_config() method does not exist"
+        assert hasattr(
+            scope_handler, "get_server_config"
+        ), "PLAN P0-2 BLOCKED: ScopeHandler.get_server_config() method does not exist"
 
         # Verify it's callable
-        method = getattr(scope_handler, 'get_server_config')
-        assert callable(method), \
-            "get_server_config exists but is not callable"
+        method = scope_handler.get_server_config
+        assert callable(method), "get_server_config exists but is not callable"
 
         # Verify we can call it (even if it raises - we test that separately)
         try:
@@ -188,35 +181,42 @@ class TestP0_2_GetServerConfigAPI:
         server_config = scope_handler.get_server_config("filesystem")
 
         # VALIDATION 1: Return type
-        assert isinstance(server_config, dict), \
-            f"get_server_config() should return dict, got {type(server_config)}"
+        assert isinstance(
+            server_config, dict
+        ), f"get_server_config() should return dict, got {type(server_config)}"
 
         # VALIDATION 2: Required fields present
         required_fields = ["command", "args", "type"]
         for field in required_fields:
-            assert field in server_config, \
-                f"get_server_config() missing required field: '{field}'"
+            assert (
+                field in server_config
+            ), f"get_server_config() missing required field: '{field}'"
 
         # VALIDATION 3: Specific values correct
-        assert server_config["command"] == "npx", \
-            f"Expected command 'npx', got '{server_config.get('command')}'"
-        assert isinstance(server_config["args"], list), \
-            "args should be a list"
-        assert "-y" in server_config["args"], \
-            "args should contain '-y' flag"
-        assert "@modelcontextprotocol/server-filesystem" in server_config["args"], \
-            "args should contain package name"
+        assert (
+            server_config["command"] == "npx"
+        ), f"Expected command 'npx', got '{server_config.get('command')}'"
+        assert isinstance(server_config["args"], list), "args should be a list"
+        assert "-y" in server_config["args"], "args should contain '-y' flag"
+        assert (
+            "@modelcontextprotocol/server-filesystem" in server_config["args"]
+        ), "args should contain package name"
 
         # VALIDATION 4: Compare to actual file contents (ANTI-GAMING)
         # Read the file directly using test harness (independent of implementation)
-        file_content = prepopulated_harness.get_server_config("user-global", "filesystem")
+        file_content = prepopulated_harness.get_server_config(
+            "user-global", "filesystem"
+        )
 
-        assert server_config == file_content, \
-            f"get_server_config() data does not match file contents.\n" \
-            f"Returned: {server_config}\n" \
+        assert server_config == file_content, (
+            f"get_server_config() data does not match file contents.\n"
+            f"Returned: {server_config}\n"
             f"File has: {file_content}"
+        )
 
-    def test_get_server_config_raises_error_on_missing_server(self, prepopulated_harness):
+    def test_get_server_config_raises_error_on_missing_server(
+        self, prepopulated_harness
+    ):
         """Test that get_server_config() raises appropriate error for missing server.
 
         STATUS Gap: "Missing get_server_config() method"
@@ -243,8 +243,10 @@ class TestP0_2_GetServerConfigAPI:
 
         # Validate error message is meaningful
         error_message = str(exc_info.value).lower()
-        assert any(keyword in error_message for keyword in ["not found", "does not exist", "missing", "unknown"]), \
-            f"Error message should indicate server not found. Got: {exc_info.value}"
+        assert any(
+            keyword in error_message
+            for keyword in ["not found", "does not exist", "missing", "unknown"]
+        ), f"Error message should indicate server not found. Got: {exc_info.value}"
 
     def test_get_server_config_works_across_all_scope_types(self, prepopulated_harness):
         """Test that get_server_config() works for all scope types.
@@ -272,32 +274,39 @@ class TestP0_2_GetServerConfigAPI:
         user_global = plugin.get_scope_handler("user-global")
         fs_config = user_global.get_server_config("filesystem")
 
-        assert fs_config["command"] == "npx", \
-            "user-global scope: get_server_config returned wrong command"
-        assert isinstance(fs_config["args"], list), \
-            "user-global scope: args should be list"
+        assert (
+            fs_config["command"] == "npx"
+        ), "user-global scope: get_server_config returned wrong command"
+        assert isinstance(
+            fs_config["args"], list
+        ), "user-global scope: args should be list"
 
         # TEST 2: project-mcp scope (.mcp.json: {"mcpServers": {...}})
         project_mcp = plugin.get_scope_handler("project-mcp")
         project_config = project_mcp.get_server_config("project-tool")
 
-        assert project_config["command"] == "python", \
-            "project-mcp scope: get_server_config returned wrong command"
-        assert "-m" in project_config["args"], \
-            "project-mcp scope: args should contain '-m' flag"
+        assert (
+            project_config["command"] == "python"
+        ), "project-mcp scope: get_server_config returned wrong command"
+        assert (
+            "-m" in project_config["args"]
+        ), "project-mcp scope: args should contain '-m' flag"
 
         # TEST 3: user-internal scope (.claude.json: {"mcpServers": {...}})
         user_internal = plugin.get_scope_handler("user-internal")
         disabled_config = user_internal.get_server_config("disabled-server")
 
-        assert disabled_config["command"] == "node", \
-            "user-internal scope: get_server_config returned wrong command"
+        assert (
+            disabled_config["command"] == "node"
+        ), "user-internal scope: get_server_config returned wrong command"
 
         # CRITICAL: Verify scope-specific fields are preserved
-        assert "disabled" in disabled_config, \
-            "user-internal scope: get_server_config should preserve 'disabled' field"
-        assert disabled_config["disabled"] is True, \
-            "user-internal scope: disabled flag should be True"
+        assert (
+            "disabled" in disabled_config
+        ), "user-internal scope: get_server_config should preserve 'disabled' field"
+        assert (
+            disabled_config["disabled"] is True
+        ), "user-internal scope: disabled flag should be True"
 
     def test_get_server_config_with_complex_config(self, prepopulated_harness):
         """Test get_server_config() with server that has complex configuration.
@@ -325,23 +334,21 @@ class TestP0_2_GetServerConfigAPI:
         github_config = scope_handler.get_server_config("github")
 
         # Validate env vars preserved
-        assert "env" in github_config, \
-            "get_server_config should preserve 'env' field"
-        assert isinstance(github_config["env"], dict), \
-            "env should be a dict"
-        assert "GITHUB_TOKEN" in github_config["env"], \
-            "env should contain GITHUB_TOKEN"
+        assert "env" in github_config, "get_server_config should preserve 'env' field"
+        assert isinstance(github_config["env"], dict), "env should be a dict"
+        assert "GITHUB_TOKEN" in github_config["env"], "env should contain GITHUB_TOKEN"
 
         # Validate command and args
-        assert github_config["command"] == "npx", \
-            "command should be 'npx'"
-        assert "@modelcontextprotocol/server-github" in github_config["args"], \
-            "args should contain github package"
+        assert github_config["command"] == "npx", "command should be 'npx'"
+        assert (
+            "@modelcontextprotocol/server-github" in github_config["args"]
+        ), "args should contain github package"
 
         # Compare to file contents (ANTI-GAMING)
         file_content = prepopulated_harness.get_server_config("user-global", "github")
-        assert github_config == file_content, \
-            "get_server_config should return exact file contents for complex configs"
+        assert (
+            github_config == file_content
+        ), "get_server_config should return exact file contents for complex configs"
 
 
 class TestP0_4_CoreCLIWorkflows:
@@ -378,26 +385,24 @@ class TestP0_4_CoreCLIWorkflows:
         """
         # Run bin/mcpi status
         result = subprocess.run(
-            [str(BIN_MCPI), "status"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            [str(BIN_MCPI), "status"], capture_output=True, text=True, timeout=10
         )
 
         # VALIDATION 1: Command succeeds
-        assert result.returncode == 0, \
-            f"bin/mcpi status failed with code {result.returncode}\n" \
-            f"stderr: {result.stderr}\n" \
+        assert result.returncode == 0, (
+            f"bin/mcpi status failed with code {result.returncode}\n"
+            f"stderr: {result.stderr}\n"
             f"stdout: {result.stdout}"
+        )
 
         # VALIDATION 2: Produces output
-        assert len(result.stdout) > 0, \
-            "bin/mcpi status should produce output"
+        assert len(result.stdout) > 0, "bin/mcpi status should produce output"
 
         # VALIDATION 3: Output contains status information
         output_lower = result.stdout.lower()
-        assert any(keyword in output_lower for keyword in ["server", "client", "scope"]), \
-            f"bin/mcpi status output should show system information. Got:\n{result.stdout}"
+        assert any(
+            keyword in output_lower for keyword in ["server", "client", "scope"]
+        ), f"bin/mcpi status output should show system information. Got:\n{result.stdout}"
 
     def test_cli_list_shows_servers(self, tmp_path):
         """Test that bin/mcpi list command shows configured servers.
@@ -418,20 +423,17 @@ class TestP0_4_CoreCLIWorkflows:
         """
         # Run bin/mcpi list
         result = subprocess.run(
-            [str(BIN_MCPI), "list"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            [str(BIN_MCPI), "list"], capture_output=True, text=True, timeout=10
         )
 
         # VALIDATION 1: Command succeeds
-        assert result.returncode == 0, \
-            f"bin/mcpi list failed with code {result.returncode}\n" \
+        assert result.returncode == 0, (
+            f"bin/mcpi list failed with code {result.returncode}\n"
             f"stderr: {result.stderr}"
+        )
 
         # VALIDATION 2: Produces output
-        assert len(result.stdout) > 0, \
-            "bin/mcpi list should produce output"
+        assert len(result.stdout) > 0, "bin/mcpi list should produce output"
 
     def test_cli_help_command_works(self, tmp_path):
         """Test that bin/mcpi --help shows usage information.
@@ -452,24 +454,24 @@ class TestP0_4_CoreCLIWorkflows:
         """
         # Run bin/mcpi --help
         result = subprocess.run(
-            [str(BIN_MCPI), "--help"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            [str(BIN_MCPI), "--help"], capture_output=True, text=True, timeout=10
         )
 
         # VALIDATION 1: Command succeeds
-        assert result.returncode == 0, \
-            f"bin/mcpi --help failed with code {result.returncode}"
+        assert (
+            result.returncode == 0
+        ), f"bin/mcpi --help failed with code {result.returncode}"
 
         # VALIDATION 2: Shows usage
         output = result.stdout.lower()
-        assert "usage" in output or "commands" in output, \
-            "Help should show usage or commands"
+        assert (
+            "usage" in output or "commands" in output
+        ), "Help should show usage or commands"
 
         # VALIDATION 3: Shows common commands
-        assert any(cmd in output for cmd in ["list", "status", "install"]), \
-            "Help should show available commands"
+        assert any(
+            cmd in output for cmd in ["list", "status", "install"]
+        ), "Help should show available commands"
 
 
 class TestP0_4_ScopeOperations:
@@ -510,43 +512,49 @@ class TestP0_4_ScopeOperations:
 
         # Verify file doesn't have our test server initially
         initial_servers = scope_handler.get_servers()
-        assert "test-new-server" not in initial_servers, \
-            "Test server should not exist initially"
+        assert (
+            "test-new-server" not in initial_servers
+        ), "Test server should not exist initially"
 
         # Execute: Add a new server
         new_config = ServerConfig(
             command="node",
             args=["test-server.js"],
             env={"TEST_VAR": "test_value"},
-            type="stdio"
+            type="stdio",
         )
 
         result = scope_handler.add_server("test-new-server", new_config)
 
         # VALIDATION 1: Operation succeeds
-        assert result.success, \
-            f"add_server should succeed, got: {result.message}"
+        assert result.success, f"add_server should succeed, got: {result.message}"
 
         # VALIDATION 2: Server appears in get_servers()
         updated_servers = scope_handler.get_servers()
-        assert "test-new-server" in updated_servers, \
-            "Server should appear in get_servers() after add"
+        assert (
+            "test-new-server" in updated_servers
+        ), "Server should appear in get_servers() after add"
 
         # VALIDATION 3: Config is correct
         added_config = updated_servers["test-new-server"]
-        assert added_config["command"] == "node", \
-            "Added server command should be 'node'"
-        assert added_config["args"] == ["test-server.js"], \
-            "Added server args should match"
-        assert added_config["env"]["TEST_VAR"] == "test_value", \
-            "Added server env should match"
+        assert (
+            added_config["command"] == "node"
+        ), "Added server command should be 'node'"
+        assert added_config["args"] == [
+            "test-server.js"
+        ], "Added server args should match"
+        assert (
+            added_config["env"]["TEST_VAR"] == "test_value"
+        ), "Added server env should match"
 
         # VALIDATION 4: File on disk is updated (ANTI-GAMING)
         file_content = mcp_harness.read_scope_file("user-global")
-        assert "test-new-server" in file_content["mcpServers"], \
-            "Server should be in actual file on disk"
-        assert file_content["mcpServers"]["test-new-server"]["command"] == "node", \
-            "File should have correct server config"
+        assert (
+            "test-new-server" in file_content["mcpServers"]
+        ), "Server should be in actual file on disk"
+        assert (
+            file_content["mcpServers"]["test-new-server"]["command"] == "node"
+        ), "File should have correct server config"
 
     def test_scope_handler_can_remove_server_from_file(self, prepopulated_harness):
         """Test that scope handler can remove a server and persist to file.
@@ -573,33 +581,32 @@ class TestP0_4_ScopeOperations:
 
         # Verify server exists initially
         initial_servers = scope_handler.get_servers()
-        assert "filesystem" in initial_servers, \
-            "Test server should exist initially"
-        assert "github" in initial_servers, \
-            "Other server should exist initially"
+        assert "filesystem" in initial_servers, "Test server should exist initially"
+        assert "github" in initial_servers, "Other server should exist initially"
 
         # Execute: Remove filesystem server
         result = scope_handler.remove_server("filesystem")
 
         # VALIDATION 1: Operation succeeds
-        assert result.success, \
-            f"remove_server should succeed, got: {result.message}"
+        assert result.success, f"remove_server should succeed, got: {result.message}"
 
         # VALIDATION 2: Server removed from get_servers()
         updated_servers = scope_handler.get_servers()
-        assert "filesystem" not in updated_servers, \
-            "Server should not appear in get_servers() after remove"
+        assert (
+            "filesystem" not in updated_servers
+        ), "Server should not appear in get_servers() after remove"
 
         # VALIDATION 3: Other servers unaffected
-        assert "github" in updated_servers, \
-            "Other servers should remain after remove"
+        assert "github" in updated_servers, "Other servers should remain after remove"
 
         # VALIDATION 4: File on disk is updated (ANTI-GAMING)
         file_content = prepopulated_harness.read_scope_file("user-global")
-        assert "filesystem" not in file_content["mcpServers"], \
-            "Server should not be in actual file on disk"
-        assert "github" in file_content["mcpServers"], \
-            "Other servers should remain in file"
+        assert (
+            "filesystem" not in file_content["mcpServers"]
+        ), "Server should not be in actual file on disk"
+        assert (
+            "github" in file_content["mcpServers"]
+        ), "Other servers should remain in file"
 
 
 class TestP1_1_RescopeFeature_TDD:
@@ -644,20 +651,16 @@ class TestP1_1_RescopeFeature_TDD:
             [str(BIN_MCPI), "rescope", "--help"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         # Should succeed and show help
-        assert result.returncode == 0, \
-            "rescope command should exist and show help"
+        assert result.returncode == 0, "rescope command should exist and show help"
 
         output_lower = result.stdout.lower()
-        assert "rescope" in output_lower, \
-            "Help should mention rescope"
-        assert "--from" in output_lower, \
-            "Help should show --from option"
-        assert "--to" in output_lower, \
-            "Help should show --to option"
+        assert "rescope" in output_lower, "Help should mention rescope"
+        assert "--from" in output_lower, "Help should show --from option"
+        assert "--to" in output_lower, "Help should show --to option"
 
     @pytest.mark.skip(reason="TDD: Rescope feature not implemented yet (PLAN P1-1)")
     def test_rescope_moves_server_between_scopes_via_cli(self, prepopulated_harness):
@@ -692,10 +695,12 @@ class TestP1_1_RescopeFeature_TDD:
         source_servers_before = source_scope.get_servers()
         dest_servers_before = dest_scope.get_servers()
 
-        assert "project-tool" in source_servers_before, \
-            "Source scope should have project-tool server"
-        assert "project-tool" not in dest_servers_before, \
-            "Destination scope should not have project-tool initially"
+        assert (
+            "project-tool" in source_servers_before
+        ), "Source scope should have project-tool server"
+        assert (
+            "project-tool" not in dest_servers_before
+        ), "Destination scope should not have project-tool initially"
 
         # Save original config for comparison
         original_config = source_scope.get_server_config("project-tool")
@@ -704,44 +709,54 @@ class TestP1_1_RescopeFeature_TDD:
         # NOTE: This will fail because rescope doesn't exist yet (TDD)
         result = subprocess.run(
             [
-                str(BIN_MCPI), "rescope", "project-tool",
-                "--from", "project-mcp",
-                "--to", "user-global"
+                str(BIN_MCPI),
+                "rescope",
+                "project-tool",
+                "--from",
+                "project-mcp",
+                "--to",
+                "user-global",
             ],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         # VALIDATION 1: Command succeeds
-        assert result.returncode == 0, \
-            f"rescope command should succeed\n" \
-            f"stderr: {result.stderr}\n" \
+        assert result.returncode == 0, (
+            f"rescope command should succeed\n"
+            f"stderr: {result.stderr}\n"
             f"stdout: {result.stdout}"
+        )
 
         # VALIDATION 2: Server removed from source
         source_servers_after = source_scope.get_servers()
-        assert "project-tool" not in source_servers_after, \
-            "Server should be removed from source scope"
+        assert (
+            "project-tool" not in source_servers_after
+        ), "Server should be removed from source scope"
 
         # VALIDATION 3: Server added to destination
         dest_servers_after = dest_scope.get_servers()
-        assert "project-tool" in dest_servers_after, \
-            "Server should be added to destination scope"
+        assert (
+            "project-tool" in dest_servers_after
+        ), "Server should be added to destination scope"
 
         # VALIDATION 4: Config preserved exactly (CRITICAL)
         moved_config = dest_scope.get_server_config("project-tool")
-        assert moved_config == original_config, \
-            "Rescope should preserve all config fields exactly"
+        assert (
+            moved_config == original_config
+        ), "Rescope should preserve all config fields exactly"
 
         # VALIDATION 5: Files on disk updated (ANTI-GAMING)
         source_file = prepopulated_harness.read_scope_file("project-mcp")
         dest_file = prepopulated_harness.read_scope_file("user-global")
 
-        assert "project-tool" not in source_file.get("mcpServers", {}), \
-            "Source file should not have server after rescope"
-        assert "project-tool" in dest_file.get("mcpServers", {}), \
-            "Destination file should have server after rescope"
+        assert "project-tool" not in source_file.get(
+            "mcpServers", {}
+        ), "Source file should not have server after rescope"
+        assert "project-tool" in dest_file.get(
+            "mcpServers", {}
+        ), "Destination file should have server after rescope"
 
     @pytest.mark.skip(reason="TDD: Rescope feature not implemented yet (PLAN P1-1)")
     def test_rescope_preserves_complex_config_fields(self, prepopulated_harness):
@@ -773,42 +788,50 @@ class TestP1_1_RescopeFeature_TDD:
         original_config = source_scope.get_server_config("github")
 
         # Verify it has complex fields
-        assert "env" in original_config, \
-            "Test server should have env vars"
-        assert "GITHUB_TOKEN" in original_config["env"], \
-            "Test server should have GITHUB_TOKEN env var"
+        assert "env" in original_config, "Test server should have env vars"
+        assert (
+            "GITHUB_TOKEN" in original_config["env"]
+        ), "Test server should have GITHUB_TOKEN env var"
 
         # Execute: Rescope via CLI
         result = subprocess.run(
             [
-                str(BIN_MCPI), "rescope", "github",
-                "--from", "user-global",
-                "--to", "project-mcp"
+                str(BIN_MCPI),
+                "rescope",
+                "github",
+                "--from",
+                "user-global",
+                "--to",
+                "project-mcp",
             ],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
-        assert result.returncode == 0, \
-            f"rescope should succeed, got: {result.stderr}"
+        assert result.returncode == 0, f"rescope should succeed, got: {result.stderr}"
 
         # VALIDATION: All fields preserved
         moved_config = dest_scope.get_server_config("github")
 
         # Check every field
-        assert moved_config["command"] == original_config["command"], \
-            "Command should be preserved"
-        assert moved_config["args"] == original_config["args"], \
-            "Args should be preserved in order"
-        assert moved_config["env"] == original_config["env"], \
-            "Env vars should be preserved"
-        assert moved_config.get("type") == original_config.get("type"), \
-            "Type field should be preserved"
+        assert (
+            moved_config["command"] == original_config["command"]
+        ), "Command should be preserved"
+        assert (
+            moved_config["args"] == original_config["args"]
+        ), "Args should be preserved in order"
+        assert (
+            moved_config["env"] == original_config["env"]
+        ), "Env vars should be preserved"
+        assert moved_config.get("type") == original_config.get(
+            "type"
+        ), "Type field should be preserved"
 
         # Full equality check
-        assert moved_config == original_config, \
-            "All config fields should be preserved exactly"
+        assert (
+            moved_config == original_config
+        ), "All config fields should be preserved exactly"
 
     @pytest.mark.skip(reason="TDD: Rescope feature not implemented yet (PLAN P1-1)")
     def test_rescope_rollback_on_failure(self, prepopulated_harness):
@@ -837,38 +860,43 @@ class TestP1_1_RescopeFeature_TDD:
 
         # Get servers before operation
         servers_before = source_scope.get_servers()
-        assert "filesystem" in servers_before, \
-            "Test server should exist before rescope"
+        assert "filesystem" in servers_before, "Test server should exist before rescope"
 
         # Execute: Try to rescope to invalid scope (should fail)
         result = subprocess.run(
             [
-                str(BIN_MCPI), "rescope", "filesystem",
-                "--from", "user-global",
-                "--to", "invalid-scope-name"
+                str(BIN_MCPI),
+                "rescope",
+                "filesystem",
+                "--from",
+                "user-global",
+                "--to",
+                "invalid-scope-name",
             ],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         # VALIDATION 1: Command fails gracefully
-        assert result.returncode != 0, \
-            "rescope with invalid scope should fail"
+        assert result.returncode != 0, "rescope with invalid scope should fail"
 
         # VALIDATION 2: Error message is clear
-        assert "invalid" in result.stderr.lower() or "not found" in result.stderr.lower(), \
-            f"Error should mention invalid scope, got: {result.stderr}"
+        assert (
+            "invalid" in result.stderr.lower() or "not found" in result.stderr.lower()
+        ), f"Error should mention invalid scope, got: {result.stderr}"
 
         # VALIDATION 3: Source unchanged (rollback worked)
         servers_after = source_scope.get_servers()
-        assert "filesystem" in servers_after, \
-            "Server should remain in source after failed rescope"
+        assert (
+            "filesystem" in servers_after
+        ), "Server should remain in source after failed rescope"
 
         # VALIDATION 4: File on disk unchanged
         file_content = prepopulated_harness.read_scope_file("user-global")
-        assert "filesystem" in file_content["mcpServers"], \
-            "Source file should be unchanged after failed rescope"
+        assert (
+            "filesystem" in file_content["mcpServers"]
+        ), "Source file should be unchanged after failed rescope"
 
 
 # ==============================================================================

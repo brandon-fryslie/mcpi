@@ -4,12 +4,12 @@ import datetime
 import os
 import platform
 import shutil
-import toml
 from pathlib import Path
-from typing import Dict, Any, Optional, List
-from platformdirs import user_config_dir, user_cache_dir
-from pydantic import BaseModel, Field, ValidationError
+from typing import Any, Dict, List, Optional
 
+import toml
+from platformdirs import user_cache_dir, user_config_dir
+from pydantic import BaseModel, Field, ValidationError
 
 # Constants
 DEFAULT_REGISTRY_URL = "https://registry.mcpi.dev/v1/servers.json"
@@ -21,24 +21,21 @@ CLAUDE_CONFIG_FILENAME = "mcp_servers.json"
 CLAUDE_PATHS = {
     "Darwin": Path.home() / ".claude" / CLAUDE_CONFIG_FILENAME,  # macOS
     "Linux": Path.home() / ".config" / "claude" / CLAUDE_CONFIG_FILENAME,
-    "Windows": lambda: Path(os.environ.get("APPDATA", "")) / "claude" / CLAUDE_CONFIG_FILENAME,
+    "Windows": lambda: Path(os.environ.get("APPDATA", ""))
+    / "claude"
+    / CLAUDE_CONFIG_FILENAME,
 }
 
 # Configuration templates
 CONFIG_TEMPLATES = {
-    "development": {
-        "auto_update_registry": False,
-        "logging_level": "DEBUG"
-    },
-    "production": {
-        "auto_update_registry": True,
-        "logging_level": "INFO"
-    }
+    "development": {"auto_update_registry": False, "logging_level": "DEBUG"},
+    "production": {"auto_update_registry": True, "logging_level": "INFO"},
 }
 
 
 class GeneralConfig(BaseModel):
     """General configuration settings."""
+
     registry_url: str = Field(default=DEFAULT_REGISTRY_URL)
     auto_update_registry: bool = Field(default=True)
     default_profile: str = Field(default=DEFAULT_PROFILE_NAME)
@@ -47,15 +44,23 @@ class GeneralConfig(BaseModel):
 
 class ProfileConfig(BaseModel):
     """Profile-specific configuration."""
+
     target: str = Field(description="Installation target (claude-code, generic, etc.)")
-    config_path: Optional[str] = Field(default=None, description="Path to target config file")
+    config_path: Optional[str] = Field(
+        default=None, description="Path to target config file"
+    )
     install_global: bool = Field(default=True, description="Install packages globally")
-    python_path: Optional[str] = Field(default=None, description="Python executable path")
-    use_uv: bool = Field(default=True, description="Prefer uv over pip for Python packages")
+    python_path: Optional[str] = Field(
+        default=None, description="Python executable path"
+    )
+    use_uv: bool = Field(
+        default=True, description="Prefer uv over pip for Python packages"
+    )
 
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
+
     level: str = Field(default="INFO")
     file: Optional[str] = Field(default=None)
     console: bool = Field(default=True)
@@ -63,6 +68,7 @@ class LoggingConfig(BaseModel):
 
 class MCPIConfig(BaseModel):
     """Complete mcpi configuration."""
+
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     profiles: Dict[str, ProfileConfig] = Field(default_factory=dict)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -71,7 +77,9 @@ class MCPIConfig(BaseModel):
 class ConfigManager:
     """Manages mcpi configuration files and profiles."""
 
-    def __init__(self, config_path: Optional[Path] = None, config_dir: Optional[Path] = None):
+    def __init__(
+        self, config_path: Optional[Path] = None, config_dir: Optional[Path] = None
+    ):
         """Initialize configuration manager.
 
         Args:
@@ -107,14 +115,14 @@ class ConfigManager:
             return self._config
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 data = toml.load(f)
 
             self._config = MCPIConfig(**data)
             self._ensure_default_profile()
             return self._config
 
-        except (toml.TomlDecodeError, ValidationError, IOError) as e:
+        except (OSError, toml.TomlDecodeError, ValidationError) as e:
             raise ValueError(f"Invalid configuration file: {e}")
 
     def save_config(self, config: Optional[MCPIConfig] = None) -> bool:
@@ -139,13 +147,13 @@ class ConfigManager:
             # Convert to dictionary and save
             data = config.model_dump()
 
-            with open(self.config_path, 'w', encoding='utf-8') as f:
+            with open(self.config_path, "w", encoding="utf-8") as f:
                 toml.dump(data, f)
 
             self._config = config
             return True
 
-        except (IOError, OSError):
+        except OSError:
             return False
 
     def get_config(self) -> MCPIConfig:
@@ -158,7 +166,9 @@ class ConfigManager:
             self._config = self.load_config()
         return self._config
 
-    def initialize(self, profile: Optional[str] = None, template: Optional[str] = None) -> bool:
+    def initialize(
+        self, profile: Optional[str] = None, template: Optional[str] = None
+    ) -> bool:
         """Initialize configuration with defaults.
 
         Args:
@@ -211,7 +221,9 @@ class ConfigManager:
 
         return config.profiles[profile_name]
 
-    def create_profile(self, name: str, target: str = "claude-code", **kwargs: Any) -> bool:
+    def create_profile(
+        self, name: str, target: str = "claude-code", **kwargs: Any
+    ) -> bool:
         """Create new profile.
 
         Args:
@@ -339,7 +351,9 @@ class ConfigManager:
             else:
                 # Check default profile exists
                 if config.general.default_profile not in config.profiles:
-                    errors.append(f"Default profile '{config.general.default_profile}' not found")
+                    errors.append(
+                        f"Default profile '{config.general.default_profile}' not found"
+                    )
 
                 # Validate each profile
                 for name, profile in config.profiles.items():
@@ -375,13 +389,17 @@ class ConfigManager:
         if profile.target == "claude-code" and profile.config_path:
             config_path = Path(profile.config_path).expanduser()
             if not config_path.parent.exists():
-                errors.append(f"Profile {name}: Config directory does not exist: {config_path.parent}")
+                errors.append(
+                    f"Profile {name}: Config directory does not exist: {config_path.parent}"
+                )
 
         # Check Python path if specified
         if profile.python_path:
             python_path = Path(profile.python_path)
             if not python_path.exists():
-                errors.append(f"Profile {name}: Python executable not found: {python_path}")
+                errors.append(
+                    f"Profile {name}: Python executable not found: {python_path}"
+                )
 
         return errors
 
@@ -404,7 +422,7 @@ class ConfigManager:
             target="claude-code",
             config_path=str(claude_code_path),
             install_global=True,
-            use_uv=True
+            use_uv=True,
         )
 
     def _get_claude_code_config_path(self) -> Path:
@@ -443,7 +461,9 @@ class ConfigManager:
 
         # Apply general settings
         if "auto_update_registry" in template_config:
-            config.general.auto_update_registry = template_config["auto_update_registry"]
+            config.general.auto_update_registry = template_config[
+                "auto_update_registry"
+            ]
 
         # Apply logging settings
         if "logging_level" in template_config:
@@ -502,23 +522,23 @@ class ConfigManager:
             return True
         except Exception:
             return False
-    
+
     def get_active_profile(self) -> str:
         """Get the name of the currently active profile.
-        
+
         Returns:
             Active profile name
         """
         config = self.get_config()
         return config.general.default_profile
-    
+
     def add_server_config(self, server_id: str, server_config: Dict[str, Any]) -> bool:
         """Add a server configuration.
-        
+
         Args:
             server_id: Server identifier
             server_config: Server configuration dictionary
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -526,38 +546,38 @@ class ConfigManager:
             # For now, store server configs in a simple way
             # This could be enhanced to store in profile-specific locations
             config = self.get_config()
-            
+
             # Store server configs in a custom section
-            if not hasattr(config, '_server_configs'):
+            if not hasattr(config, "_server_configs"):
                 config._server_configs = {}
-            
+
             config._server_configs[server_id] = server_config
             return self.save_config(config)
-            
+
         except Exception:
             return False
-    
+
     def get_server_configs(self) -> Dict[str, Dict[str, Any]]:
         """Get all server configurations.
-        
+
         Returns:
             Dictionary of server configurations
         """
         try:
             config = self.get_config()
-            
+
             # Return server configs if they exist
-            if hasattr(config, '_server_configs'):
+            if hasattr(config, "_server_configs"):
                 return config._server_configs
             else:
                 return {}
-                
+
         except Exception:
             return {}
-    
+
     def get_config_path(self) -> Path:
         """Get the configuration file path.
-        
+
         Returns:
             Path to configuration file
         """

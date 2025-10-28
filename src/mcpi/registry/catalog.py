@@ -1,36 +1,49 @@
 """MCP Server Registry Catalog and Models."""
 
 import json
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from .cue_validator import CUEValidator
 
 
 class InstallationMethod(str, Enum):
     """Supported installation methods."""
+
     NPX = "npx"  # For npm packages that can be run with npx
     NPM = "npm"  # For npm packages that need global install
     PIP = "pip"  # For Python packages
-    UV = "uv"   # For Python packages with uv
+    UV = "uv"  # For Python packages with uv
     GIT = "git"  # For git repositories
     DOCKER = "docker"  # For docker-based servers
 
 
 class MCPServer(BaseModel):
     """MCP server registry entry."""
+
     model_config = ConfigDict(use_enum_values=True)
 
     # Core fields
-    description: str = Field(..., description="Brief description of server functionality")
-    command: str = Field(..., description="Base command to run the server (e.g., 'npx', 'python', 'node')")
-    args: List[str] = Field(default_factory=list, description="Arguments for the command")
+    description: str = Field(
+        ..., description="Brief description of server functionality"
+    )
+    command: str = Field(
+        ...,
+        description="Base command to run the server (e.g., 'npx', 'python', 'node')",
+    )
+    args: List[str] = Field(
+        default_factory=list, description="Arguments for the command"
+    )
     repository: Optional[str] = Field(None, description="Git repository URL")
-    categories: List[str] = Field(default_factory=list, description="Server categories for classification")
+    categories: List[str] = Field(
+        default_factory=list, description="Server categories for classification"
+    )
 
-    @field_validator('command')
+    @field_validator("command")
     @classmethod
     def validate_command(cls, v: str) -> str:
         """Ensure command is not empty."""
@@ -38,14 +51,15 @@ class MCPServer(BaseModel):
             raise ValueError("Command cannot be empty")
         return v.strip()
 
-
     def get_install_command(self) -> List[str]:
         """Get the full installation command."""
         # For now, installation is handled by the command and args directly
         # This method may be expanded in the future if needed
         return []
 
-    def get_run_command(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_run_command(
+        self, config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get the full run configuration for Claude Code.
 
         Args:
@@ -58,10 +72,7 @@ class MCPServer(BaseModel):
             config = {}
 
         # Start with base command and args
-        run_config = {
-            "command": self.command,
-            "args": self.args.copy()
-        }
+        run_config = {"command": self.command, "args": self.args.copy()}
 
         # Add environment variables from config if provided
         if config.get("env"):
@@ -72,10 +83,13 @@ class MCPServer(BaseModel):
 
 class ServerRegistry(BaseModel):
     """Complete server registry."""
+
     model_config = ConfigDict(use_enum_values=True)
 
     # Direct mapping of server_id -> MCPServer (root model)
-    servers: Dict[str, MCPServer] = Field(default_factory=dict, description="Server definitions")
+    servers: Dict[str, MCPServer] = Field(
+        default_factory=dict, description="Server definitions"
+    )
 
     def get_server(self, server_id: str) -> Optional[MCPServer]:
         """Get a server by ID."""
@@ -92,8 +106,10 @@ class ServerRegistry(BaseModel):
 
         for server_id, server in self.servers.items():
             # Check ID and description for matches
-            if (query_lower in server_id.lower() or
-                query_lower in server.description.lower()):
+            if (
+                query_lower in server_id.lower()
+                or query_lower in server.description.lower()
+            ):
                 results.append((server_id, server))
 
         return results
@@ -114,7 +130,9 @@ class ServerRegistry(BaseModel):
 class ServerCatalog:
     """Central catalog for MCP servers."""
 
-    def __init__(self, registry_path: Optional[Path] = None, validate_with_cue: bool = True):
+    def __init__(
+        self, registry_path: Optional[Path] = None, validate_with_cue: bool = True
+    ):
         """Initialize the catalog with optional custom registry path.
 
         Args:
@@ -146,7 +164,7 @@ class ServerCatalog:
             self._registry = ServerRegistry()
         else:
             # Load based on file extension
-            if self.registry_path.suffix.lower() in ['.yaml', '.yml']:
+            if self.registry_path.suffix.lower() in [".yaml", ".yml"]:
                 self._load_yaml_registry()
             else:
                 # Default to JSON
@@ -163,24 +181,28 @@ class ServerCatalog:
                 if not is_valid:
                     raise RuntimeError(f"Registry validation failed: {error}")
 
-            with open(self.registry_path, 'r', encoding='utf-8') as f:
+            with open(self.registry_path, encoding="utf-8") as f:
                 data = json.load(f)
             # Convert flat dictionary to ServerRegistry format
             servers = {k: MCPServer(**v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
-            raise RuntimeError(f"Failed to load registry from {self.registry_path}: {e}")
+            raise RuntimeError(
+                f"Failed to load registry from {self.registry_path}: {e}"
+            )
 
     def _load_yaml_registry(self) -> None:
         """Load registry from YAML format."""
         try:
-            with open(self.registry_path, 'r', encoding='utf-8') as f:
+            with open(self.registry_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             # Convert flat dictionary to ServerRegistry format
             servers = {k: MCPServer(**v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
-            raise RuntimeError(f"Failed to load YAML registry from {self.registry_path}: {e}")
+            raise RuntimeError(
+                f"Failed to load YAML registry from {self.registry_path}: {e}"
+            )
 
     def save_registry(self, format_type: str = "json") -> bool:
         """Save registry to file."""
@@ -205,17 +227,21 @@ class ServerCatalog:
             if self.validate_with_cue:
                 is_valid, error = self.cue_validator.validate(data)
                 if not is_valid:
-                    raise RuntimeError(f"Registry validation failed before save: {error}")
+                    raise RuntimeError(
+                        f"Registry validation failed before save: {error}"
+                    )
 
             # Write to file
-            with open(self.registry_path, 'w', encoding='utf-8') as f:
+            with open(self.registry_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             # Validate file after writing if enabled
             if self.validate_with_cue:
                 is_valid, error = self.cue_validator.validate_file(self.registry_path)
                 if not is_valid:
-                    raise RuntimeError(f"Registry validation failed after save: {error}")
+                    raise RuntimeError(
+                        f"Registry validation failed after save: {error}"
+                    )
 
             return True
         except Exception as e:
@@ -225,8 +251,8 @@ class ServerCatalog:
     def _save_yaml_registry(self) -> bool:
         """Save registry in YAML format."""
         try:
-            yaml_path = self.registry_path.with_suffix('.yaml')
-            with open(yaml_path, 'w', encoding='utf-8') as f:
+            yaml_path = self.registry_path.with_suffix(".yaml")
+            with open(yaml_path, "w", encoding="utf-8") as f:
                 # Export as flat dictionary
                 data = {k: v.model_dump() for k, v in self._registry.servers.items()}
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)

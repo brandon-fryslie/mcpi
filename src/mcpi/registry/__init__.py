@@ -1,17 +1,17 @@
 """MCP Server Registry."""
 
 from mcpi.registry.catalog import (
-    MCPServer,
-    ServerRegistry,
-    ServerCatalog,
     InstallationMethod,
+    MCPServer,
+    ServerCatalog,
+    ServerRegistry,
 )
-from mcpi.registry.validation import RegistryValidator
 from mcpi.registry.discovery import ServerDiscovery
+from mcpi.registry.validation import RegistryValidator
 
 __all__ = [
     "MCPServer",
-    "ServerRegistry", 
+    "ServerRegistry",
     "ServerCatalog",
     "InstallationMethod",
     "RegistryValidator",

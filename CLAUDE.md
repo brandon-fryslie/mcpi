@@ -62,6 +62,99 @@ python -m mcpi.cli --help
 mcpi --help
 ```
 
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and quality assurance.
+
+### Workflow Overview
+
+**Location**: `.github/workflows/test.yml`
+
+**Triggers**:
+- Push to `master`, `main`, or `develop` branches
+- Pull requests to `master`, `main`, or `develop` branches
+- Manual workflow dispatch
+
+**Python Versions**: 3.12, 3.13 (matching `requires-python >= 3.12`)
+
+**Operating Systems**: Ubuntu (Linux), macOS, Windows
+
+### CI Jobs
+
+**1. Test Job**
+- Runs pytest across all Python versions and operating systems
+- Generates coverage report on Ubuntu + Python 3.12
+- Uploads coverage HTML report as artifact (30-day retention)
+- Uses uv for fast dependency installation with caching
+
+**2. Quality Job**
+- Runs on Ubuntu + Python 3.12
+- **Black**: Code formatting check (blocking - must pass)
+- **Ruff**: Linting (non-blocking - warnings shown)
+- **mypy**: Type checking (non-blocking - errors shown)
+
+**3. Test Summary Job**
+- Aggregates results from test and quality jobs
+- Fails if tests fail
+- Shows warnings if quality checks have issues
+
+### Quality Gates
+
+**Blocking (Must Pass)**:
+- All tests must pass (currently ~85% pass rate expected)
+- Black formatting must be clean
+
+**Non-Blocking (Warnings Only)**:
+- Ruff linting issues (shown but don't fail build)
+- mypy type errors (shown but don't fail build)
+
+### Local CI Simulation
+
+Run the same checks locally before pushing:
+
+```bash
+# Run tests
+pytest -v --tb=short
+
+# Generate coverage report
+pytest --cov=src/mcpi --cov-report=term --cov-report=html
+
+# Check formatting
+black --check src/ tests/
+
+# Lint code
+ruff check src/ tests/
+
+# Type check
+mypy src/
+
+# Fix issues
+black src/ tests/
+ruff check src/ tests/ --fix
+```
+
+### Viewing CI Results
+
+**GitHub Actions UI**:
+1. Navigate to repository on GitHub
+2. Click "Actions" tab
+3. Select workflow run to view results
+4. Download coverage report from artifacts
+
+**Status Badge**:
+The README displays a CI status badge showing the current build status.
+
+### Python Version Support
+
+**Current**: Python 3.12+ (as specified in `pyproject.toml`)
+
+**CI Testing**: Tests on both Python 3.12 and 3.13
+
+**Future**: To support older Python versions (3.9-3.11), update:
+1. `requires-python` in `pyproject.toml`
+2. `python-version` matrix in `.github/workflows/test.yml`
+3. Test and fix any compatibility issues
+
 ## Project Architecture
 
 MCPI (Model Context Protocol Interface) is a command-line tool and Python library for managing MCP servers across different MCP-compatible clients. The architecture uses a **plugin-based design** with scope-based configuration management.
@@ -129,6 +222,7 @@ Each client plugin defines multiple configuration scopes (e.g., project-level, u
 - **Integration Tests**: Test workflows end-to-end (see `test_installer_workflows_integration.py`)
 - **Functional Tests**: Un-gameable tests that verify real functionality (see `test_cli_scope_features.py`)
 - **Test Harness**: Custom test harness pattern for complex scenarios (see `test_harness.py`)
+- **CI/CD**: Automated testing on every push via GitHub Actions
 
 ### Key Dependencies
 

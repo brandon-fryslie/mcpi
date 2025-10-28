@@ -13,11 +13,9 @@ Test Pattern:
 - Tests are resistant to refactoring (test behavior, not implementation)
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
 from click.testing import CliRunner
-from click.shell_completion import CompletionItem
-import click
 
 from mcpi.cli import main
 from mcpi.clients.types import ServerState
@@ -46,27 +44,28 @@ class TestClientNameCompletion:
         # Setup: Create mock context with manager that has multiple clients
         mock_manager = Mock()
         mock_manager.get_client_info.return_value = {
-            'claude-code': {'server_count': 3, 'scopes': []},
-            'cursor': {'server_count': 1, 'scopes': []},
-            'vscode': {'server_count': 0, 'scopes': []}
+            "claude-code": {"server_count": 3, "scopes": []},
+            "cursor": {"server_count": 1, "scopes": []},
+            "vscode": {"server_count": 0, "scopes": []},
         }
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
         # Execute: Call completion function (will be imported once implemented)
-      # from mcpi.cli import complete_client_names
-      # completions = complete_client_names(mock_ctx, None, "")
 
-        # For now, this test will fail with ImportError or AttributeError
+    # from mcpi.cli import complete_client_names
+    # completions = complete_client_names(mock_ctx, None, "")
 
-        # Verify: Should return all three clients
-      # completion_values = [c.value for c in completions]
-      # assert 'claude-code' in completion_values
-      # assert 'cursor' in completion_values
-      # assert 'vscode' in completion_values
-      # assert len(completion_values) == 3
+    # For now, this test will fail with ImportError or AttributeError
+
+    # Verify: Should return all three clients
+    # completion_values = [c.value for c in completions]
+    # assert 'claude-code' in completion_values
+    # assert 'cursor' in completion_values
+    # assert 'vscode' in completion_values
+    # assert len(completion_values) == 3
 
     def test_complete_client_names_filters_by_prefix(self):
         """Test that client completion filters based on partial input.
@@ -82,24 +81,23 @@ class TestClientNameCompletion:
 
         mock_manager = Mock()
         mock_manager.get_client_info.return_value = {
-            'claude-code': {'server_count': 3},
-            'cursor': {'server_count': 1},
-            'vscode': {'server_count': 0}
+            "claude-code": {"server_count": 3},
+            "cursor": {"server_count": 1},
+            "vscode": {"server_count": 0},
         }
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_client_names
-      # completions = complete_client_names(mock_ctx, None, "cl")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'claude-code' in completion_values
-      # assert 'cursor' not in completion_values
-      # assert 'vscode' not in completion_values
-      # assert len(completion_values) == 1
+    # from mcpi.cli import complete_client_names
+    # completions = complete_client_names(mock_ctx, None, "cl")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'claude-code' in completion_values
+    # assert 'cursor' not in completion_values
+    # assert 'vscode' not in completion_values
+    # assert len(completion_values) == 1
 
     def test_complete_client_names_handles_no_clients(self):
         """Test graceful handling when no clients are detected.
@@ -117,13 +115,12 @@ class TestClientNameCompletion:
         mock_manager.get_client_info.return_value = {}
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_client_names
-      # completions = complete_client_names(mock_ctx, None, "")
-      # assert len(completions) == 0
+    # from mcpi.cli import complete_client_names
+    # completions = complete_client_names(mock_ctx, None, "")
+    # assert len(completions) == 0
 
     def test_complete_client_names_handles_missing_context(self):
         """Test fallback behavior when context is unavailable.
@@ -139,10 +136,9 @@ class TestClientNameCompletion:
         mock_ctx = Mock()
         mock_ctx.obj = {}  # No manager in context
 
-
-      # from mcpi.cli import complete_client_names
-      # completions = complete_client_names(mock_ctx, None, "")
-      # assert len(completions) == 0  # Should return empty, not crash
+    # from mcpi.cli import complete_client_names
+    # completions = complete_client_names(mock_ctx, None, "")
+    # assert len(completions) == 0  # Should return empty, not crash
 
 
 class TestServerIDCompletion:
@@ -166,24 +162,23 @@ class TestServerIDCompletion:
 
         mock_catalog = Mock()
         mock_catalog.list_servers.return_value = [
-            ('aws', Mock(description='AWS integration server')),
-            ('docker', Mock(description='Docker management server')),
-            ('filesystem', Mock(description='Filesystem operations server'))
+            ("aws", Mock(description="AWS integration server")),
+            ("docker", Mock(description="Docker management server")),
+            ("filesystem", Mock(description="Filesystem operations server")),
         ]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'catalog': mock_catalog}
+        mock_ctx.obj = {"catalog": mock_catalog}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'aws' in completion_values
-      # assert 'docker' in completion_values
-      # assert 'filesystem' in completion_values
-      # assert len(completion_values) == 3
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'aws' in completion_values
+    # assert 'docker' in completion_values
+    # assert 'filesystem' in completion_values
+    # assert len(completion_values) == 3
 
     def test_complete_server_ids_includes_help_text(self):
         """Test that server completion includes descriptions as help text.
@@ -198,23 +193,20 @@ class TestServerIDCompletion:
         # NOTE: This test will fail until complete_server_ids() is implemented
 
         mock_server = Mock()
-        mock_server.description = 'AWS integration for cloud services'
+        mock_server.description = "AWS integration for cloud services"
 
         mock_catalog = Mock()
-        mock_catalog.list_servers.return_value = [
-            ('aws', mock_server)
-        ]
+        mock_catalog.list_servers.return_value = [("aws", mock_server)]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'catalog': mock_catalog}
+        mock_ctx.obj = {"catalog": mock_catalog}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "")
-        #
-        # aws_completion = [c for c in completions if c.value == 'aws'][0]
-      # assert 'AWS integration' in aws_completion.help
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "")
+    #
+    # aws_completion = [c for c in completions if c.value == 'aws'][0]
+    # assert 'AWS integration' in aws_completion.help
 
     def test_complete_server_ids_filters_by_prefix(self):
         """Test that server completion filters based on partial input.
@@ -230,23 +222,22 @@ class TestServerIDCompletion:
 
         mock_catalog = Mock()
         mock_catalog.list_servers.return_value = [
-            ('aws', Mock(description='AWS')),
-            ('docker', Mock(description='Docker')),
-            ('dotnet', Mock(description='.NET'))
+            ("aws", Mock(description="AWS")),
+            ("docker", Mock(description="Docker")),
+            ("dotnet", Mock(description=".NET")),
         ]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'catalog': mock_catalog}
+        mock_ctx.obj = {"catalog": mock_catalog}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "doc")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'docker' in completion_values
-      # assert 'aws' not in completion_values
-      # assert 'dotnet' not in completion_values
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "doc")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'docker' in completion_values
+    # assert 'aws' not in completion_values
+    # assert 'dotnet' not in completion_values
 
     def test_complete_server_ids_limits_results(self):
         """Test that server completion limits results to prevent overwhelming output.
@@ -261,22 +252,22 @@ class TestServerIDCompletion:
         # NOTE: This test will fail until complete_server_ids() is implemented
 
         # Create mock catalog with 100 servers
-        mock_servers = [(f'server-{i}', Mock(description=f'Server {i}'))
-                        for i in range(100)]
+        mock_servers = [
+            (f"server-{i}", Mock(description=f"Server {i}")) for i in range(100)
+        ]
 
         mock_catalog = Mock()
         mock_catalog.list_servers.return_value = mock_servers
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'catalog': mock_catalog}
+        mock_ctx.obj = {"catalog": mock_catalog}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "server")
-        #
-        # # Should limit to reasonable number (e.g., 50)
-      # assert len(completions) <= 50
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "server")
+    #
+    # # Should limit to reasonable number (e.g., 50)
+    # assert len(completions) <= 50
 
     def test_complete_server_ids_handles_empty_registry(self):
         """Test graceful handling when registry is empty.
@@ -294,13 +285,12 @@ class TestServerIDCompletion:
         mock_catalog.list_servers.return_value = []
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'catalog': mock_catalog}
+        mock_ctx.obj = {"catalog": mock_catalog}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "")
-      # assert len(completions) == 0
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # assert len(completions) == 0
 
 
 class TestContextAwareServerCompletion:
@@ -328,22 +318,21 @@ class TestContextAwareServerCompletion:
         mock_manager = Mock()
         # Only server1 and server2 are installed
         mock_manager.list_servers.return_value = {
-            'client/scope/server1': Mock(id='server1', state=ServerState.ENABLED),
-            'client/scope/server2': Mock(id='server2', state=ServerState.DISABLED)
+            "client/scope/server1": Mock(id="server1", state=ServerState.ENABLED),
+            "client/scope/server2": Mock(id="server2", state=ServerState.DISABLED),
         }
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'server1' in completion_values
-      # assert 'server2' in completion_values
-        # # Should not include servers from registry that aren't installed
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'server1' in completion_values
+    # assert 'server2' in completion_values
+    # # Should not include servers from registry that aren't installed
 
     def test_enable_command_only_completes_disabled_servers(self):
         """Test that 'enable' command only shows disabled servers.
@@ -360,25 +349,24 @@ class TestContextAwareServerCompletion:
 
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            'client/scope/server1': Mock(id='server1', state=ServerState.ENABLED),
-            'client/scope/server2': Mock(id='server2', state=ServerState.DISABLED),
-            'client/scope/server3': Mock(id='server3', state=ServerState.DISABLED)
+            "client/scope/server1": Mock(id="server1", state=ServerState.ENABLED),
+            "client/scope/server2": Mock(id="server2", state=ServerState.DISABLED),
+            "client/scope/server3": Mock(id="server3", state=ServerState.DISABLED),
         }
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-        # # Simulate context where command is 'enable'
-        # mock_ctx.info_name = 'enable'
-      # completions = complete_server_ids(mock_ctx, None, "")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'server2' in completion_values
-      # assert 'server3' in completion_values
-      # assert 'server1' not in completion_values  # Already enabled
+    # from mcpi.cli import complete_server_ids
+    # # Simulate context where command is 'enable'
+    # mock_ctx.info_name = 'enable'
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'server2' in completion_values
+    # assert 'server3' in completion_values
+    # assert 'server1' not in completion_values  # Already enabled
 
     def test_disable_command_only_completes_enabled_servers(self):
         """Test that 'disable' command only shows enabled servers.
@@ -394,24 +382,23 @@ class TestContextAwareServerCompletion:
 
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            'client/scope/server1': Mock(id='server1', state=ServerState.ENABLED),
-            'client/scope/server2': Mock(id='server2', state=ServerState.ENABLED),
-            'client/scope/server3': Mock(id='server3', state=ServerState.DISABLED)
+            "client/scope/server1": Mock(id="server1", state=ServerState.ENABLED),
+            "client/scope/server2": Mock(id="server2", state=ServerState.ENABLED),
+            "client/scope/server3": Mock(id="server3", state=ServerState.DISABLED),
         }
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
-
-      # from mcpi.cli import complete_server_ids
-        # mock_ctx.info_name = 'disable'
-      # completions = complete_server_ids(mock_ctx, None, "")
-      # completion_values = [c.value for c in completions]
-        #
-      # assert 'server1' in completion_values
-      # assert 'server2' in completion_values
-      # assert 'server3' not in completion_values  # Already disabled
+    # from mcpi.cli import complete_server_ids
+    # mock_ctx.info_name = 'disable'
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # completion_values = [c.value for c in completions]
+    #
+    # assert 'server1' in completion_values
+    # assert 'server2' in completion_values
+    # assert 'server3' not in completion_values  # Already disabled
 
 
 class TestScopeCompletionIntegration:
@@ -437,20 +424,20 @@ class TestScopeCompletionIntegration:
 
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
-            {'name': 'user-internal'},
-            {'name': 'project-mcp'}
+            {"name": "user-internal"},
+            {"name": "project-mcp"},
         ]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
-        mock_ctx.params = {'client': 'claude-code'}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {"client": "claude-code"}
 
         completions = scope_type.shell_complete(mock_ctx, None, "")
         completion_values = [c.value for c in completions]
 
-        assert 'user-internal' in completion_values
-        assert 'project-mcp' in completion_values
-        mock_manager.get_scopes_for_client.assert_called_once_with('claude-code')
+        assert "user-internal" in completion_values
+        assert "project-mcp" in completion_values
+        mock_manager.get_scopes_for_client.assert_called_once_with("claude-code")
 
     def test_scope_completion_filters_by_prefix(self):
         """Test that scope completion filters based on partial input.
@@ -466,21 +453,21 @@ class TestScopeCompletionIntegration:
 
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
-            {'name': 'user-internal'},
-            {'name': 'project'},
-            {'name': 'project-mcp'}
+            {"name": "user-internal"},
+            {"name": "project"},
+            {"name": "project-mcp"},
         ]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
         completions = scope_type.shell_complete(mock_ctx, None, "proj")
         completion_values = [c.value for c in completions]
 
-        assert 'project' in completion_values
-        assert 'project-mcp' in completion_values
-        assert 'user-internal' not in completion_values
+        assert "project" in completion_values
+        assert "project-mcp" in completion_values
+        assert "user-internal" not in completion_values
 
 
 class TestCompletionCommand:
@@ -502,12 +489,12 @@ class TestCompletionCommand:
         # NOTE: This test will fail until completion command is implemented
 
         runner = CliRunner()
-        result = runner.invoke(main, ['completion', '--help'])
+        result = runner.invoke(main, ["completion", "--help"])
 
         # Will fail with "Error: No such command" until implemented
         assert result.exit_code == 0, "completion command should exist"
-        assert 'completion' in result.output.lower()
-        assert 'shell' in result.output.lower()
+        assert "completion" in result.output.lower()
+        assert "shell" in result.output.lower()
 
     def test_completion_command_generates_bash_script(self):
         """Test that completion command generates valid bash script.
@@ -523,13 +510,13 @@ class TestCompletionCommand:
         # NOTE: This test will fail until completion command is implemented
 
         runner = CliRunner()
-        result = runner.invoke(main, ['completion', '--shell', 'bash'])
+        result = runner.invoke(main, ["completion", "--shell", "bash"])
 
         assert result.exit_code == 0
         # Should contain bash completion markers
-        assert '_MCPI_COMPLETE' in result.output or 'complete' in result.output
+        assert "_MCPI_COMPLETE" in result.output or "complete" in result.output
         # Should reference mcpi command
-        assert 'mcpi' in result.output
+        assert "mcpi" in result.output
 
     def test_completion_command_generates_zsh_script(self):
         """Test that completion command generates valid zsh script.
@@ -544,11 +531,11 @@ class TestCompletionCommand:
         # NOTE: This test will fail until completion command is implemented
 
         runner = CliRunner()
-        result = runner.invoke(main, ['completion', '--shell', 'zsh'])
+        result = runner.invoke(main, ["completion", "--shell", "zsh"])
 
         assert result.exit_code == 0
-        assert '_MCPI_COMPLETE' in result.output or 'compinit' in result.output
-        assert 'mcpi' in result.output
+        assert "_MCPI_COMPLETE" in result.output or "compinit" in result.output
+        assert "mcpi" in result.output
 
     def test_completion_command_auto_detects_shell(self):
         """Test that completion command auto-detects shell from environment.
@@ -563,11 +550,11 @@ class TestCompletionCommand:
         # NOTE: This test will fail until completion command is implemented
 
         runner = CliRunner()
-        result = runner.invoke(main, ['completion'], env={'SHELL': '/bin/bash'})
+        result = runner.invoke(main, ["completion"], env={"SHELL": "/bin/bash"})
 
         # Should succeed and generate completion for detected shell
         # (or show helpful error if detection fails)
-        assert result.exit_code == 0 or 'shell' in result.output.lower()
+        assert result.exit_code == 0 or "shell" in result.output.lower()
 
     def test_completion_command_shows_installation_instructions(self):
         """Test that completion command provides setup instructions.
@@ -582,11 +569,11 @@ class TestCompletionCommand:
         # NOTE: This test will fail until completion command is implemented
 
         runner = CliRunner()
-        result = runner.invoke(main, ['completion', '--shell', 'bash'])
+        result = runner.invoke(main, ["completion", "--shell", "bash"])
 
         assert result.exit_code == 0
         # Should mention how to activate completion
-        assert 'bashrc' in result.output.lower() or 'eval' in result.output.lower()
+        assert "bashrc" in result.output.lower() or "eval" in result.output.lower()
 
 
 class TestCompletionEdgeCases:
@@ -620,7 +607,7 @@ class TestCompletionEdgeCases:
         # Should return default scopes as fallback
         assert len(completions) > 0  # Has fallback values
         completion_values = [c.value for c in completions]
-        assert 'user' in completion_values  # Default fallback
+        assert "user" in completion_values  # Default fallback
 
     def test_completion_handles_catalog_load_failure(self):
         """Test completion when catalog fails to load registry.
@@ -641,11 +628,12 @@ class TestCompletionEdgeCases:
         # mock_ctx.obj = {'catalog': mock_catalog}
         # mock_ctx.params = {}
         #
-      # from mcpi.cli import complete_server_ids
-      # completions = complete_server_ids(mock_ctx, None, "")
-        #
-        # # Should handle error and return empty
-      # assert len(completions) == 0
+
+    # from mcpi.cli import complete_server_ids
+    # completions = complete_server_ids(mock_ctx, None, "")
+    #
+    # # Should handle error and return empty
+    # assert len(completions) == 0
 
     def test_completion_handles_partial_client_data(self):
         """Test completion when client info has missing fields.
@@ -670,13 +658,14 @@ class TestCompletionEdgeCases:
         # mock_ctx.obj = {'mcp_manager': mock_manager}
         # mock_ctx.params = {}
         #
-      # from mcpi.cli import complete_client_names
-      # completions = complete_client_names(mock_ctx, None, "")
-        #
-        # # Should still return client names even with incomplete data
-      # completion_values = [c.value for c in completions]
-      # assert 'claude-code' in completion_values
-      # assert 'cursor' in completion_values
+
+    # from mcpi.cli import complete_client_names
+    # completions = complete_client_names(mock_ctx, None, "")
+    #
+    # # Should still return client names even with incomplete data
+    # completion_values = [c.value for c in completions]
+    # assert 'claude-code' in completion_values
+    # assert 'cursor' in completion_values
 
 
 class TestCompletionIntegrationWithClick:
@@ -697,18 +686,18 @@ class TestCompletionIntegrationWithClick:
         """
         # NOTE: This test will fail until decorators are updated
 
-      # from mcpi.cli import list  # list command
-        #
-        # # Find --client option in command parameters
-        # client_option = None
-        # for param in list.params:
-        #     if hasattr(param, 'name') and param.name == 'client':
-        #         client_option = param
-        #         break
-        #
-      # assert client_option is not None, "--client option should exist"
-      # assert hasattr(client_option, 'shell_complete'), "--client should have completion"
-      # assert client_option.shell_complete is not None
+    # from mcpi.cli import list  # list command
+    #
+    # # Find --client option in command parameters
+    # client_option = None
+    # for param in list.params:
+    #     if hasattr(param, 'name') and param.name == 'client':
+    #         client_option = param
+    #         break
+    #
+    # assert client_option is not None, "--client option should exist"
+    # assert hasattr(client_option, 'shell_complete'), "--client should have completion"
+    # assert client_option.shell_complete is not None
 
     def test_server_id_argument_has_completion_callback(self):
         """Test that server_id arguments are wired for completion.
@@ -721,18 +710,18 @@ class TestCompletionIntegrationWithClick:
         """
         # NOTE: This test will fail until decorators are updated
 
-      # from mcpi.cli import add  # add command
-        #
-        # # Find server_id argument in command parameters
-        # server_id_arg = None
-        # for param in add.params:
-        #     if hasattr(param, 'name') and param.name == 'server_id':
-        #         server_id_arg = param
-        #         break
-        #
-      # assert server_id_arg is not None, "server_id argument should exist"
-      # assert hasattr(server_id_arg, 'shell_complete'), "server_id should have completion"
-      # assert server_id_arg.shell_complete is not None
+    # from mcpi.cli import add  # add command
+    #
+    # # Find server_id argument in command parameters
+    # server_id_arg = None
+    # for param in add.params:
+    #     if hasattr(param, 'name') and param.name == 'server_id':
+    #         server_id_arg = param
+    #         break
+    #
+    # assert server_id_arg is not None, "server_id argument should exist"
+    # assert hasattr(server_id_arg, 'shell_complete'), "server_id should have completion"
+    # assert server_id_arg.shell_complete is not None
 
     def test_scope_option_has_dynamic_completion(self):
         """Test that --scope options use DynamicScopeType (regression test).
@@ -747,7 +736,7 @@ class TestCompletionIntegrationWithClick:
         # Find --scope option in command parameters
         scope_option = None
         for param in add.params:
-            if hasattr(param, 'name') and param.name == 'scope':
+            if hasattr(param, "name") and param.name == "scope":
                 scope_option = param
                 break
 
@@ -755,8 +744,10 @@ class TestCompletionIntegrationWithClick:
 
         # Check that it uses DynamicScopeType (which has shell_complete)
         from mcpi.cli import DynamicScopeType
-        assert isinstance(scope_option.type, DynamicScopeType), \
-            "--scope should use DynamicScopeType for completion"
+
+        assert isinstance(
+            scope_option.type, DynamicScopeType
+        ), "--scope should use DynamicScopeType for completion"
 
 
 class TestCompletionPerformance:
@@ -775,18 +766,19 @@ class TestCompletionPerformance:
         - Tests actual performance, not mocked timing
         - Ensures completion is usable in real scenarios
         """
-        from mcpi.cli import DynamicScopeType
         import time
+
+        from mcpi.cli import DynamicScopeType
 
         scope_type = DynamicScopeType()
 
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
-            {'name': f'scope-{i}'} for i in range(10)
+            {"name": f"scope-{i}"} for i in range(10)
         ]
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}
 
         # Measure completion time
@@ -824,16 +816,17 @@ class TestCompletionPerformance:
         # mock_ctx.obj = {'catalog': mock_catalog}
         # mock_ctx.params = {}
         #
-      # from mcpi.cli import complete_server_ids
-        #
-        # start = time.time()
-      # completions = complete_server_ids(mock_ctx, None, "")
-        # elapsed = time.time() - start
-        #
-        # # Should complete quickly even with huge registry
-      # assert elapsed < 0.5, f"Completion too slow: {elapsed*1000:.1f}ms"
-        # # Should limit results
-      # assert len(completions) <= 50, "Should limit results for large registry"
+
+    # from mcpi.cli import complete_server_ids
+    #
+    # start = time.time()
+    # completions = complete_server_ids(mock_ctx, None, "")
+    # elapsed = time.time() - start
+    #
+    # # Should complete quickly even with huge registry
+    # assert elapsed < 0.5, f"Completion too slow: {elapsed*1000:.1f}ms"
+    # # Should limit results
+    # assert len(completions) <= 50, "Should limit results for large registry"
 
 
 # Summary of Test Coverage
@@ -930,26 +923,32 @@ class TestRescopeCompletion:
         # Setup: Mock manager with servers in different scopes
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            'server-in-user-global': Mock(state=ServerState.ENABLED),
-            'another-server': Mock(state=ServerState.ENABLED),
+            "server-in-user-global": Mock(state=ServerState.ENABLED),
+            "another-server": Mock(state=ServerState.ENABLED),
         }
-        mock_manager.get_default_client.return_value = 'claude-code'
+        mock_manager.get_default_client.return_value = "claude-code"
 
         # Create context with both --to and --from parameters set
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
-        mock_ctx.params = {'to_scope': 'project-mcp', 'from_scope': 'user-global', 'client': 'claude-code'}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {
+            "to_scope": "project-mcp",
+            "from_scope": "user-global",
+            "client": "claude-code",
+        }
 
         # Simulate user hitting TAB for server_name argument
-        completions = complete_rescope_server_name(mock_ctx, None, '')
+        completions = complete_rescope_server_name(mock_ctx, None, "")
 
         # Verify completion calls list_servers with correct scope
-        mock_manager.list_servers.assert_called_with(client='claude-code', scope='user-global')
+        mock_manager.list_servers.assert_called_with(
+            client="claude-code", scope="user-global"
+        )
 
         # Verify returns servers from that scope
         completion_values = [c.value for c in completions]
-        assert 'server-in-user-global' in completion_values
-        assert 'another-server' in completion_values
+        assert "server-in-user-global" in completion_values
+        assert "another-server" in completion_values
 
     def test_rescope_to_scope_excludes_from_scope(self):
         """Test that --to completion excludes the --from scope.
@@ -967,34 +966,37 @@ class TestRescopeCompletion:
         # Create mock manager with multiple scopes
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
-            {'name': 'project-mcp', 'priority': 1},
-            {'name': 'user-global', 'priority': 4},
-            {'name': 'user-local', 'priority': 3},
-            {'name': 'user-mcp', 'priority': 6},
+            {"name": "project-mcp", "priority": 1},
+            {"name": "user-global", "priority": 4},
+            {"name": "user-local", "priority": 3},
+            {"name": "user-mcp", "priority": 6},
         ]
 
         # Create context where --from is already set to user-global
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
-        mock_ctx.params = {'from_scope': 'user-global', 'client': 'claude-code'}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {"from_scope": "user-global", "client": "claude-code"}
 
         # Create mock param to indicate we're completing the --to parameter
         mock_param = Mock()
-        mock_param.name = 'to_scope'
+        mock_param.name = "to_scope"
 
         # Test --to scope completion
         scope_type = DynamicScopeType()
-        completions = scope_type.shell_complete(mock_ctx, mock_param, '')
+        completions = scope_type.shell_complete(mock_ctx, mock_param, "")
 
         completion_values = [c.value for c in completions]
 
         # Should include other scopes
-        assert 'project-mcp' in completion_values
-        assert 'user-local' in completion_values
-        assert 'user-mcp' in completion_values
+        assert "project-mcp" in completion_values
+        assert "user-local" in completion_values
+        assert "user-mcp" in completion_values
 
         # Should NOT include the --from scope
-        assert 'user-global' not in completion_values or len([c for c in completions if c.value == 'user-global']) == 0
+        assert (
+            "user-global" not in completion_values
+            or len([c for c in completions if c.value == "user-global"]) == 0
+        )
 
     def test_rescope_completion_with_no_from_scope_shows_all(self):
         """Test that without --from set, all scopes are shown.
@@ -1010,29 +1012,29 @@ class TestRescopeCompletion:
 
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
-            {'name': 'project-mcp', 'priority': 1},
-            {'name': 'user-global', 'priority': 4},
-            {'name': 'user-local', 'priority': 3},
+            {"name": "project-mcp", "priority": 1},
+            {"name": "user-global", "priority": 4},
+            {"name": "user-local", "priority": 3},
         ]
 
         # Context without from_scope set
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
-        mock_ctx.params = {'client': 'claude-code'}  # No from_scope
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {"client": "claude-code"}  # No from_scope
 
         # Mock param (no name set, or generic name)
         mock_param = Mock()
-        mock_param.name = 'to_scope'
+        mock_param.name = "to_scope"
 
         scope_type = DynamicScopeType()
-        completions = scope_type.shell_complete(mock_ctx, mock_param, '')
+        completions = scope_type.shell_complete(mock_ctx, mock_param, "")
 
         completion_values = [c.value for c in completions]
 
         # Should show all scopes when source unknown
-        assert 'project-mcp' in completion_values
-        assert 'user-global' in completion_values
-        assert 'user-local' in completion_values
+        assert "project-mcp" in completion_values
+        assert "user-global" in completion_values
+        assert "user-local" in completion_values
 
     def test_rescope_without_scopes_shows_all_servers(self):
         """Test that typing 'mcpi rescope <TAB>' shows all installed servers.
@@ -1049,24 +1051,24 @@ class TestRescopeCompletion:
         # Setup: Mock manager with servers in different scopes
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            'server-in-user': Mock(),
-            'server-in-project': Mock(),
-            'another-server': Mock(),
+            "server-in-user": Mock(),
+            "server-in-project": Mock(),
+            "another-server": Mock(),
         }
-        mock_manager.get_default_client.return_value = 'claude-code'
+        mock_manager.get_default_client.return_value = "claude-code"
 
         mock_ctx = Mock()
-        mock_ctx.obj = {'mcp_manager': mock_manager}
+        mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {}  # No scopes specified
 
         # Simulate user hitting TAB after 'mcpi rescope '
-        completions = complete_rescope_server_name(mock_ctx, None, '')
+        completions = complete_rescope_server_name(mock_ctx, None, "")
 
         # Should show all installed servers
         completion_values = [c.value for c in completions]
-        assert 'server-in-user' in completion_values
-        assert 'server-in-project' in completion_values
-        assert 'another-server' in completion_values
+        assert "server-in-user" in completion_values
+        assert "server-in-project" in completion_values
+        assert "another-server" in completion_values
 
         # Verify it called list_servers without scope filter
-        mock_manager.list_servers.assert_called_with(client='claude-code')
+        mock_manager.list_servers.assert_called_with(client="claude-code")

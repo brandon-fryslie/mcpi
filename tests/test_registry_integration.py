@@ -12,12 +12,13 @@ These tests eliminate the need for ad-hoc validation commands like:
 """
 
 import json
-import pytest
 from pathlib import Path
-from mcpi.registry.catalog import ServerRegistry, MCPServer
-from mcpi.registry.validation import RegistryValidator
-from mcpi.registry.cue_validator import CUEValidator
 
+import pytest
+
+from mcpi.registry.catalog import MCPServer, ServerRegistry
+from mcpi.registry.cue_validator import CUEValidator
+from mcpi.registry.validation import RegistryValidator
 
 # Path to actual registry file
 REGISTRY_PATH = Path(__file__).parent.parent / "data" / "registry.json"
@@ -34,7 +35,7 @@ class TestActualRegistryValidation:
     def test_json_syntax_valid(self):
         """Layer 1: Validate JSON syntax is correct."""
         try:
-            with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+            with open(REGISTRY_PATH, encoding="utf-8") as f:
                 data = json.load(f)
             assert isinstance(data, dict), "Registry root must be a dictionary"
         except json.JSONDecodeError as e:
@@ -57,7 +58,7 @@ class TestActualRegistryValidation:
 
     def test_pydantic_model_validation(self):
         """Layer 3: Validate data loads into Pydantic models."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         try:
@@ -70,7 +71,9 @@ class TestActualRegistryValidation:
 
         # Verify each server is an MCPServer instance
         for server_id, server in registry.servers.items():
-            assert isinstance(server, MCPServer), f"Server {server_id} is not an MCPServer instance"
+            assert isinstance(
+                server, MCPServer
+            ), f"Server {server_id} is not an MCPServer instance"
 
     def test_semantic_validation(self):
         """Layer 4: Validate business logic and semantic rules."""
@@ -78,15 +81,15 @@ class TestActualRegistryValidation:
         is_valid = validator.validate_registry_file(REGISTRY_PATH)
         result = validator.get_validation_report()
 
-        errors = result.get('errors', [])
-        warnings = result.get('warnings', [])
+        errors = result.get("errors", [])
+        warnings = result.get("warnings", [])
 
         # Format error message if validation fails
         # Note: Semantic validation may fail due to schema mismatch with simplified model
         # This is expected until the validation code is updated to match the current schema
         if errors:
             # Filter out errors related to missing attributes in simplified model
-            real_errors = [e for e in errors if 'has no attribute' not in e]
+            real_errors = [e for e in errors if "has no attribute" not in e]
             if real_errors:
                 error_msg = "Semantic validation errors found:\n"
                 for error in real_errors:
@@ -96,11 +99,12 @@ class TestActualRegistryValidation:
         # Warnings are non-fatal - just log them
         if warnings:
             import warnings as py_warnings
+
             py_warnings.warn(f"Registry has {len(warnings)} validation warnings")
 
     def test_all_servers_valid(self):
         """Layer 5: Validate each individual server entry."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         registry = ServerRegistry(servers=data)
@@ -108,68 +112,80 @@ class TestActualRegistryValidation:
         for server_id, server in registry.servers.items():
             # Required fields
             assert server.description, f"Server {server_id} missing description"
-            assert server.description.strip(), f"Server {server_id} has empty description"
+            assert (
+                server.description.strip()
+            ), f"Server {server_id} has empty description"
 
             assert server.command, f"Server {server_id} missing command"
             assert server.command.strip(), f"Server {server_id} has empty command"
 
             # Args should be a list (can be empty)
-            assert isinstance(server.args, list), f"Server {server_id} args must be a list"
+            assert isinstance(
+                server.args, list
+            ), f"Server {server_id} args must be a list"
 
             # Repository is optional, but if present should be a string or None
-            assert server.repository is None or isinstance(server.repository, str), \
-                f"Server {server_id} repository must be string or None"
+            assert server.repository is None or isinstance(
+                server.repository, str
+            ), f"Server {server_id} repository must be string or None"
 
             # If repository is provided, it should be a valid URL
             if server.repository:
-                assert server.repository.startswith(('http://', 'https://', 'git://')), \
-                    f"Server {server_id} repository must be a valid URL: {server.repository}"
+                assert server.repository.startswith(
+                    ("http://", "https://", "git://")
+                ), f"Server {server_id} repository must be a valid URL: {server.repository}"
 
     def test_server_ids_are_valid(self):
         """Validate all server IDs follow naming conventions."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         for server_id in data.keys():
             # Server IDs should be lowercase alphanumeric with hyphens
             assert server_id, "Server ID cannot be empty"
-            assert server_id == server_id.lower(), \
-                f"Server ID {server_id} should be lowercase"
-            assert all(c.isalnum() or c == '-' for c in server_id), \
-                f"Server ID {server_id} should only contain lowercase letters, numbers, and hyphens"
-            assert not server_id.startswith('-') and not server_id.endswith('-'), \
-                f"Server ID {server_id} should not start or end with hyphen"
+            assert (
+                server_id == server_id.lower()
+            ), f"Server ID {server_id} should be lowercase"
+            assert all(
+                c.isalnum() or c == "-" for c in server_id
+            ), f"Server ID {server_id} should only contain lowercase letters, numbers, and hyphens"
+            assert not server_id.startswith("-") and not server_id.endswith(
+                "-"
+            ), f"Server ID {server_id} should not start or end with hyphen"
 
     def test_no_duplicate_servers(self):
         """Verify no duplicate server entries."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         server_ids = list(data.keys())
         unique_ids = set(server_ids)
 
-        assert len(server_ids) == len(unique_ids), \
-            f"Duplicate server IDs found: {[sid for sid in server_ids if server_ids.count(sid) > 1]}"
+        assert len(server_ids) == len(
+            unique_ids
+        ), f"Duplicate server IDs found: {[sid for sid in server_ids if server_ids.count(sid) > 1]}"
 
     def test_common_servers_present(self):
         """Verify expected common servers are in the registry."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         # Servers we just added/verified
-        expected_servers = ['context7', 'sequentialthinking']
+        expected_servers = ["context7", "sequentialthinking"]
 
         for server_id in expected_servers:
-            assert server_id in data, \
-                f"Expected server '{server_id}' not found in registry"
+            assert (
+                server_id in data
+            ), f"Expected server '{server_id}' not found in registry"
 
     def test_registry_not_empty(self):
         """Verify registry contains at least some servers."""
-        with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert len(data) >= 10, \
-            f"Registry seems sparse - only {len(data)} servers. Expected at least 10."
+        assert (
+            len(data) >= 10
+        ), f"Registry seems sparse - only {len(data)} servers. Expected at least 10."
 
 
 class TestRegistryConsistency:
@@ -201,8 +217,9 @@ class TestRegistryConsistency:
         content_normalized = content.rstrip()
         expected_normalized = expected_format.rstrip()
 
-        assert content_normalized == expected_normalized, \
-            "registry.json formatting is inconsistent. Run: python -m json.tool --indent 2 data/registry.json > temp && mv temp data/registry.json"
+        assert (
+            content_normalized == expected_normalized
+        ), "registry.json formatting is inconsistent. Run: python -m json.tool --indent 2 data/registry.json > temp && mv temp data/registry.json"
 
 
 if __name__ == "__main__":

@@ -44,17 +44,13 @@ These tests cannot be gamed because:
 5. They assert on OBSERVABLE outcomes (what users would see)
 """
 
-import json
+
 import pytest
-from pathlib import Path
-from typing import Dict, Any
 
 from mcpi.clients.claude_code import ClaudeCodePlugin
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.registry import ClientRegistry
-from mcpi.clients.types import ServerConfig, OperationResult
-
-from test_harness import MCPTestHarness, mcp_test_dir, mcp_harness, prepopulated_harness
+from mcpi.clients.types import OperationResult
 
 
 class TestCriticalAPI:
@@ -94,12 +90,14 @@ class TestCriticalAPI:
         scope_handler = plugin.get_scope_handler("user-global")
 
         # CRITICAL: Verify the method exists
-        assert hasattr(scope_handler, 'get_server_config'), \
-            "ScopeHandler missing get_server_config() method (PLAN P0-2)"
+        assert hasattr(
+            scope_handler, "get_server_config"
+        ), "ScopeHandler missing get_server_config() method (PLAN P0-2)"
 
         # Verify it's callable
-        assert callable(scope_handler.get_server_config), \
-            "get_server_config exists but is not callable"
+        assert callable(
+            scope_handler.get_server_config
+        ), "get_server_config exists but is not callable"
 
     def test_get_server_config_returns_complete_data(self, prepopulated_harness):
         """Test that get_server_config() returns complete server configuration.
@@ -128,12 +126,13 @@ class TestCriticalAPI:
         server_config = scope_handler.get_server_config("filesystem")
 
         # Verify it's a dict with required fields
-        assert isinstance(server_config, dict), \
-            "get_server_config should return dict (or ServerConfig)"
-        assert "command" in server_config, \
-            "ServerConfig missing 'command' field"
-        assert server_config["command"] == "npx", \
-            f"Expected command 'npx', got '{server_config['command']}'"
+        assert isinstance(
+            server_config, dict
+        ), "get_server_config should return dict (or ServerConfig)"
+        assert "command" in server_config, "ServerConfig missing 'command' field"
+        assert (
+            server_config["command"] == "npx"
+        ), f"Expected command 'npx', got '{server_config['command']}'"
 
         # Verify args are present and correct
         assert "args" in server_config, "ServerConfig missing 'args' field"
@@ -141,9 +140,12 @@ class TestCriticalAPI:
         assert "-y" in server_config["args"], "args missing expected values"
 
         # Verify complete data matches file contents
-        file_content = prepopulated_harness.get_server_config("user-global", "filesystem")
-        assert server_config == file_content, \
-            "get_server_config() returned data doesn't match file contents"
+        file_content = prepopulated_harness.get_server_config(
+            "user-global", "filesystem"
+        )
+        assert (
+            server_config == file_content
+        ), "get_server_config() returned data doesn't match file contents"
 
         # Test 2: Error handling for non-existent server
         with pytest.raises(Exception) as exc_info:
@@ -151,8 +153,9 @@ class TestCriticalAPI:
 
         # Verify error is meaningful
         error_message = str(exc_info.value).lower()
-        assert "not found" in error_message or "does not exist" in error_message, \
-            f"Error message should indicate server not found, got: {exc_info.value}"
+        assert (
+            "not found" in error_message or "does not exist" in error_message
+        ), f"Error message should indicate server not found, got: {exc_info.value}"
 
     def test_get_server_config_works_across_all_scopes(self, prepopulated_harness):
         """Test that get_server_config() works for all scope types.
@@ -177,22 +180,26 @@ class TestCriticalAPI:
         # Test user-global scope (settings.json format)
         user_global = plugin.get_scope_handler("user-global")
         fs_config = user_global.get_server_config("filesystem")
-        assert fs_config["command"] == "npx", \
-            "user-global scope: get_server_config returned wrong data"
+        assert (
+            fs_config["command"] == "npx"
+        ), "user-global scope: get_server_config returned wrong data"
 
         # Test project-mcp scope (.mcp.json format)
         project_mcp = plugin.get_scope_handler("project-mcp")
         project_config = project_mcp.get_server_config("project-tool")
-        assert project_config["command"] == "python", \
-            "project-mcp scope: get_server_config returned wrong data"
+        assert (
+            project_config["command"] == "python"
+        ), "project-mcp scope: get_server_config returned wrong data"
 
         # Test user-internal scope (.claude.json format)
         user_internal = plugin.get_scope_handler("user-internal")
         disabled_config = user_internal.get_server_config("disabled-server")
-        assert disabled_config["command"] == "node", \
-            "user-internal scope: get_server_config returned wrong data"
-        assert disabled_config.get("disabled") is True, \
-            "user-internal scope: should preserve 'disabled' flag"
+        assert (
+            disabled_config["command"] == "node"
+        ), "user-internal scope: get_server_config returned wrong data"
+        assert (
+            disabled_config.get("disabled") is True
+        ), "user-internal scope: should preserve 'disabled' flag"
 
 
 class TestCoreUserWorkflows:
@@ -234,35 +241,41 @@ class TestCoreUserWorkflows:
         user_global = plugin.get_scope_handler("user-global")
         user_servers = user_global.get_servers()
 
-        assert len(user_servers) == 2, \
-            f"Expected 2 servers in user-global, got {len(user_servers)}"
-        assert "filesystem" in user_servers, \
-            "user-global should contain 'filesystem' server"
-        assert "github" in user_servers, \
-            "user-global should contain 'github' server"
+        assert (
+            len(user_servers) == 2
+        ), f"Expected 2 servers in user-global, got {len(user_servers)}"
+        assert (
+            "filesystem" in user_servers
+        ), "user-global should contain 'filesystem' server"
+        assert "github" in user_servers, "user-global should contain 'github' server"
 
         # Test project-mcp scope
         project_mcp = plugin.get_scope_handler("project-mcp")
         project_servers = project_mcp.get_servers()
 
-        assert len(project_servers) == 1, \
-            f"Expected 1 server in project-mcp, got {len(project_servers)}"
-        assert "project-tool" in project_servers, \
-            "project-mcp should contain 'project-tool' server"
+        assert (
+            len(project_servers) == 1
+        ), f"Expected 1 server in project-mcp, got {len(project_servers)}"
+        assert (
+            "project-tool" in project_servers
+        ), "project-mcp should contain 'project-tool' server"
 
         # Test user-internal scope
         user_internal = plugin.get_scope_handler("user-internal")
         internal_servers = user_internal.get_servers()
 
-        assert len(internal_servers) == 1, \
-            f"Expected 1 server in user-internal, got {len(internal_servers)}"
-        assert "disabled-server" in internal_servers, \
-            "user-internal should contain 'disabled-server'"
+        assert (
+            len(internal_servers) == 1
+        ), f"Expected 1 server in user-internal, got {len(internal_servers)}"
+        assert (
+            "disabled-server" in internal_servers
+        ), "user-internal should contain 'disabled-server'"
 
         # Verify disabled state is preserved
         disabled_config = internal_servers["disabled-server"]
-        assert disabled_config.get("disabled") is True, \
-            "disabled flag should be preserved in server listing"
+        assert (
+            disabled_config.get("disabled") is True
+        ), "disabled flag should be preserved in server listing"
 
     def test_add_and_remove_server_workflow(self, mcp_harness):
         """Test complete add → verify → remove workflow.
@@ -286,10 +299,9 @@ class TestCoreUserWorkflows:
         - Cannot pass with in-memory stubs
         """
         # Create a clean test environment
-        mcp_harness.prepopulate_file("user-global", {
-            "mcpEnabled": True,
-            "mcpServers": {}
-        })
+        mcp_harness.prepopulate_file(
+            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+        )
 
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
         scope_handler = plugin.get_scope_handler("user-global")
@@ -302,7 +314,7 @@ class TestCoreUserWorkflows:
         new_server_config = {
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-memory"],
-            "type": "stdio"
+            "type": "stdio",
         }
 
         result = scope_handler.add_server("memory-server", new_server_config)
@@ -320,10 +332,12 @@ class TestCoreUserWorkflows:
 
         # Verify configuration is correct
         saved_config = mcp_harness.get_server_config("user-global", "memory-server")
-        assert saved_config["command"] == "npx", \
-            f"Expected command 'npx', got '{saved_config['command']}'"
-        assert saved_config["args"] == new_server_config["args"], \
-            "Args don't match what was added"
+        assert (
+            saved_config["command"] == "npx"
+        ), f"Expected command 'npx', got '{saved_config['command']}'"
+        assert (
+            saved_config["args"] == new_server_config["args"]
+        ), "Args don't match what was added"
 
         # REMOVE OPERATION
         result = scope_handler.remove_server("memory-server")
@@ -333,13 +347,11 @@ class TestCoreUserWorkflows:
 
         # VERIFICATION: Check file was actually modified
         final_count = mcp_harness.count_servers_in_scope("user-global")
-        assert final_count == 0, \
-            f"Expected 0 servers after remove, got {final_count}"
+        assert final_count == 0, f"Expected 0 servers after remove, got {final_count}"
 
         # Verify server no longer in listing
         servers = scope_handler.get_servers()
-        assert "memory-server" not in servers, \
-            "Server still in listing after remove"
+        assert "memory-server" not in servers, "Server still in listing after remove"
 
     def test_update_server_preserves_other_servers(self, prepopulated_harness):
         """Test that updating a server doesn't affect other servers.
@@ -370,7 +382,7 @@ class TestCoreUserWorkflows:
         updated_config = {
             "command": "node",  # Changed from npx
             "args": ["updated-filesystem.js"],  # Changed
-            "type": "stdio"
+            "type": "stdio",
         }
 
         result = scope_handler.update_server("filesystem", updated_config)
@@ -378,20 +390,20 @@ class TestCoreUserWorkflows:
 
         # Verify filesystem server was updated
         fs_config = scope_handler.get_server_config("filesystem")
-        assert fs_config["command"] == "node", \
-            "Server command not updated"
-        assert fs_config["args"] == ["updated-filesystem.js"], \
-            "Server args not updated"
+        assert fs_config["command"] == "node", "Server command not updated"
+        assert fs_config["args"] == ["updated-filesystem.js"], "Server args not updated"
 
         # CRITICAL: Verify github server was NOT changed
         github_config = scope_handler.get_server_config("github")
-        assert github_config == initial_github, \
-            "Update to 'filesystem' server affected 'github' server"
+        assert (
+            github_config == initial_github
+        ), "Update to 'filesystem' server affected 'github' server"
 
         # Verify total server count unchanged
         final_servers = scope_handler.get_servers()
-        assert len(final_servers) == len(initial_servers), \
-            "Update changed total server count"
+        assert len(final_servers) == len(
+            initial_servers
+        ), "Update changed total server count"
 
 
 class TestRescopeFeaturePreparation:
@@ -439,15 +451,17 @@ class TestRescopeFeaturePreparation:
         user_global = plugin.get_scope_handler("user-global")
 
         # Verify server exists in source
-        assert project_mcp.has_server("project-tool"), \
-            "Source server must exist before rescope"
+        assert project_mcp.has_server(
+            "project-tool"
+        ), "Source server must exist before rescope"
 
         # Capture original configuration
         original_config = project_mcp.get_server_config("project-tool")
 
         # Verify server does NOT exist in destination
-        assert not user_global.has_server("project-tool"), \
-            "Destination must not have server before rescope"
+        assert not user_global.has_server(
+            "project-tool"
+        ), "Destination must not have server before rescope"
 
         # RESCOPE OPERATION (this will fail until implemented)
         # This is the API we expect to exist:
@@ -457,28 +471,28 @@ class TestRescopeFeaturePreparation:
             server_name="project-tool",
             from_scope="project-mcp",
             to_scope="user-global",
-            client="claude-code"
+            client="claude-code",
         )
 
         assert result.success, f"Rescope failed: {result.message}"
 
         # VERIFICATION: Destination has server
-        assert user_global.has_server("project-tool"), \
-            "Server not found in destination after rescope"
+        assert user_global.has_server(
+            "project-tool"
+        ), "Server not found in destination after rescope"
 
         # Verify configuration preserved
         dest_config = user_global.get_server_config("project-tool")
-        assert dest_config == original_config, \
-            "Configuration changed during rescope"
+        assert dest_config == original_config, "Configuration changed during rescope"
 
         # VERIFICATION: Source no longer has server
-        assert not project_mcp.has_server("project-tool"), \
-            "Server still in source after rescope"
+        assert not project_mcp.has_server(
+            "project-tool"
+        ), "Server still in source after rescope"
 
         # Verify source file was actually modified
         source_count = prepopulated_harness.count_servers_in_scope("project-mcp")
-        assert source_count == 0, \
-            "Source scope still contains servers after rescope"
+        assert source_count == 0, "Source scope still contains servers after rescope"
 
     @pytest.mark.skip(reason="Rescope feature not yet implemented (PLAN P1-1)")
     def test_rescope_preserves_complex_config(self, mcp_harness):
@@ -504,31 +518,21 @@ class TestRescopeFeaturePreparation:
         complex_config = {
             "command": "python",
             "args": ["-m", "complex_server", "--verbose"],
-            "env": {
-                "API_KEY": "test-key-123",
-                "DEBUG": "true",
-                "TIMEOUT": "30"
-            },
+            "env": {"API_KEY": "test-key-123", "DEBUG": "true", "TIMEOUT": "30"},
             "type": "stdio",
             "disabled": True,
-            "metadata": {
-                "version": "1.2.3",
-                "author": "test"
-            }
+            "metadata": {"version": "1.2.3", "author": "test"},
         }
 
         # Prepopulate source scope
-        mcp_harness.prepopulate_file("project-mcp", {
-            "mcpServers": {
-                "complex-server": complex_config
-            }
-        })
+        mcp_harness.prepopulate_file(
+            "project-mcp", {"mcpServers": {"complex-server": complex_config}}
+        )
 
         # Prepopulate empty destination
-        mcp_harness.prepopulate_file("user-global", {
-            "mcpEnabled": True,
-            "mcpServers": {}
-        })
+        mcp_harness.prepopulate_file(
+            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+        )
 
         # RESCOPE OPERATION
         from mcpi.operations.rescope import rescope_server
@@ -537,7 +541,7 @@ class TestRescopeFeaturePreparation:
             server_name="complex-server",
             from_scope="project-mcp",
             to_scope="user-global",
-            client="claude-code"
+            client="claude-code",
         )
 
         assert result.success, f"Rescope failed: {result.message}"
@@ -545,20 +549,24 @@ class TestRescopeFeaturePreparation:
         # VERIFICATION: All fields preserved
         dest_config = mcp_harness.get_server_config("user-global", "complex-server")
 
-        assert dest_config["command"] == complex_config["command"], \
-            "Command not preserved"
-        assert dest_config["args"] == complex_config["args"], \
-            "Args not preserved"
-        assert dest_config["env"] == complex_config["env"], \
-            "Environment variables not preserved"
-        assert dest_config["disabled"] == complex_config["disabled"], \
-            "Disabled flag not preserved"
-        assert dest_config["metadata"] == complex_config["metadata"], \
-            "Metadata not preserved"
+        assert (
+            dest_config["command"] == complex_config["command"]
+        ), "Command not preserved"
+        assert dest_config["args"] == complex_config["args"], "Args not preserved"
+        assert (
+            dest_config["env"] == complex_config["env"]
+        ), "Environment variables not preserved"
+        assert (
+            dest_config["disabled"] == complex_config["disabled"]
+        ), "Disabled flag not preserved"
+        assert (
+            dest_config["metadata"] == complex_config["metadata"]
+        ), "Metadata not preserved"
 
         # Complete equality check
-        assert dest_config == complex_config, \
-            "Configuration not preserved exactly during rescope"
+        assert (
+            dest_config == complex_config
+        ), "Configuration not preserved exactly during rescope"
 
     @pytest.mark.skip(reason="Rescope feature not yet implemented (PLAN P1-1)")
     def test_rescope_rollback_on_failure(self, prepopulated_harness):
@@ -579,20 +587,24 @@ class TestRescopeFeaturePreparation:
         - Checks both source and destination for partial changes
         - Tests transactional integrity
         """
-        from mcpi.operations.rescope import rescope_server
         from unittest.mock import patch
+
+        from mcpi.operations.rescope import rescope_server
 
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
         # Capture initial state
-        initial_project_count = prepopulated_harness.count_servers_in_scope("project-mcp")
+        initial_project_count = prepopulated_harness.count_servers_in_scope(
+            "project-mcp"
+        )
         initial_user_count = prepopulated_harness.count_servers_in_scope("user-global")
 
         # Mock remove_server to fail
-        with patch.object(plugin.get_scope_handler("project-mcp"), 'remove_server') as mock_remove:
+        with patch.object(
+            plugin.get_scope_handler("project-mcp"), "remove_server"
+        ) as mock_remove:
             mock_remove.return_value = OperationResult(
-                success=False,
-                message="Simulated failure"
+                success=False, message="Simulated failure"
             )
 
             # Attempt rescope (should fail and rollback)
@@ -600,19 +612,23 @@ class TestRescopeFeaturePreparation:
                 server_name="project-tool",
                 from_scope="project-mcp",
                 to_scope="user-global",
-                client="claude-code"
+                client="claude-code",
             )
 
             assert not result.success, "Rescope should fail when remove fails"
 
         # VERIFICATION: Rollback occurred
         # Source should still have server
-        assert prepopulated_harness.count_servers_in_scope("project-mcp") == initial_project_count, \
-            "Source scope changed despite failure"
+        assert (
+            prepopulated_harness.count_servers_in_scope("project-mcp")
+            == initial_project_count
+        ), "Source scope changed despite failure"
 
         # Destination should NOT have server (rollback deleted it)
-        assert prepopulated_harness.count_servers_in_scope("user-global") == initial_user_count, \
-            "Destination scope changed despite failure (rollback didn't work)"
+        assert (
+            prepopulated_harness.count_servers_in_scope("user-global")
+            == initial_user_count
+        ), "Destination scope changed despite failure (rollback didn't work)"
 
 
 class TestManagerIntegration:
@@ -660,11 +676,9 @@ class TestManagerIntegration:
         assert len(scopes) > 0, "Should have at least one scope"
 
         # Verify scope names
-        scope_names = [s['name'] for s in scopes]
-        assert "user-global" in scope_names, \
-            "user-global scope should be available"
-        assert "project-mcp" in scope_names, \
-            "project-mcp scope should be available"
+        scope_names = [s["name"] for s in scopes]
+        assert "user-global" in scope_names, "user-global scope should be available"
+        assert "project-mcp" in scope_names, "project-mcp scope should be available"
 
     def test_manager_get_servers_aggregates_across_scopes(self, prepopulated_harness):
         """Test that manager can aggregate servers from multiple scopes.
@@ -695,17 +709,21 @@ class TestManagerIntegration:
         servers = manager.list_servers()
 
         # Verify we get servers from multiple scopes
-        assert len(servers) >= 3, \
-            f"Expected at least 3 servers (from different scopes), got {len(servers)}"
+        assert (
+            len(servers) >= 3
+        ), f"Expected at least 3 servers (from different scopes), got {len(servers)}"
 
         # Verify we have servers from different scopes
         server_ids = [s.server_id for s in servers]
-        assert "filesystem" in server_ids, \
-            "Should have 'filesystem' from user-global scope"
-        assert "project-tool" in server_ids, \
-            "Should have 'project-tool' from project-mcp scope"
-        assert "disabled-server" in server_ids, \
-            "Should have 'disabled-server' from user-internal scope"
+        assert (
+            "filesystem" in server_ids
+        ), "Should have 'filesystem' from user-global scope"
+        assert (
+            "project-tool" in server_ids
+        ), "Should have 'project-tool' from project-mcp scope"
+        assert (
+            "disabled-server" in server_ids
+        ), "Should have 'disabled-server' from user-internal scope"
 
 
 # ============================================================================

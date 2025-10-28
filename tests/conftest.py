@@ -1,11 +1,13 @@
 """Test configuration and common utilities."""
 
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
+
 try:
-    from mcpi.config.manager import ConfigManager, ProfileConfig, MCPIConfig
+    from mcpi.config.manager import ConfigManager, MCPIConfig, ProfileConfig
 except ImportError:
     # These may not exist in the new structure
     ConfigManager = ProfileConfig = MCPIConfig = None
@@ -13,12 +15,11 @@ except ImportError:
 from mcpi.registry.catalog import MCPServer
 
 # Import test harness fixtures
-from tests.test_harness import MCPTestHarness, mcp_test_dir, mcp_harness, mcp_manager_with_harness, prepopulated_harness
-
 
 # =============================================================================
 # CRITICAL SAFETY: Prevent tests from modifying real user files
 # =============================================================================
+
 
 @pytest.fixture(scope="session", autouse=True)
 def protect_real_user_files():
@@ -43,8 +44,8 @@ def protect_real_user_files():
     ]
 
     # Set environment variable to signal we're in test mode
-    original_env = os.environ.get('MCPI_TEST_MODE')
-    os.environ['MCPI_TEST_MODE'] = '1'
+    original_env = os.environ.get("MCPI_TEST_MODE")
+    os.environ["MCPI_TEST_MODE"] = "1"
 
     def check_path_safety(path: Path) -> None:
         """Check if a path is safe to write to during tests."""
@@ -52,9 +53,9 @@ def protect_real_user_files():
 
         # Allow writes to temp directories
         temp_prefixes = [
-            Path('/tmp'),
-            Path('/var/folders'),  # macOS temp
-            Path(os.environ.get('TMPDIR', '/tmp')).resolve(),
+            Path("/tmp"),
+            Path("/var/folders"),  # macOS temp
+            Path(os.environ.get("TMPDIR", "/tmp")).resolve(),
         ]
 
         for temp_prefix in temp_prefixes:
@@ -75,10 +76,15 @@ def protect_real_user_files():
                 )
 
         # Block writes to real .mcp.json or .claude directories in project
-        if path.name in ['.mcp.json', '.claude', 'settings.json', 'settings.local.json']:
+        if path.name in [
+            ".mcp.json",
+            ".claude",
+            "settings.json",
+            "settings.local.json",
+        ]:
             # Check if it's NOT in a temp directory
             path_str = str(path)
-            if '/tmp' not in path_str and '/var/folders' not in path_str:
+            if "/tmp" not in path_str and "/var/folders" not in path_str:
                 raise RuntimeError(
                     f"SAFETY VIOLATION: Test attempted to write to real config file: {path}\n"
                     f"Tests MUST use temporary directories.\n"
@@ -98,17 +104,19 @@ def protect_real_user_files():
         check_path_safety(self)
         return original_write_bytes(self, *args, **kwargs)
 
-    def safe_open(file, mode='r', *args, **kwargs):
-        if 'w' in mode or 'a' in mode or '+' in mode:
+    def safe_open(file, mode="r", *args, **kwargs):
+        if "w" in mode or "a" in mode or "+" in mode:
             check_path_safety(Path(file))
         return original_open(file, mode, *args, **kwargs)
 
     # Apply patches
     Path.write_text = safe_write_text
     Path.write_bytes = safe_write_bytes
-    builtins_open = __builtins__['open'] if isinstance(__builtins__, dict) else __builtins__.open
+    builtins_open = (
+        __builtins__["open"] if isinstance(__builtins__, dict) else __builtins__.open
+    )
 
-    with patch('builtins.open', side_effect=safe_open):
+    with patch("builtins.open", side_effect=safe_open):
         try:
             yield
         finally:
@@ -116,9 +124,10 @@ def protect_real_user_files():
             Path.write_text = original_write_text
             Path.write_bytes = original_write_bytes
             if original_env is not None:
-                os.environ['MCPI_TEST_MODE'] = original_env
+                os.environ["MCPI_TEST_MODE"] = original_env
             else:
-                os.environ.pop('MCPI_TEST_MODE', None)
+                os.environ.pop("MCPI_TEST_MODE", None)
+
 
 # =============================================================================
 
@@ -178,7 +187,7 @@ def create_mock_profile(**overrides):
         "config_path": "/test/config",
         "install_global": True,
         "use_uv": True,
-        "python_path": None
+        "python_path": None,
     }
     defaults.update(overrides)
 
@@ -189,7 +198,9 @@ def create_mock_profile(**overrides):
     return profile
 
 
-def create_mock_server(method="npx", package="test-package", required_config=None, optional_config=None):
+def create_mock_server(
+    method="npx", package="test-package", required_config=None, optional_config=None
+):
     """Create a mock MCP server with specified configuration."""
     server = Mock()
 

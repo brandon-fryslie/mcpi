@@ -2,9 +2,10 @@
 
 import json
 import subprocess
-import pytest
 from pathlib import Path
 from typing import List
+
+import pytest
 
 
 def run_cli_command(args: List[str]) -> tuple[int, str, str]:
