@@ -1,15 +1,14 @@
 # MCP Manager (mcpi)
 
-A comprehensive command-line tool and Python library for managing Model Context Protocol (MCP) servers. Discover, install, and configure MCP servers for Claude Code and other compatible tools with ease.
+A command-line tool for managing Model Context Protocol (MCP) servers across different MCP-compatible clients. Discover, install, and configure MCP servers for Claude Code and other compatible tools with ease.
 
 ## Features
 
-- **Comprehensive Registry**: Exhaustive catalog of known MCP servers
-- **Universal Installation**: Install MCP servers across different tools and platforms
-- **Configuration Management**: Simplified configuration with templates and profiles
-- **CLI Interface**: Intuitive command-line interface for all operations
-- **Claude Code Integration**: Native support for Claude Code configuration
-- **Cross-Platform**: Works on Linux, macOS, and Windows
+- **Comprehensive Registry**: Catalog of known MCP servers with metadata
+- **Scope-Based Configuration**: Manage servers across multiple configuration scopes (project-level, user-level)
+- **Multi-Client Support**: Works with Claude Code, Cursor, VS Code, and other MCP clients
+- **CLI Interface**: Intuitive command-line interface with shell tab completion
+- **Plugin Architecture**: Extensible client plugin system for supporting new MCP clients
 
 ## Installation
 
@@ -33,253 +32,419 @@ source .venv/bin/activate
 
 ## Quick Start
 
-### Initialize Configuration
-```bash
-mcpi config init
-```
-
 ### Discover MCP Servers
 ```bash
-# List all available servers
-mcpi list
+# List all available servers from the registry
+mcpi registry list
 
 # Search for specific functionality
-mcpi search filesystem
+mcpi registry search filesystem
 
 # Get detailed information about a server
-mcpi info filesystem
+mcpi registry info filesystem
+
+# List all categories
+mcpi registry categories
 ```
 
-### Install MCP Servers
+### Manage Installed Servers
 ```bash
-# Install to Claude Code (auto-detected)
-mcpi install filesystem
+# List currently installed servers
+mcpi list
 
-# Install with specific configuration
-mcpi install database --config postgres_template
+# List servers in a specific scope
+mcpi list --scope user-global
 
-# Install multiple servers
-mcpi install filesystem database github
-```
+# List servers for a specific client
+mcpi list --client claude-code
 
-### Manage Installations
-```bash
-# Check status of installed servers
+# Add a server (interactive scope selection)
+mcpi add filesystem
+
+# Add a server to a specific scope
+mcpi add filesystem --scope project-mcp
+
+# Remove a server
+mcpi remove filesystem
+
+# Check system status
 mcpi status
-
-# Update a server
-mcpi update filesystem
-
-# Uninstall a server
-mcpi uninstall filesystem
 ```
+
+### Scope Management
+```bash
+# List available scopes for the default client
+mcpi scope list
+
+# List scopes for a specific client
+mcpi scope list --client claude-code
+
+# Move a server between scopes
+mcpi rescope filesystem --from project-mcp --to user-global
+```
+
+### Client Management
+```bash
+# List detected MCP clients
+mcpi client list
+
+# Get information about a specific client
+mcpi client info claude-code
+
+# Set the default client
+mcpi client set-default claude-code
+```
+
+### Shell Tab Completion
+```bash
+# Enable tab completion for bash
+mcpi completion --shell bash
+
+# Enable tab completion for zsh
+mcpi completion --shell zsh
+
+# Enable tab completion for fish
+mcpi completion --shell fish
+```
+
+## Architecture
+
+MCPI uses a **scope-based configuration system** with a **plugin architecture** for supporting multiple MCP clients.
+
+### Scope-Based Configuration
+
+Instead of traditional profile-based configuration, mcpi uses **scopes** which are hierarchical configuration levels with different priorities. Each MCP client defines its own scopes.
+
+#### Example Scopes (Claude Code)
+
+| Scope Name | Type | Priority | Description |
+|------------|------|----------|-------------|
+| `project-mcp` | Project | 10 | Project-level `.mcp.json` (highest priority) |
+| `project-local` | Project | 20 | Project-local `.claude/settings.local.json` |
+| `project-internal` | Project | 30 | Project-internal `.claude/settings.json` |
+| `user-internal` | User | 40 | User-internal `~/.claude/settings.json` |
+| `user-global` | User | 50 | User-global `~/.config/claude/settings.json` |
+| `user-local` | User | 60 | User-local `~/.claude/settings.local.json` (lowest priority) |
+
+**Priority System**: Lower priority numbers override higher priority numbers. Project-level scopes override user-level scopes.
+
+### Plugin Architecture
+
+Each MCP client (Claude Code, Cursor, VS Code) is implemented as a **plugin** that conforms to the `MCPClientPlugin` protocol:
+
+- **Client Detection**: Automatically detects installed clients
+- **Scope Handlers**: Each scope is managed by a handler that knows how to read/write that specific configuration file
+- **Schema Validation**: Configuration changes are validated against client-specific schemas
+- **Extensible**: Easy to add support for new MCP clients
 
 ## CLI Commands
 
-### Discovery Commands
+### Registry Commands
+
+#### `mcpi registry list`
+List all servers in the registry.
+
+```bash
+mcpi registry list
+```
+
+#### `mcpi registry search <query>`
+Search for servers by name or description.
+
+```bash
+mcpi registry search filesystem
+mcpi registry search "database operations"
+```
+
+#### `mcpi registry info <server-id>`
+Show detailed information about a server from the registry.
+
+```bash
+mcpi registry info filesystem
+mcpi registry info brave-search
+```
+
+#### `mcpi registry categories`
+List all server categories with counts.
+
+```bash
+mcpi registry categories
+```
+
+### Server Management Commands
 
 #### `mcpi list [OPTIONS]`
-List available MCP servers.
+List installed MCP servers.
 
 **Options:**
-- `--category TEXT`: Filter by category
-- `--platform TEXT`: Filter by platform
-- `--json`: Output in JSON format
+- `--client TEXT`: Filter by client (uses default if not specified)
+- `--scope TEXT`: Filter by scope (available scopes depend on client)
+- `--state TEXT`: Filter by state (enabled, disabled, not_installed)
+- `--verbose, -v`: Show detailed information
 
 **Examples:**
 ```bash
-mcpi list --category filesystem
-mcpi list --platform darwin --json
+# List all installed servers
+mcpi list
+
+# List servers in a specific scope
+mcpi list --scope user-global
+
+# List servers for a specific client
+mcpi list --client claude-code
+
+# List only enabled servers
+mcpi list --state enabled
+
+# Show detailed information
+mcpi list --verbose
 ```
 
-#### `mcpi search <query> [OPTIONS]`
-Search MCP servers by name, description, or capabilities.
-
-**Examples:**
-```bash
-mcpi search "file system"
-mcpi search database --category data
-```
-
-#### `mcpi info <server> [OPTIONS]`
-Show detailed information about an MCP server.
+#### `mcpi add <server-id> [OPTIONS]`
+Add an MCP server from the registry.
 
 **Options:**
-- `--version TEXT`: Show specific version info
-- `--json`: Output in JSON format
+- `--client TEXT`: Target client (uses default if not specified)
+- `--scope TEXT`: Target scope (interactive selection if not specified)
+- `--dry-run`: Show what would be done without making changes
 
 **Examples:**
 ```bash
+# Add a server (interactive scope selection)
+mcpi add filesystem
+
+# Add to a specific scope
+mcpi add filesystem --scope project-mcp
+
+# Preview without making changes
+mcpi add filesystem --dry-run
+```
+
+#### `mcpi remove <server-id> [OPTIONS]`
+Remove an MCP server.
+
+**Options:**
+- `--client TEXT`: Target client (uses default if not specified)
+- `--scope TEXT`: Source scope (auto-detected if not specified)
+- `--dry-run`: Show what would be done without making changes
+
+**Examples:**
+```bash
+# Remove a server (prompts for confirmation)
+mcpi remove filesystem
+
+# Remove from a specific scope
+mcpi remove filesystem --scope project-mcp
+```
+
+#### `mcpi enable <server-id> [OPTIONS]`
+Enable a disabled MCP server.
+
+**Options:**
+- `--client TEXT`: Target client (uses default if not specified)
+- `--dry-run`: Show what would be done without making changes
+
+**Examples:**
+```bash
+mcpi enable filesystem
+```
+
+#### `mcpi disable <server-id> [OPTIONS]`
+Disable an enabled MCP server.
+
+**Options:**
+- `--client TEXT`: Target client (uses default if not specified)
+- `--dry-run`: Show what would be done without making changes
+
+**Examples:**
+```bash
+mcpi disable filesystem
+```
+
+#### `mcpi rescope <server-name> --from <scope> --to <scope> [OPTIONS]`
+Move an MCP server configuration from one scope to another.
+
+**Options:**
+- `--from TEXT`: Source scope (required)
+- `--to TEXT`: Destination scope (required)
+- `--client TEXT`: MCP client to use (auto-detected if not specified)
+- `--dry-run`: Show what would happen without making changes
+
+**Examples:**
+```bash
+# Move server from project to user scope
+mcpi rescope filesystem --from project-mcp --to user-global
+
+# Preview the operation
+mcpi rescope filesystem --from project-mcp --to user-global --dry-run
+
+# Specify a client explicitly
+mcpi rescope filesystem --from project-mcp --to user-global --client claude-code
+```
+
+**Notes:**
+- The operation is atomic and will rollback if any errors occur
+- Both source and destination scopes must exist for the specified client
+- The server must not already exist in the destination scope
+
+#### `mcpi info [server-id] [OPTIONS]`
+Show detailed information about a server or system status.
+
+**Options:**
+- `--client TEXT`: Target client (uses default if not specified)
+
+**Examples:**
+```bash
+# Show system status
+mcpi info
+
+# Show server information
 mcpi info filesystem
-mcpi info database --version 2.1.0
 ```
 
-#### `mcpi categories`
-List all available server categories.
+### Scope Management Commands
 
-### Installation Commands
-
-#### `mcpi install <server> [OPTIONS]`
-Install one or more MCP servers.
+#### `mcpi scope list [OPTIONS]`
+List available configuration scopes.
 
 **Options:**
-- `--version TEXT`: Install specific version
-- `--config TEXT`: Use configuration template
-- `--profile TEXT`: Install to specific profile
-- `--dry-run`: Preview installation without executing
-- `--force`: Force reinstallation
+- `--client TEXT`: Filter by client (uses default if not specified)
 
 **Examples:**
 ```bash
-mcpi install filesystem
-mcpi install database --config postgres_template
-mcpi install github --version 1.2.0 --profile development
+# List scopes for default client
+mcpi scope list
+
+# List scopes for a specific client
+mcpi scope list --client claude-code
 ```
 
-#### `mcpi uninstall <server> [OPTIONS]`
-Remove installed MCP servers.
+### Client Management Commands
+
+#### `mcpi client list`
+List available MCP clients.
+
+```bash
+mcpi client list
+```
+
+#### `mcpi client info [client-name]`
+Show detailed information about a client.
+
+```bash
+# Show default client info
+mcpi client info
+
+# Show specific client info
+mcpi client info claude-code
+```
+
+#### `mcpi client set-default <client-name>`
+Set the default client for MCPI operations.
+
+```bash
+mcpi client set-default claude-code
+```
+
+### System Commands
+
+#### `mcpi status`
+Show system status and summary information.
+
+```bash
+mcpi status
+```
+
+#### `mcpi completion --shell <shell>`
+Generate shell completion script for mcpi.
+
+**Tab completion provides intelligent suggestions for:**
+- Command names (list, add, remove, etc.)
+- Option flags (--client, --scope, --help)
+- Client names (based on detected MCP clients)
+- Scope names (filtered by selected client)
+- Server IDs (from the registry)
 
 **Options:**
-- `--profile TEXT`: Remove from specific profile
-- `--keep-config`: Keep configuration files
+- `--shell TEXT`: Shell type (bash, zsh, fish) - auto-detects if not specified
 
 **Examples:**
 ```bash
-mcpi uninstall filesystem
-mcpi uninstall database --keep-config
+# Auto-detect shell and show instructions
+mcpi completion
+
+# Generate bash completion
+mcpi completion --shell bash
+
+# Generate zsh completion
+mcpi completion --shell zsh
+
+# Generate fish completion
+mcpi completion --shell fish
 ```
 
-#### `mcpi update <server> [OPTIONS]`
-Update installed MCP servers.
+**Installation:**
 
-**Options:**
-- `--all`: Update all installed servers
-- `--version TEXT`: Update to specific version
-- `--profile TEXT`: Update in specific profile
-
-**Examples:**
+For **bash**, add to `~/.bashrc`:
 ```bash
-mcpi update filesystem
-mcpi update --all
-mcpi update database --version 2.2.0
+eval "$(_MCPI_COMPLETE=bash_source mcpi)"
 ```
 
-### Configuration Commands
-
-#### `mcpi config init [OPTIONS]`
-Initialize mcpi configuration.
-
-**Options:**
-- `--profile TEXT`: Initialize specific profile
-- `--template TEXT`: Use configuration template
-
-#### `mcpi config profile create <name>`
-Create new configuration profile.
-
-#### `mcpi config profile switch <name>`
-Switch to different configuration profile.
-
-#### `mcpi config profile list`
-List available configuration profiles.
-
-#### `mcpi config validate [OPTIONS]`
-Validate current configuration.
-
-**Options:**
-- `--profile TEXT`: Validate specific profile
-- `--fix`: Attempt to fix validation errors
-
-### Management Commands
-
-#### `mcpi status [OPTIONS]`
-Show status of installed MCP servers.
-
-**Options:**
-- `--profile TEXT`: Show status for specific profile
-- `--json`: Output in JSON format
-
-#### `mcpi doctor [OPTIONS]`
-Diagnose installation and configuration issues.
-
-**Options:**
-- `--profile TEXT`: Diagnose specific profile
-- `--verbose`: Show detailed diagnostic information
-
-#### `mcpi backup [OPTIONS]`
-Backup current configuration.
-
-**Options:**
-- `--output TEXT`: Backup file path
-- `--profile TEXT`: Backup specific profile
-
-#### `mcpi restore <backup_file> [OPTIONS]`
-Restore configuration from backup.
-
-**Options:**
-- `--profile TEXT`: Restore to specific profile
-
-## Configuration
-
-### Configuration File Location
-- **Linux/macOS**: `~/.config/mcpi/config.toml`
-- **Windows**: `%APPDATA%/mcpi/config.toml`
-
-### Configuration Structure
-```toml
-[general]
-registry_url = "https://registry.mcpi.dev/v1/servers.json"
-auto_update_registry = true
-default_profile = "default"
-
-[profiles.default]
-target = "claude-code"
-config_path = "~/.claude/mcp_servers.json"
-
-[profiles.development]
-target = "generic"
-config_path = "./mcp_config.json"
-
-[logging]
-level = "INFO"
-file = "~/.config/mcpi/mcpi.log"
-```
-
-### Profile Management
-Profiles allow you to maintain different MCP server configurations for different environments or tools.
-
-**Create a new profile:**
+For **zsh**, add to `~/.zshrc`:
 ```bash
-mcpi config profile create production
+eval "$(_MCPI_COMPLETE=zsh_source mcpi)"
 ```
 
-**Switch between profiles:**
+For **fish**, add to `~/.config/fish/config.fish`:
 ```bash
-mcpi config profile switch production
-```
-
-**Install servers to specific profile:**
-```bash
-mcpi install filesystem --profile production
+eval (env _MCPI_COMPLETE=fish_source mcpi)
 ```
 
 ## MCP Server Registry
 
-The registry contains comprehensive information about available MCP servers, including:
+The registry contains information about available MCP servers, including:
 
-- **Basic Information**: Name, description, author, license
-- **Installation Details**: Package manager, dependencies, platforms
-- **Configuration**: Required and optional parameters
-- **Capabilities**: What the server can do
-- **Documentation**: Links to documentation and examples
+- **Basic Information**: Name, description, repository
+- **Installation Details**: Command and arguments needed to run the server
+- **Categories**: Classification for easy discovery (when populated)
 
-### Registry Categories
-- **Filesystem**: Local and remote file system operations
-- **Database**: Database connectivity and operations  
-- **API**: REST API and web service integrations
-- **Development**: Development tools and utilities
-- **Media**: Image, video, and audio processing
-- **Data**: Data processing and transformation
-- **AI/ML**: Machine learning and AI service integrations
+### Registry Format
+
+The registry is stored in `data/registry.json` with the following structure:
+
+```json
+{
+  "server-id": {
+    "description": "Brief description of server functionality",
+    "command": "npx",
+    "args": ["-y", "@package/mcp-server"],
+    "repository": "https://github.com/org/repo",
+    "categories": ["category1", "category2"]
+  }
+}
+```
+
+### Adding Servers to Registry
+
+To add a new MCP server to the registry:
+
+1. Edit `data/registry.json`
+2. Add a new entry with the server details
+3. Ensure the command and args are correct
+4. Optionally add categories for classification
+5. Submit a pull request
+
+## Supported MCP Servers
+
+### Core Servers (Anthropic)
+- **filesystem**: Local filesystem operations
+- **sqlite**: SQLite database operations
+- **brave-search**: Web search via Brave Search API
+- **fetch**: Make HTTP requests and fetch web content
+- **github**: Interact with GitHub repositories, issues, and pull requests
+
+### Community Servers
+The registry contains additional community-contributed servers. Use `mcpi registry list` to see all available servers.
 
 ## Integration with Claude Code
 
@@ -287,61 +452,43 @@ mcpi provides seamless integration with Claude Code:
 
 **Automatic Detection**: mcpi automatically detects Claude Code installations and configures MCP servers appropriately.
 
-**Configuration Management**: Updates Claude Code's `mcp_servers.json` configuration file directly.
+**Multiple Configuration Scopes**: Claude Code supports 6 different configuration scopes, from project-level to user-level.
 
-**Validation**: Ensures configurations are compatible with Claude Code's requirements.
+**Configuration Management**: Updates Claude Code's configuration files directly with proper validation.
 
 **Example Claude Code Integration:**
 ```bash
-# Install filesystem server for Claude Code
-mcpi install filesystem
+# Add filesystem server to project scope
+mcpi add filesystem --scope project-mcp
 
-# This automatically updates ~/.claude/mcp_servers.json:
+# This updates .mcp.json in your project:
 # {
 #   "mcpServers": {
 #     "filesystem": {
 #       "command": "npx",
-#       "args": ["@anthropic/mcp-server-filesystem", "/Users/username/allowed-directory"]
+#       "args": ["-y", "@anthropic/mcp-server-filesystem"]
 #     }
 #   }
 # }
 ```
-
-## Supported MCP Servers
-
-### Core Servers (Anthropic)
-- **filesystem**: Local filesystem operations
-- **sqlite**: SQLite database operations
-- **git**: Git repository management
-- **brave-search**: Web search via Brave Search API
-- **slack**: Slack workspace integration
-
-### Community Servers
-- **github**: GitHub repository and API integration
-- **postgres**: PostgreSQL database operations
-- **redis**: Redis data structure operations
-- **docker**: Docker container management
-- **kubernetes**: Kubernetes cluster operations
-
-### API Integration Servers
-- **openai**: OpenAI API integration
-- **anthropic**: Anthropic API integration
-- **google-drive**: Google Drive file operations
-- **aws-s3**: Amazon S3 bucket operations
-- **notion**: Notion workspace integration
-
-*Full registry available at: `mcpi list`*
 
 ## Development
 
 ### Project Structure
 ```
 mcpi/
-├── src/mcpi/           # Source code
-├── data/               # Registry data and templates
-├── tests/              # Test suite
-├── docs/               # Documentation
-└── scripts/            # Development scripts
+├── src/mcpi/              # Source code
+│   ├── cli.py            # CLI interface
+│   ├── clients/          # Client plugins
+│   │   ├── base.py       # Base protocols and types
+│   │   ├── manager.py    # MCPManager orchestration
+│   │   ├── claude_code.py # Claude Code plugin
+│   │   └── file_based.py # File-based scope implementations
+│   └── registry/         # Server registry
+│       └── catalog.py    # Server catalog and models
+├── data/                 # Registry data
+│   └── registry.json     # Server definitions
+└── tests/                # Test suite
 ```
 
 ### Development Setup
@@ -358,17 +505,22 @@ source .venv/bin/activate
 pytest
 
 # Run with coverage
-pytest --cov=mcpi
+pytest --cov=src/mcpi
 
 # Run specific test file
-pytest tests/test_registry.py
+pytest tests/test_registry_categories.py
+
+# Validate registry data
+pytest tests/test_registry_integration.py -v
 ```
 
 ### Code Quality
 ```bash
 # Format code
-black src/
-ruff check src/ --fix
+black src/ tests/
+
+# Lint code
+ruff check src/ tests/ --fix
 
 # Type checking
 mypy src/
@@ -381,45 +533,26 @@ To add a new MCP server to the registry:
 
 1. Fork the repository
 2. Add server details to `data/registry.json`
-3. Include configuration template in `data/templates/`
-4. Add tests for the new server
-5. Submit a pull request
+3. Test the server entry: `mcpi registry info <your-server-id>`
+4. Submit a pull request
 
 ### Server Entry Format
 ```json
 {
-  "id": "your-server",
-  "name": "Your MCP Server",
-  "description": "Brief description of functionality",
-  "category": ["category1", "category2"],
-  "author": "Your Name",
-  "repository": "https://github.com/user/repo",
-  "documentation": "https://docs.yourserver.com",
-  "versions": {
-    "latest": "1.0.0",
-    "supported": ["1.0.0"]
-  },
-  "installation": {
-    "method": "npm|pip|git|binary",
-    "package": "package-name",
-    "system_dependencies": [],
-    "python_dependencies": []
-  },
-  "configuration": {
-    "template": "template_name.json",
-    "required_params": ["param1"],
-    "optional_params": ["param2"]
-  },
-  "capabilities": ["capability1", "capability2"],
-  "platforms": ["linux", "darwin", "windows"],
-  "license": "MIT"
+  "your-server-id": {
+    "description": "Brief description of functionality",
+    "command": "npx",
+    "args": ["-y", "@package/your-mcp-server"],
+    "repository": "https://github.com/user/repo",
+    "categories": ["category1", "category2"]
+  }
 }
 ```
 
 ### Development Guidelines
 - Follow PEP 8 style guidelines
 - Add type hints to all functions
-- Write comprehensive tests
+- Write tests for new features
 - Update documentation for new features
 - Use semantic versioning
 
@@ -427,41 +560,46 @@ To add a new MCP server to the registry:
 
 ### Common Issues
 
-**Installation fails with permission errors:**
+**Server not showing up after adding:**
 ```bash
-# Try installing with user flag
-pip install --user mcpi
+# Check if server was added successfully
+mcpi list --verbose
 
-# Or use uv which manages virtual environments automatically
-uv add mcpi
+# Check specific scope
+mcpi list --scope project-mcp
 ```
 
-**MCP server not working after installation:**
+**Cannot find default client:**
 ```bash
-# Validate configuration
-mcpi config validate
+# List available clients
+mcpi client list
 
-# Run diagnostic
-mcpi doctor
-
-# Check server status
-mcpi status
+# Set default client manually
+mcpi client set-default claude-code
 ```
 
-**Registry update failures:**
+**Scope not found:**
 ```bash
-# Force registry update
-mcpi sync --force
+# List available scopes
+mcpi scope list
 
-# Check network connectivity
-mcpi doctor --verbose
+# Check scope existence in current directory
+mcpi scope list --client claude-code
+```
+
+**Tab completion not working:**
+```bash
+# Re-run the completion setup
+mcpi completion --shell bash
+
+# Make sure to source your shell config
+source ~/.bashrc  # or ~/.zshrc for zsh
 ```
 
 ### Getting Help
 
 - **GitHub Issues**: [Report bugs and request features](https://github.com/user/mcpi/issues)
-- **Documentation**: [Full documentation](https://mcpi.dev/docs)
-- **Discord**: [Community chat](https://discord.gg/mcpi)
+- **Documentation**: See CLAUDE.md in the repository for development documentation
 
 ## License
 
@@ -475,4 +613,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Made with ❤️ for the MCP community**
+**Note**: This tool manages MCP server configurations. It does not install the underlying npm/pip packages - those are installed automatically when the MCP client (like Claude Code) first uses the server.

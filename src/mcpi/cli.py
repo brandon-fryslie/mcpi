@@ -1288,6 +1288,32 @@ def registry_info(ctx: click.Context, server_id: str) -> None:
         console.print(f"[red]Error getting server info: {e}[/red]")
 
 
+@registry.command('categories')
+@click.pass_context
+def list_categories(ctx: click.Context) -> None:
+    """List all MCP server categories from the registry."""
+    try:
+        catalog = get_catalog(ctx)
+        category_counts = catalog.list_categories()
+
+        if not category_counts:
+            console.print("[yellow]No categories found in registry[/yellow]")
+            console.print("[dim]Tip: Categories are currently empty. Add category data to servers in registry.json[/dim]")
+            return
+
+        table = Table(title="MCP Server Categories")
+        table.add_column("Category", style="cyan", no_wrap=True)
+        table.add_column("Server Count", style="green", justify="right")
+
+        for category, count in sorted(category_counts.items()):
+            table.add_row(category, str(count))
+
+        console.print(table)
+        console.print(f"\n[dim]Total categories: {len(category_counts)}[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error listing categories: {e}[/red]")
+
 # STATUS COMMAND
 
 @main.command()
