@@ -12,6 +12,9 @@ except ImportError:
 
 from mcpi.registry.catalog import MCPServer
 
+# Import test harness fixtures
+from tests.test_harness import MCPTestHarness, mcp_test_dir, mcp_harness, mcp_manager_with_harness, prepopulated_harness
+
 
 # =============================================================================
 # CRITICAL SAFETY: Prevent tests from modifying real user files
@@ -152,7 +155,7 @@ def mock_mcpi_config():
 def mock_mcp_server():
     """Create a mock MCPServer with common setup."""
     server = Mock(spec=MCPServer)
-    
+
     # New structure fields
     server.id = "test-server"
     server.name = "Test Server"
@@ -164,7 +167,7 @@ def mock_mcp_server():
     server.install_method = "npx"
     server.required_config = []
     server.optional_config = {}
-    
+
     return server
 
 
@@ -178,18 +181,18 @@ def create_mock_profile(**overrides):
         "python_path": None
     }
     defaults.update(overrides)
-    
+
     profile = Mock()
     for key, value in defaults.items():
         setattr(profile, key, value)
-    
+
     return profile
 
 
 def create_mock_server(method="npx", package="test-package", required_config=None, optional_config=None):
     """Create a mock MCP server with specified configuration."""
     server = Mock()
-    
+
     # New structure
     server.id = "test-server"
     server.name = "Test Server"
@@ -201,5 +204,5 @@ def create_mock_server(method="npx", package="test-package", required_config=Non
     server.install_method = method
     server.required_config = required_config or []
     server.optional_config = optional_config or {}
-    
+
     return server
