@@ -197,6 +197,25 @@ class FileBasedScope(ScopeHandler):
         except Exception:
             return {}
     
+    def get_server_config(self, server_id: str) -> ServerConfig:
+        """Get the full configuration for a specific server.
+        
+        Args:
+            server_id: The ID of the server to retrieve
+            
+        Returns:
+            ServerConfig object with full server configuration
+            
+        Raises:
+            ValueError: If server doesn't exist in this scope
+        """
+        servers = self.get_servers()
+        if server_id not in servers:
+            raise ValueError(f"Server '{server_id}' not found in scope '{self.config.name}'")
+        
+        server_data = servers[server_id]
+        return ServerConfig.from_dict(server_data)
+    
     def add_server(self, server_id: str, config: ServerConfig) -> OperationResult:
         """Add a server to this scope.
         
@@ -412,6 +431,25 @@ class CommandBasedScope(ScopeHandler):
             
         except Exception:
             return {}
+    
+    def get_server_config(self, server_id: str) -> ServerConfig:
+        """Get the full configuration for a specific server.
+        
+        Args:
+            server_id: The ID of the server to retrieve
+            
+        Returns:
+            ServerConfig object with full server configuration
+            
+        Raises:
+            ValueError: If server doesn't exist in this scope
+        """
+        servers = self.get_servers()
+        if server_id not in servers:
+            raise ValueError(f"Server '{server_id}' not found in scope '{self.config.name}'")
+        
+        server_data = servers[server_id]
+        return ServerConfig.from_dict(server_data)
     
     def add_server(self, server_id: str, config: ServerConfig) -> OperationResult:
         """Add a server using command.

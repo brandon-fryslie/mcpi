@@ -1,478 +1,266 @@
-"""End-to-end installer workflow integration tests.
-
-These tests validate complete installation workflows from registry discovery
-through final configuration, testing the full user journey.
-"""
+"""Integration tests for installer workflows using the test harness."""
 
 import pytest
-import json
-import tempfile
-import toml
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open, MagicMock
-import subprocess
+from unittest.mock import patch, MagicMock, call
 
-from mcpi.installer.base import InstallationResult, InstallationStatus
-from mcpi.installer.claude_code import ClaudeCodeInstaller
-from mcpi.installer.npm import NPMInstaller
-from mcpi.installer.python import PythonInstaller
-from mcpi.installer.git import GitInstaller
-from mcpi.registry.catalog import MCPServer, ServerCatalog
-from mcpi.config.manager import ConfigManager
+from mcpi.clients.types import ServerConfig, ServerState, OperationResult
+from mcpi.registry.catalog import InstallationMethod
+from tests.test_harness import (
+    mcp_test_dir,
+    mcp_harness,
+    mcp_manager_with_harness,
+    prepopulated_harness
+)
 
 
-class TestEndToEndInstallerWorkflows:
-    """Test complete installer workflows from start to finish."""
-
-    @pytest.fixture
-    def sample_npm_server(self):
-        """Sample NPM server for testing."""
-        return MCPServer(**{
-            "id": "filesystem",
-            "name": "Filesystem MCP Server",
-            "description": "Access local filesystem operations",
-            "category": ["filesystem", "local"],
-            "author": "Anthropic",
-            "repository": "https://github.com/anthropics/mcp-server-filesystem",
-            "versions": {"latest": "1.0.0", "supported": ["1.0.0"]},
-            "installation": {
-                "method": "npm",
-                "package": "@anthropic/mcp-server-filesystem",
-                "system_dependencies": [],
-                "python_dependencies": []
+class TestInstallerWorkflowsWithHarness:
+    """Test installation workflows with real file operations."""
+    
+    @patch('subprocess.run')
+    def test_npx_server_installation(self, mock_run, mcp_manager_with_harness):
+        """Test installing an NPX-based server."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Mock successful npx installation
+        mock_run.return_value = MagicMock(returncode=0, stdout="Installation successful")
+        
+        # Add an NPX server
+        config = ServerConfig(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem"],
+            type="stdio"
+        )
+        
+        result = manager.add_server("filesystem", config, "user-global", "claude-code")
+        assert result.success
+        
+        # Verify file was created with correct content
+        harness.assert_valid_json("user-global")
+        harness.assert_server_exists("user-global", "filesystem")
+        harness.assert_server_command("user-global", "filesystem", "npx")
+        
+        # Verify the full configuration
+        server_config = harness.get_server_config("user-global", "filesystem")
+        assert server_config["args"] == ["-y", "@modelcontextprotocol/server-filesystem"]
+        assert server_config["type"] == "stdio"
+    
+    @patch('subprocess.run')
+    def test_pip_server_installation(self, mock_run, mcp_manager_with_harness):
+        """Test installing a pip-based server."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Mock successful pip installation
+        mock_run.return_value = MagicMock(returncode=0, stdout="Successfully installed")
+        
+        # Add a Python server
+        config = ServerConfig(
+            command="python",
+            args=["-m", "mcp_server_git"],
+            env={"GITHUB_TOKEN": "${GITHUB_TOKEN}"},
+            type="stdio"
+        )
+        
+        result = manager.add_server("git-server", config, "user-mcp", "claude-code")
+        assert result.success
+        
+        # Verify configuration
+        harness.assert_server_exists("user-mcp", "git-server")
+        server_config = harness.get_server_config("user-mcp", "git-server")
+        assert server_config["command"] == "python"
+        assert server_config["env"]["GITHUB_TOKEN"] == "${GITHUB_TOKEN}"
+    
+    def test_server_state_transitions(self, mcp_manager_with_harness):
+        """Test server state changes using Claude's actual enable/disable format."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Add a server to MCP config
+        config = ServerConfig(
+            command="node",
+            args=["server.js"],
+            type="stdio"
+        )
+        result = manager.add_server("state-test", config, "project-mcp", "claude-code")
+        assert result.success
+        
+        # Initially should be enabled (default state)
+        servers = manager.list_servers("claude-code", "project-mcp")
+        server_info = next((s for s in servers.values() if s.id == "state-test"), None)
+        assert server_info is not None
+        assert server_info.state == ServerState.ENABLED
+        
+        # Test real disable operation using Claude's format
+        result = manager.disable_server("state-test", "claude-code")
+        assert result.success
+        
+        # Check that a Claude settings file was created/updated with disabled array
+        settings_scopes = ["project-local", "user-local", "user-global"]
+        disabled_found = False
+        
+        for scope in settings_scopes:
+            settings_content = harness.read_scope_file(scope)
+            if settings_content and "disabledMcpjsonServers" in settings_content:
+                disabled_servers = settings_content.get("disabledMcpjsonServers", [])
+                if "state-test" in disabled_servers:
+                    disabled_found = True
+                    break
+        
+        assert disabled_found, "Server should be in disabledMcpjsonServers array"
+        
+        # Verify the server now shows as disabled
+        servers_after_disable = manager.list_servers("claude-code", "project-mcp")
+        disabled_server = next((s for s in servers_after_disable.values() if s.id == "state-test"), None)
+        assert disabled_server is not None
+        assert disabled_server.state == ServerState.DISABLED
+        
+        # Test enable operation
+        result = manager.enable_server("state-test", "claude-code")
+        assert result.success
+        
+        # Verify the server is now enabled
+        servers_after_enable = manager.list_servers("claude-code", "project-mcp")
+        enabled_server = next((s for s in servers_after_enable.values() if s.id == "state-test"), None)
+        assert enabled_server is not None
+        assert enabled_server.state == ServerState.ENABLED
+    
+    def test_environment_variable_handling(self, mcp_manager_with_harness):
+        """Test proper handling of environment variables."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Add server with multiple env vars
+        config = ServerConfig(
+            command="python",
+            args=["-m", "secure_server"],
+            env={
+                "API_KEY": "${API_KEY}",
+                "DEBUG": "true",
+                "PORT": "3000"
             },
-            "configuration": {
-                "required_params": ["root_path"],
-                "optional_params": ["allowed_extensions"]
-            },
-            "capabilities": ["file_operations"],
-            "platforms": ["linux", "darwin", "windows"],
-            "license": "MIT"
-        })
+            type="stdio"
+        )
+        
+        result = manager.add_server("env-test", config, "user-internal", "claude-code")
+        assert result.success
+        
+        # Verify all env vars are preserved
+        server_config = harness.get_server_config("user-internal", "env-test")
+        assert server_config["env"]["API_KEY"] == "${API_KEY}"
+        assert server_config["env"]["DEBUG"] == "true"
+        assert server_config["env"]["PORT"] == "3000"
 
-    @pytest.fixture
-    def sample_python_server(self):
-        """Sample Python server for testing."""
-        return MCPServer(**{
-            "id": "database",
-            "name": "Database MCP Server",
-            "description": "Database connectivity and operations",
-            "category": ["database", "data"],
-            "author": "Community",
-            "repository": "https://github.com/community/mcp-server-database",
-            "versions": {"latest": "2.1.0", "supported": ["2.1.0", "2.0.0"]},
-            "installation": {
-                "method": "pip",
-                "package": "mcp-server-database",
-                "system_dependencies": ["postgresql-dev"],
-                "python_dependencies": ["psycopg2>=2.8.0"]
-            },
-            "configuration": {
-                "required_params": ["database_url"],
-                "optional_params": ["connection_pool_size", "timeout"]
-            },
-            "capabilities": ["database_operations", "sql_queries"],
-            "platforms": ["linux", "darwin"],
-            "license": "MIT"
-        })
 
-    @pytest.fixture
-    def sample_git_server(self):
-        """Sample Git server for testing."""
-        return MCPServer(**{
-            "id": "custom-server",
-            "name": "Custom MCP Server",
-            "description": "Custom development server from Git",
-            "category": ["development", "custom"],
-            "author": "Developer",
-            "repository": "https://github.com/developer/custom-mcp-server",
-            "versions": {"latest": "main", "supported": ["main", "v1.0"]},
-            "installation": {
-                "method": "git",
-                "package": "https://github.com/developer/custom-mcp-server.git",
-                "system_dependencies": [],
-                "python_dependencies": ["requirements.txt"]
-            },
-            "configuration": {
-                "required_params": ["api_key"],
-                "optional_params": ["debug_mode"]
-            },
-            "capabilities": ["custom_operations"],
-            "platforms": ["linux", "darwin"],
-            "license": "GPL-3.0"
-        })
-
-    def test_npm_server_full_installation_workflow(self, sample_npm_server):
-        """Test complete NPM server installation workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_dir = Path(temp_dir) / ".claude"
-            config_dir.mkdir()
-            config_file = config_dir / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            # Mock NPM operations
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                # Setup mocks for successful NPM installation
-                mock_subprocess.side_effect = [
-                    Mock(returncode=0, stdout="npm install successful"),  # npm install
-                    Mock(returncode=0, stdout="@anthropic/mcp-server-filesystem@1.0.0")  # npm list
-                ]
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test the full installation workflow
-                result = installer.install(sample_npm_server)
-                
-                # Verify installation was attempted
-                assert mock_subprocess.called
-                
-                # Verify NPM install command was called
-                install_call = mock_subprocess.call_args_list[0]
-                assert "npm" in install_call[0][0]
-                assert "install" in install_call[0][0]
-                assert "@anthropic/mcp-server-filesystem" in install_call[0][0]
-
-    def test_python_server_full_installation_workflow(self, sample_python_server):
-        """Test complete Python server installation workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_dir = Path(temp_dir) / ".claude"
-            config_dir.mkdir()
-            config_file = config_dir / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                # Setup mocks for successful Python installation
-                mock_subprocess.side_effect = [
-                    Mock(returncode=0, stdout="uv pip install successful"),  # uv install
-                    Mock(returncode=0, stdout="mcp-server-database 2.1.0")  # package check
-                ]
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test the full installation workflow
-                result = installer.install(sample_python_server)
-                
-                # Verify installation was attempted
-                assert mock_subprocess.called
-
-    def test_git_server_full_installation_workflow(self, sample_git_server):
-        """Test complete Git server installation workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_dir = Path(temp_dir) / ".claude"
-            config_dir.mkdir()
-            config_file = config_dir / "mcp_servers.json"
-            
-            # Create initial config file  
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists, \
-                 patch('pathlib.Path.mkdir') as mock_mkdir:
-                
-                # Setup mocks for successful Git installation
-                mock_subprocess.side_effect = [
-                    Mock(returncode=0, stdout="Cloning into repository"),  # git clone
-                    Mock(returncode=0, stdout="requirements installed")   # pip install
-                ]
-                mock_exists.return_value = True
-                mock_mkdir.return_value = None
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test the full installation workflow
-                result = installer.install(sample_git_server)
-                
-                # Verify installation was attempted
-                assert mock_subprocess.called
-
-    def test_registry_to_installation_complete_workflow(self):
-        """Test complete workflow from registry discovery to installation."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            registry_path = Path(temp_dir) / "registry.yaml"
-            config_dir = Path(temp_dir) / ".claude"
-            config_dir.mkdir()
-            config_file = config_dir / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            # Create a test registry
-            registry_data = {
-                "version": "1.0.0",
-                "servers": [{
-                    "id": "filesystem",
-                    "name": "Filesystem Server",
-                    "description": "File operations",
-                    "category": ["filesystem"],
-                    "author": "Test",
-                    "versions": {"latest": "1.0.0"},
-                    "installation": {"method": "npm", "package": "@test/filesystem"},
-                    "configuration": {"required_params": []},
-                    "capabilities": ["files"],
-                    "platforms": ["linux"],
-                    "license": "MIT"
-                }]
-            }
-            
-            with open(registry_path, 'w') as f:
-                import yaml
-                yaml.dump(registry_data, f)
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                mock_exists.return_value = True
-                
-                # Step 1: Discovery
-                catalog = ServerCatalog(registry_path=registry_path)
-                servers = catalog.list_servers()
-                assert len(servers) > 0
-                
-                # Step 2: Search for specific server
-                search_results = catalog.search_servers("filesystem")
-                assert len(search_results) > 0
-                
-                # Step 3: Get server details
-                server = search_results[0][0]  # First result, server object
-                assert server.id == "filesystem"
-                
-                # Step 4: Installation
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                result = installer.install(server)
-                
-                # Verify complete workflow
-                assert mock_subprocess.called
-
-    def test_installation_failure_recovery_workflow(self, sample_npm_server):
-        """Test installation failure and recovery workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            backup_file = Path(temp_dir) / "mcp_servers.json.backup"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists, \
-                 patch('shutil.copy2') as mock_copy:
-                
-                # Simulate installation failure
-                mock_subprocess.side_effect = subprocess.CalledProcessError(1, "npm install")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test installation failure handling
-                result = installer.install(sample_npm_server)
-                
-                # Verify failure was handled gracefully
-                assert mock_subprocess.called
-
-    def test_multi_server_installation_workflow(self, sample_npm_server, sample_python_server):
-        """Test installing multiple servers in sequence."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                # Setup mocks for successful installations
-                mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Install first server
-                result1 = installer.install(sample_npm_server)
-                assert mock_subprocess.called
-                
-                # Reset mock for second installation
-                mock_subprocess.reset_mock()
-                
-                # Install second server
-                result2 = installer.install(sample_python_server)
-                assert mock_subprocess.called
-
-    def test_configuration_customization_workflow(self, sample_npm_server):
-        """Test server installation with custom configuration."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Install with custom configuration
-                custom_config = {"root_path": "/custom/path", "allowed_extensions": [".txt", ".md"]}
-                result = installer.install(sample_npm_server, config_params=custom_config)
-                
-                assert mock_subprocess.called
-
-    def test_uninstallation_workflow(self, sample_npm_server):
-        """Test complete server uninstallation workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Start with server already installed
-            initial_config = {
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["@anthropic/mcp-server-filesystem", "/some/path"]
-                    }
-                }
-            }
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test uninstallation
-                result = installer.uninstall(sample_npm_server.id)
-                
-                # Verify uninstallation was attempted
-                assert config_file.exists()  # Should still exist after uninstall
-
-    def test_server_update_workflow(self, sample_npm_server):
-        """Test server update workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Start with server already installed
-            initial_config = {
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["@anthropic/mcp-server-filesystem", "/some/path"]
-                    }
-                }
-            }
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                # Mock successful update
-                mock_subprocess.return_value = Mock(returncode=0, stdout="updated to 1.1.0")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test update (uninstall + reinstall)
-                uninstall_result = installer.uninstall(sample_npm_server.id)
-                install_result = installer.install(sample_npm_server)
-                
-                # Verify both operations completed
-                assert config_file.exists()
-
-    def test_cross_platform_installation_workflow(self, sample_npm_server):
-        """Test installation workflow across different platforms."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            # Test different platform configurations
-            platforms = ["Linux", "Darwin", "Windows"]
-            
-            for platform in platforms:
-                with patch('subprocess.run') as mock_subprocess, \
-                     patch('pathlib.Path.exists') as mock_exists, \
-                     patch('platform.system', return_value=platform):
-                    
-                    mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                    mock_exists.return_value = True
-                    
-                    installer = ClaudeCodeInstaller(config_path=config_file)
-                    
-                    # Verify platform-specific installation
-                    result = installer.install(sample_npm_server)
-                    assert mock_subprocess.called
-
-    def test_dependency_resolution_workflow(self, sample_python_server):
-        """Test installation workflow with system dependencies."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                # Mock dependency installation
-                mock_subprocess.side_effect = [
-                    Mock(returncode=0, stdout="system deps installed"),    # system deps
-                    Mock(returncode=0, stdout="python package installed") # python package
-                ]
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test installation with dependencies
-                result = installer.install(sample_python_server)
-                
-                # Should have made subprocess calls for dependencies
-                assert mock_subprocess.called
-
-    def test_installer_component_interactions(self, sample_npm_server):
-        """Test how installer components interact with each other."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_file = Path(temp_dir) / "mcp_servers.json"
-            
-            # Create initial config file
-            initial_config = {"mcpServers": {}}
-            config_file.write_text(json.dumps(initial_config))
-            
-            with patch('subprocess.run') as mock_subprocess, \
-                 patch('pathlib.Path.exists') as mock_exists:
-                
-                mock_subprocess.return_value = Mock(returncode=0, stdout="success")
-                mock_exists.return_value = True
-                
-                installer = ClaudeCodeInstaller(config_path=config_file)
-                
-                # Test that Claude Code installer delegates to NPM installer
-                result = installer.install(sample_npm_server)
-                
-                # Verify the delegation happened
-                assert hasattr(installer, 'npm_installer')
-                assert hasattr(installer, 'python_installer')
-                assert hasattr(installer, 'git_installer')
-                assert mock_subprocess.called
+class TestComplexWorkflows:
+    """Test complex multi-step workflows."""
+    
+    def test_migration_workflow(self, mcp_manager_with_harness, prepopulated_harness):
+        """Test migrating servers from one scope to another."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Use prepopulated harness that has servers in user-global
+        from mcpi.clients.claude_code import ClaudeCodePlugin
+        manager.registry.inject_client_instance(
+            "claude-code",
+            ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
+        )
+        
+        # Verify initial state
+        prepopulated_harness.assert_server_exists("user-global", "filesystem")
+        prepopulated_harness.assert_server_exists("user-global", "github")
+        
+        # Get the filesystem server config
+        fs_config = prepopulated_harness.get_server_config("user-global", "filesystem")
+        
+        # "Migrate" filesystem to project scope
+        config = ServerConfig(
+            command=fs_config["command"],
+            args=fs_config["args"],
+            type=fs_config["type"]
+        )
+        
+        # Add to project scope
+        result = manager.add_server("filesystem", config, "project-mcp", "claude-code")
+        assert result.success
+        
+        # Remove from user scope
+        result = manager.remove_server("filesystem", "user-global", "claude-code")
+        assert result.success
+        
+        # Verify migration complete
+        prepopulated_harness.assert_server_exists("project-mcp", "filesystem")
+        with pytest.raises(AssertionError):
+            prepopulated_harness.assert_server_exists("user-global", "filesystem")
+        
+        # GitHub server should still be in user-global
+        prepopulated_harness.assert_server_exists("user-global", "github")
+    
+    def test_bulk_operations(self, mcp_manager_with_harness):
+        """Test bulk adding and removing servers."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Add multiple servers in bulk
+        servers_to_add = [
+            ("server1", ServerConfig(command="npx", args=["pkg1"], type="stdio")),
+            ("server2", ServerConfig(command="npx", args=["pkg2"], type="stdio")),
+            ("server3", ServerConfig(command="python", args=["-m", "pkg3"], type="stdio")),
+            ("server4", ServerConfig(command="node", args=["pkg4.js"], type="stdio")),
+        ]
+        
+        # Add all servers to user-mcp scope
+        for server_id, config in servers_to_add:
+            result = manager.add_server(server_id, config, "user-mcp", "claude-code")
+            assert result.success
+        
+        # Verify all were added
+        assert harness.count_servers_in_scope("user-mcp") == 4
+        
+        # List and verify each
+        servers = manager.list_servers("claude-code", "user-mcp")
+        server_ids = {info.id for info in servers.values()}
+        assert "server1" in server_ids
+        assert "server2" in server_ids
+        assert "server3" in server_ids
+        assert "server4" in server_ids
+        
+        # Remove servers 2 and 3
+        manager.remove_server("server2", "user-mcp", "claude-code")
+        manager.remove_server("server3", "user-mcp", "claude-code")
+        
+        # Verify removal
+        assert harness.count_servers_in_scope("user-mcp") == 2
+        harness.assert_server_exists("user-mcp", "server1")
+        harness.assert_server_exists("user-mcp", "server4")
+        
+        with pytest.raises(AssertionError):
+            harness.assert_server_exists("user-mcp", "server2")
+        with pytest.raises(AssertionError):
+            harness.assert_server_exists("user-mcp", "server3")
+    
+    def test_error_recovery(self, mcp_manager_with_harness):
+        """Test recovery from various error conditions."""
+        manager, harness = mcp_manager_with_harness
+        
+        # Add a server
+        config = ServerConfig(
+            command="python",
+            args=["-m", "test_server"],
+            type="stdio"
+        )
+        manager.add_server("test-server", config, "user-global", "claude-code")
+        
+        # Try to add duplicate (should handle gracefully)
+        result = manager.add_server("test-server", config, "user-global", "claude-code")
+        # This might succeed (overwrite) or fail (duplicate check)
+        
+        # Try to remove non-existent server
+        result = manager.remove_server("nonexistent", "user-global", "claude-code")
+        assert not result.success
+        
+        # Original server should still be there
+        harness.assert_server_exists("user-global", "test-server")
+        
+        # Try to add to non-existent scope
+        result = manager.add_server("bad-scope-test", config, "invalid-scope", "claude-code")
+        assert not result.success
+        
+        # No file should have been created for invalid scope
+        assert "invalid-scope" not in harness.path_overrides

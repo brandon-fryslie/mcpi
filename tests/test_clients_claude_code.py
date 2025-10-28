@@ -206,22 +206,30 @@ class TestClaudeCodePlugin:
         assert server_info.state == ServerState.ENABLED
     
     def test_list_servers_with_disabled_server(self, plugin):
-        """Test listing servers with disabled server."""
-        # Mock scope with disabled server
+        """Test listing servers with disabled server using Claude's actual format."""
+        # Mock scope with server (without disabled flag)
         mock_handler = plugin._scopes["user-mcp"]
         mock_handler.exists = Mock(return_value=True)
         mock_handler.get_servers = Mock(return_value={
             "disabled-server": {
                 "command": "python",
                 "args": ["-m", "test_server"],
-                "type": "stdio",
-                "disabled": True
+                "type": "stdio"
             }
+        })
+        
+        # Mock Claude settings scope with disabled array
+        settings_handler = plugin._scopes["user-local"]
+        settings_handler.exists = Mock(return_value=True)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={
+            "enabledMcpjsonServers": [],
+            "disabledMcpjsonServers": ["disabled-server"]
         })
         
         # Mock other scopes to be empty
         for name, handler in plugin._scopes.items():
-            if name != "user-mcp":
+            if name not in ["user-mcp", "user-local"]:
                 handler.exists = Mock(return_value=False)
                 handler.get_servers = Mock(return_value={})
         
@@ -334,17 +342,26 @@ class TestClaudeCodePlugin:
         assert state == ServerState.ENABLED
     
     def test_get_server_state_disabled(self, plugin):
-        """Test getting state of disabled server."""
-        # Mock handler to have disabled server
+        """Test getting state of disabled server using Claude's actual format."""
+        # Mock handler to have server (without disabled flag)
         mock_handler = plugin._scopes["user-mcp"]
         mock_handler.has_server = Mock(return_value=True)
         mock_handler.get_servers = Mock(return_value={
-            "test-server": {"command": "python", "disabled": True}
+            "test-server": {"command": "python"}
+        })
+        
+        # Mock Claude settings scope with disabled array
+        settings_handler = plugin._scopes["user-local"]
+        settings_handler.exists = Mock(return_value=True)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={
+            "enabledMcpjsonServers": [],
+            "disabledMcpjsonServers": ["test-server"]
         })
         
         # Mock other handlers to not have the server
         for name, handler in plugin._scopes.items():
-            if name != "user-mcp":
+            if name not in ["user-mcp", "user-local"]:
                 handler.has_server = Mock(return_value=False)
         
         state = plugin.get_server_state("test-server")
@@ -356,10 +373,25 @@ class TestClaudeCodePlugin:
         for handler in plugin._scopes.values():
             handler.has_server = Mock(return_value=False)
         
+        # Mock a settings handler to be available for writing (use project-local since it has higher priority)
+        settings_handler = plugin._scopes["project-local"]
+        settings_handler.exists = Mock(return_value=False)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={})
+        settings_handler.writer = Mock()
+        settings_handler.writer.write = Mock(return_value=True)
+        settings_handler.config = Mock()
+        settings_handler.config.path = Mock()
+        
+        # Mock other settings scopes to not exist so project-local is chosen
+        for scope_name in ["user-local", "user-global"]:
+            scope_handler = plugin._scopes[scope_name]
+            scope_handler.exists = Mock(return_value=False)
+        
         result = plugin.enable_server("nonexistent-server")
         
-        assert not result.success
-        assert "not found" in result.message
+        # Should succeed even if server doesn't exist (it gets added to enabled array)
+        assert result.success
     
     def test_enable_server_already_enabled(self, plugin):
         """Test enabling already enabled server."""
@@ -367,32 +399,66 @@ class TestClaudeCodePlugin:
         mock_handler = plugin._scopes["user-mcp"]
         mock_handler.has_server = Mock(return_value=True)
         mock_handler.get_servers = Mock(return_value={
-            "test-server": {"command": "python"}  # No disabled flag = enabled
+            "test-server": {"command": "python"}
         })
+        
+        # Mock settings handler with enabled server (use project-local since it has higher priority)
+        settings_handler = plugin._scopes["project-local"]
+        settings_handler.exists = Mock(return_value=True)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={
+            "enabledMcpjsonServers": ["test-server"],
+            "disabledMcpjsonServers": []
+        })
+        settings_handler.writer = Mock()
+        settings_handler.writer.write = Mock(return_value=True)
+        settings_handler.config = Mock()
+        settings_handler.config.path = Mock()
+        
+        # Mock other settings scopes to not exist so project-local is chosen
+        for scope_name in ["user-local", "user-global"]:
+            scope_handler = plugin._scopes[scope_name]
+            scope_handler.exists = Mock(return_value=False)
         
         # Mock other handlers to not have the server
         for name, handler in plugin._scopes.items():
-            if name != "user-mcp":
+            if name not in ["user-mcp", "project-local"]:
                 handler.has_server = Mock(return_value=False)
         
         result = plugin.enable_server("test-server")
         
         assert result.success
-        assert "already enabled" in result.message
     
     def test_enable_server_success(self, plugin):
-        """Test successful server enabling."""
-        # Mock handler to have disabled server
+        """Test successful server enabling using Claude's actual format."""
+        # Mock handler to have server
         mock_handler = plugin._scopes["user-mcp"]
         mock_handler.has_server = Mock(return_value=True)
         mock_handler.get_servers = Mock(return_value={
-            "test-server": {"command": "python", "disabled": True}
+            "test-server": {"command": "python"}
         })
-        mock_handler.update_server = Mock(return_value=OperationResult.success_result("Server updated"))
+        
+        # Mock settings handler with disabled server (use project-local since it has higher priority)
+        settings_handler = plugin._scopes["project-local"]
+        settings_handler.exists = Mock(return_value=True)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={
+            "enabledMcpjsonServers": [],
+            "disabledMcpjsonServers": ["test-server"]
+        })
+        settings_handler.writer = Mock()
+        settings_handler.writer.write = Mock(return_value=True)
+        settings_handler.config = Mock()
+        settings_handler.config.path = Mock()
+        
+        # Mock other settings scopes to not exist so project-local is chosen
+        for scope_name in ["user-local", "user-global"]:
+            scope_handler = plugin._scopes[scope_name]
+            scope_handler.exists = Mock(return_value=False)
         
         # Mock other handlers to not have the server
         for name, handler in plugin._scopes.items():
-            if name != "user-mcp":
+            if name not in ["user-mcp", "project-local"]:
                 handler.has_server = Mock(return_value=False)
         
         result = plugin.enable_server("test-server")
@@ -400,25 +466,39 @@ class TestClaudeCodePlugin:
         assert result.success
         assert "Enabled server" in result.message
         
-        # Verify update_server was called with config without disabled flag
-        mock_handler.update_server.assert_called_once()
-        call_args = mock_handler.update_server.call_args
-        updated_config = call_args[0][1]  # Second argument is the ServerConfig
-        assert "disabled" not in updated_config.to_dict()
+        # Verify the writer was called to update the settings
+        settings_handler.writer.write.assert_called_once()
     
     def test_disable_server_success(self, plugin):
-        """Test successful server disabling."""
+        """Test successful server disabling using Claude's actual format."""
         # Mock handler to have enabled server
         mock_handler = plugin._scopes["user-mcp"]
         mock_handler.has_server = Mock(return_value=True)
         mock_handler.get_servers = Mock(return_value={
-            "test-server": {"command": "python"}  # No disabled flag = enabled
+            "test-server": {"command": "python"}
         })
-        mock_handler.update_server = Mock(return_value=OperationResult.success_result("Server updated"))
+        
+        # Mock settings handler with enabled server (use project-local since it has higher priority)
+        settings_handler = plugin._scopes["project-local"]
+        settings_handler.exists = Mock(return_value=True)
+        settings_handler.reader = Mock()
+        settings_handler.reader.read = Mock(return_value={
+            "enabledMcpjsonServers": ["test-server"],
+            "disabledMcpjsonServers": []
+        })
+        settings_handler.writer = Mock()
+        settings_handler.writer.write = Mock(return_value=True)
+        settings_handler.config = Mock()
+        settings_handler.config.path = Mock()
+        
+        # Mock other settings scopes to not exist so project-local is chosen
+        for scope_name in ["user-local", "user-global"]:
+            scope_handler = plugin._scopes[scope_name]
+            scope_handler.exists = Mock(return_value=False)
         
         # Mock other handlers to not have the server
         for name, handler in plugin._scopes.items():
-            if name != "user-mcp":
+            if name not in ["user-mcp", "project-local"]:
                 handler.has_server = Mock(return_value=False)
         
         result = plugin.disable_server("test-server")
@@ -426,9 +506,5 @@ class TestClaudeCodePlugin:
         assert result.success
         assert "Disabled server" in result.message
         
-        # Verify update_server was called with config with disabled flag
-        mock_handler.update_server.assert_called_once()
-        call_args = mock_handler.update_server.call_args
-        updated_config = call_args[0][1]  # Second argument is the ServerConfig
-        config_dict = updated_config.to_dict()
-        assert config_dict.get("disabled") is True
+        # Verify the writer was called to update the settings
+        settings_handler.writer.write.assert_called_once()

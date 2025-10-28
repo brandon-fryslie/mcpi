@@ -23,6 +23,7 @@ dependencies = [
     "markdownify>=0.11.0",
     "typer>=0.20.0",
     "pytest>=8.4.2",
+    "referencing<0.37.0",  # 0.37+ requires Python 3.13+
 ]
 
 [project.optional-dependencies]
@@ -42,20 +43,25 @@ dev = [
 mcpi = "mcpi.cli:main"
 
 [build-system]
-requires = ["flit_core >=3.9,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
-#[tool.setuptools.packages.find]
-#where = ["src"]
-#include = ["mcpi*"]
-#exclude = ["tests*"]
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mcpi*"]
+exclude = ["tests*"]
 
-#[tool.setuptools.package-data]
-#mcpi = ["py.typed"]
-#
+[tool.setuptools.package-data]
+mcpi = ["py.typed", "clients/schemas/*.yaml", "clients/schemas/*.json"]
+
+# Use strict mode for editable installs to handle paths with spaces
+[tool.setuptools.dynamic]
+
+[tool.distutils.bdist_wheel]
+universal = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]

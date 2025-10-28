@@ -9,7 +9,7 @@ properties:
     type: object
     description: "Dictionary of MCP server configurations"
     patternProperties:
-      "^[a-zA-Z0-9_-]+$":
+      "^[a-zA-Z0-9@/_.-]+$":
         type: object
         description: "MCP server configuration"
         properties:

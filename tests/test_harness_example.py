@@ -160,7 +160,7 @@ class TestMCPManagerIntegration:
             harness.assert_server_exists("user-mcp", "temp-server")
     
     def test_update_server(self, mcp_manager_with_harness):
-        """Test updating a server configuration."""
+        """Test updating a server configuration by removing and re-adding."""
         manager, harness = mcp_manager_with_harness
         
         # Add initial server
@@ -176,14 +176,17 @@ class TestMCPManagerIntegration:
         config = harness.get_server_config("project-mcp", "update-test")
         assert config["args"] == ["-m", "old_module"]
         
-        # Update the server
+        # Update the server by removing and re-adding
+        result = manager.remove_server("update-test", "project-mcp", "claude-code")
+        assert result.success
+        
         new_config = ServerConfig(
             command="python3",
             args=["-m", "new_module"],
             env={"PYTHONPATH": "/custom/path"},
             type="stdio"
         )
-        result = manager.update_server("update-test", new_config, "project-mcp", "claude-code")
+        result = manager.add_server("update-test", new_config, "project-mcp", "claude-code")
         assert result.success
         
         # Verify updated state

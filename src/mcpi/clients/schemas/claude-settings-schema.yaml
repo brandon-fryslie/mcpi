@@ -73,7 +73,7 @@ properties:
             type: object
             description: "Project-specific MCP server overrides"
             patternProperties:
-              "^[a-zA-Z0-9_-]+$":
+              "^[a-zA-Z0-9@/_.-]+$":
                 type: object
                 properties:
                   enabled:
@@ -152,6 +152,33 @@ properties:
       autoUpdate:
         type: boolean
         default: true
+    additionalProperties: false
+
+  # MCP Server control arrays (Claude's actual format)
+  enabledMcpjsonServers:
+    type: array
+    description: "Array of MCP server IDs that are enabled"
+    items:
+      type: string
+    default: []
+
+  disabledMcpjsonServers:
+    type: array
+    description: "Array of MCP server IDs that are disabled"
+    items:
+      type: string
+    default: []
+
+  # Permissions for MCP tools
+  permissions:
+    type: object
+    properties:
+      allow:
+        type: array
+        description: "Array of allowed MCP tool names"
+        items:
+          type: string
+        default: []
     additionalProperties: false
 
 additionalProperties: true  # Allow additional settings for extensibility

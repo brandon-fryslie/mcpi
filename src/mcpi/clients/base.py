@@ -72,6 +72,21 @@ class ScopeHandler(ABC):
         """
         ...
     
+    @abstractmethod
+    def get_server_config(self, server_id: str) -> ServerConfig:
+        """Get the full configuration for a specific server.
+        
+        Args:
+            server_id: The ID of the server to retrieve
+            
+        Returns:
+            ServerConfig object with full server configuration
+            
+        Raises:
+            ValueError: If server doesn't exist in this scope
+        """
+        ...
+    
     def has_server(self, server_id: str) -> bool:
         """Check if scope contains a specific server.
         

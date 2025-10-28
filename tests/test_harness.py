@@ -312,14 +312,26 @@ def prepopulated_harness(mcp_harness):
         }
     })
     
-    # User-internal with disabled server
+    # User-internal with a regular server  
     mcp_harness.prepopulate_file("user-internal", {
+        "mcpServers": {
+            "internal-server": {
+                "command": "node",
+                "args": ["internal-server.js"],
+                "type": "stdio"
+            }
+        }
+    })
+    
+    # User-local settings with a disabled server (using Claude's actual format)
+    mcp_harness.prepopulate_file("user-local", {
+        "enabledMcpjsonServers": ["filesystem"],
+        "disabledMcpjsonServers": ["disabled-server"],
         "mcpServers": {
             "disabled-server": {
                 "command": "node",
                 "args": ["disabled-server.js"],
-                "type": "stdio",
-                "disabled": True
+                "type": "stdio"
             }
         }
     })

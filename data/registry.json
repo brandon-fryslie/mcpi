@@ -1,476 +1,164 @@
 {
-  "version": "2.0.0",
-  "servers": {
-    "filesystem": {
-      "id": "filesystem",
-      "name": "Filesystem",
-      "description": "Access and manage local filesystem operations",
-      "command": "npx",
-      "package": "-y @anthropic/mcp-server-filesystem",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "root_path": "/",
-        "allowed_extensions": null,
-        "max_file_size": null
-      },
-      "config_schema": null,
-      "categories": ["filesystem", "core"],
-      "keywords": ["files", "directories", "read", "write", "fs"],
-      "repository": "https://github.com/anthropics/mcp-filesystem-server",
-      "homepage": null,
-      "documentation": "https://github.com/anthropics/mcp-filesystem-server#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Anthropic",
-      "license": "MIT",
-      "verified": true
-    },
-    "brave-search": {
-      "id": "brave-search",
-      "name": "Brave Search",
-      "description": "Search the web using Brave Search API",
-      "command": "npx",
-      "package": "-y @anthropic/mcp-server-brave-search",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["api_key"],
-      "optional_config": {
-        "safe_search": "moderate",
-        "country": "us"
-      },
-      "config_schema": null,
-      "categories": ["search", "web", "core"],
-      "keywords": ["brave", "search", "web", "internet", "query"],
-      "repository": "https://github.com/anthropics/mcp-brave-search",
-      "homepage": null,
-      "documentation": "https://github.com/anthropics/mcp-brave-search#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Anthropic",
-      "license": "MIT",
-      "verified": true
-    },
-    "sqlite": {
-      "id": "sqlite",
-      "name": "SQLite",
-      "description": "Query and manage SQLite databases",
-      "command": "npx",
-      "package": "-y @anthropic/mcp-server-sqlite",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "database": ":memory:",
-        "readonly": false
-      },
-      "config_schema": null,
-      "categories": ["database", "sql", "core"],
-      "keywords": ["sqlite", "database", "sql", "query", "db"],
-      "repository": "https://github.com/anthropics/mcp-sqlite",
-      "homepage": null,
-      "documentation": "https://github.com/anthropics/mcp-sqlite#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Anthropic",
-      "license": "MIT",
-      "verified": true
-    },
-    "fetch": {
-      "id": "fetch",
-      "name": "Fetch",
-      "description": "Make HTTP requests and fetch web content",
-      "command": "npx",
-      "package": "-y @anthropic/mcp-server-fetch",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "max_redirects": 5,
-        "timeout": 30000,
-        "user_agent": null
-      },
-      "config_schema": null,
-      "categories": ["web", "http", "core"],
-      "keywords": ["fetch", "http", "https", "web", "request", "api"],
-      "repository": "https://github.com/anthropics/mcp-fetch",
-      "homepage": null,
-      "documentation": "https://github.com/anthropics/mcp-fetch#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Anthropic",
-      "license": "MIT",
-      "verified": true
-    },
-    "github": {
-      "id": "github",
-      "name": "GitHub",
-      "description": "Interact with GitHub repositories, issues, and pull requests",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-github",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["token"],
-      "optional_config": {
-        "owner": null,
-        "repo": null
-      },
-      "config_schema": null,
-      "categories": ["development", "git", "vcs"],
-      "keywords": ["github", "git", "repository", "issues", "pull requests", "pr"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/github",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": true
-    },
-    "gitlab": {
-      "id": "gitlab",
-      "name": "GitLab",
-      "description": "Interact with GitLab repositories and merge requests",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-gitlab",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["token"],
-      "optional_config": {
-        "url": "https://gitlab.com",
-        "project_id": null
-      },
-      "config_schema": null,
-      "categories": ["development", "git", "vcs"],
-      "keywords": ["gitlab", "git", "repository", "merge requests", "mr"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/gitlab",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": true
-    },
-    "postgres": {
-      "id": "postgres",
-      "name": "PostgreSQL",
-      "description": "Query and manage PostgreSQL databases",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-postgres",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["connection_string"],
-      "optional_config": {
-        "schema": "public",
-        "max_connections": 10
-      },
-      "config_schema": null,
-      "categories": ["database", "sql"],
-      "keywords": ["postgres", "postgresql", "database", "sql", "query"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/postgres",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "slack": {
-      "id": "slack",
-      "name": "Slack",
-      "description": "Send and receive messages in Slack workspaces",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-slack",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["token"],
-      "optional_config": {
-        "workspace": null,
-        "default_channel": null
-      },
-      "config_schema": null,
-      "categories": ["communication", "messaging"],
-      "keywords": ["slack", "messaging", "chat", "communication"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/slack",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "google-maps": {
-      "id": "google-maps",
-      "name": "Google Maps",
-      "description": "Search locations and get directions using Google Maps",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-google-maps",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": ["api_key"],
-      "optional_config": {
-        "language": "en",
-        "region": "us"
-      },
-      "config_schema": null,
-      "categories": ["maps", "location", "navigation"],
-      "keywords": ["google", "maps", "directions", "places", "geocoding"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/google-maps",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "puppeteer": {
-      "id": "puppeteer",
-      "name": "Puppeteer",
-      "description": "Automate web browser interactions and scraping",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-puppeteer",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "headless": true,
-        "viewport_width": 1280,
-        "viewport_height": 720
-      },
-      "config_schema": null,
-      "categories": ["web", "automation", "scraping"],
-      "keywords": ["puppeteer", "browser", "automation", "scraping", "web"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "aws": {
-      "id": "aws",
-      "name": "AWS",
-      "description": "Manage AWS resources and services",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-aws",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "region": "us-east-1",
-        "profile": "default"
-      },
-      "config_schema": null,
-      "categories": ["cloud", "aws", "infrastructure"],
-      "keywords": ["aws", "amazon", "cloud", "s3", "ec2", "lambda"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/aws",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "memory": {
-      "id": "memory",
-      "name": "Memory",
-      "description": "Simple key-value memory storage",
-      "command": "npx",
-      "package": "@anthropic/mcp-server-memory",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "persist": false,
-        "storage_path": null
-      },
-      "config_schema": null,
-      "categories": ["storage", "memory", "core"],
-      "keywords": ["memory", "storage", "key-value", "cache"],
-      "repository": "https://github.com/anthropics/mcp-memory",
-      "homepage": null,
-      "documentation": "https://github.com/anthropics/mcp-memory#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Anthropic",
-      "license": "MIT",
-      "verified": true
-    },
-    "docker": {
-      "id": "docker",
-      "name": "Docker",
-      "description": "Manage Docker containers and images",
-      "command": "npx",
-      "package": "mcp-server-docker",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "socket": "/var/run/docker.sock"
-      },
-      "config_schema": null,
-      "categories": ["containerization", "devops"],
-      "keywords": ["docker", "containers", "images", "compose"],
-      "repository": "https://github.com/ckreiling/mcp-server-docker",
-      "homepage": null,
-      "documentation": "https://github.com/ckreiling/mcp-server-docker#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "ckreiling",
-      "license": "MIT",
-      "verified": false
-    },
-    "playwright": {
-      "id": "playwright",
-      "name": "Playwright",
-      "description": "Browser automation and testing with Playwright",
-      "command": "npx",
-      "package": "@executeautomation/playwright-mcp-server",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "browser": "chromium",
-        "headless": true
-      },
-      "config_schema": null,
-      "categories": ["testing", "automation", "web"],
-      "keywords": ["playwright", "testing", "browser", "automation", "e2e"],
-      "repository": "https://github.com/executeautomation/playwright-mcp-server",
-      "homepage": null,
-      "documentation": "https://github.com/executeautomation/playwright-mcp-server#readme",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "executeautomation",
-      "license": "MIT",
-      "verified": false
-    },
-    "time": {
-      "id": "time",
-      "name": "Time",
-      "description": "Get current time and timezone information",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-time",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {
-        "timezone": "UTC"
-      },
-      "config_schema": null,
-      "categories": ["utilities", "time"],
-      "keywords": ["time", "date", "timezone", "clock"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "everything": {
-      "id": "everything",
-      "name": "Everything",
-      "description": "The ultimate MCP server with every tool",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-everything",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {},
-      "config_schema": null,
-      "categories": ["utilities", "kitchen-sink"],
-      "keywords": ["everything", "all", "tools", "utilities"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    },
-    "sequentialthinking": {
-      "id": "sequentialthinking",
-      "name": "Sequential Thinking",
-      "description": "Tools for systematic reasoning and problem solving",
-      "command": "npx",
-      "package": "@modelcontextprotocol/server-sequential-thinking",
-      "args": [],
-      "env": {},
-      "install_method": "npx",
-      "install_package": null,
-      "install_args": [],
-      "required_config": [],
-      "optional_config": {},
-      "config_schema": null,
-      "categories": ["reasoning", "ai-tools"],
-      "keywords": ["thinking", "reasoning", "problem-solving", "logic"],
-      "repository": "https://github.com/modelcontextprotocol/servers",
-      "homepage": null,
-      "documentation": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
-      "version": "0.1.0",
-      "min_version": null,
-      "author": "Model Context Protocol",
-      "license": "MIT",
-      "verified": false
-    }
+  "filesystem": {
+    "description": "Access and manage local filesystem operations",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@anthropic/mcp-server-filesystem"
+    ],
+    "repository": "https://github.com/anthropics/mcp-filesystem-server"
+  },
+  "brave-search": {
+    "description": "Search the web using Brave Search API",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@anthropic/mcp-server-brave-search"
+    ],
+    "repository": "https://github.com/anthropics/mcp-brave-search"
+  },
+  "context7": {
+    "description": "Up-to-date code documentation for LLMs and AI code editors",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ],
+    "repository": "https://github.com/upstash/context7"
+  },
+  "sqlite": {
+    "description": "Query and manage SQLite databases",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@anthropic/mcp-server-sqlite"
+    ],
+    "repository": "https://github.com/anthropics/mcp-sqlite"
+  },
+  "fetch": {
+    "description": "Make HTTP requests and fetch web content",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@anthropic/mcp-server-fetch"
+    ],
+    "repository": "https://github.com/anthropics/mcp-fetch"
+  },
+  "github": {
+    "description": "Interact with GitHub repositories, issues, and pull requests",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-github"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "gitlab": {
+    "description": "Interact with GitLab repositories and merge requests",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-gitlab"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "postgres": {
+    "description": "Query and manage PostgreSQL databases",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-postgres"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "slack": {
+    "description": "Send and receive messages in Slack workspaces",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-slack"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "google-maps": {
+    "description": "Search locations and get directions using Google Maps",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-google-maps"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "puppeteer": {
+    "description": "Automate web browser interactions and scraping",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-puppeteer"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "aws": {
+    "description": "Manage AWS resources and services",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-aws"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "memory": {
+    "description": "Simple key-value memory storage",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@anthropic/mcp-server-memory"
+    ],
+    "repository": "https://github.com/anthropics/mcp-memory"
+  },
+  "docker": {
+    "description": "Manage Docker containers and images",
+    "command": "npx",
+    "args": [
+      "-y",
+      "mcp-server-docker"
+    ],
+    "repository": "https://github.com/ckreiling/mcp-server-docker"
+  },
+  "playwright": {
+    "description": "Browser automation and testing with Playwright",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@executeautomation/playwright-mcp-server"
+    ],
+    "repository": "https://github.com/executeautomation/playwright-mcp-server"
+  },
+  "time": {
+    "description": "Get current time and timezone information",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-time"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "everything": {
+    "description": "The ultimate MCP server with every tool",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-everything"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "sequentialthinking": {
+    "description": "Tools for systematic reasoning and problem solving",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-sequential-thinking"
+    ],
+    "repository": "https://github.com/modelcontextprotocol/servers"
   }
 }

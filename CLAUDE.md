@@ -31,7 +31,12 @@ pytest -v --tb=short
 
 # Run with PYTHONPATH set (for when imports fail)
 PYTHONPATH=src uv run pytest tests/test_cli_scope_features.py::TestDynamicScopeType -v --tb=short
+
+# Validate registry data (integration tests for data/registry.json)
+pytest tests/test_registry_integration.py -v
 ```
+
+**Registry Validation**: The test suite includes integration tests that validate the actual `data/registry.json` file through multiple layers (JSON syntax, CUE schema, Pydantic models, semantic validation). This eliminates the need for ad-hoc validation commands. See `.agent_planning/REGISTRY_VALIDATION_TESTING.md` for details.
 
 ### Code Quality
 ```bash
