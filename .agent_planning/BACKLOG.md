@@ -480,6 +480,40 @@ Advanced features from spec not implemented. Nice-to-have for 1.0, not MVP.
 
 ---
 
+### P2-5: Enable/Disable Architectural Refactor - 1.1 INITIATIVE
+**Effort**: 10-15 hours (5-7 days) • **Status**: PLANNED (post-1.0)
+**Decision**: **DEFER TO 1.1** (confirmed via DECISION-ENABLE-DISABLE-REFACTOR.md)
+**Initiative**: See `INITIATIVE-ENABLE-DISABLE-REFACTOR.md`
+**Timeline**: 1.1 release (~2025-11-11, 1 week after 1.0)
+
+**Scope**: Refactor client/scope architecture to meet user requirements
+- Each client in separate directory
+- Each scope in separate file
+- Separate enable/disable handlers per scope type
+- Protocol-based design for scope capabilities
+- Eliminate code duplication (~200 lines)
+
+**User Requirements Satisfaction**:
+- Before: 48% (functionality works, architecture poor)
+- After: 100% (all requirements met)
+
+**Why Defer to 1.1**:
+- Current implementation WORKS correctly (enable/disable functional)
+- Refactor is ARCHITECTURAL improvement, not bug fix
+- Risk/benefit ratio too high for 4 days before 1.0 release
+- Better quality refactor with no time pressure
+
+**5-Phase Implementation Plan**:
+1. Create new directory structure (2 hours)
+2. Extract scope classes (4 hours)
+3. Simplify plugin (1 hour)
+4. Update tests (2 hours)
+5. Verification & cleanup (1 hour)
+
+**See**: `INITIATIVE-ENABLE-DISABLE-REFACTOR.md` for full details
+
+---
+
 ## P3: NICE-TO-HAVE (DEFER TO POST-1.0)
 
 ### P3-2: Create Architecture Documentation for Contributors

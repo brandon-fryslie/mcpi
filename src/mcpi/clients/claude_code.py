@@ -164,41 +164,51 @@ class ClaudeCodePlugin(MCPClientPlugin):
 
         return scopes
 
-    def _get_server_state(self, server_id: str) -> ServerState:
-        """Get the actual state of a server using Claude's enable/disable arrays.
+    def _get_server_state(self, server_id: str, scope: str) -> ServerState:
+        """Get the actual state of a server in a specific scope.
+
+        BUG-FIX: This now only checks the SERVER'S OWN SCOPE for enable/disable state,
+        preventing cross-scope pollution where a server in user-global would show as
+        DISABLED because it appeared in user-local's disabledMcpjsonServers array.
 
         Args:
             server_id: Server identifier
+            scope: The scope where the server exists (ONLY check this scope's arrays)
 
         Returns:
             Server state (ENABLED, DISABLED, or NOT_INSTALLED)
         """
-        # Check Claude settings scopes for enabled/disabled arrays
-        settings_scopes = ["project-local", "user-local", "user-global"]
+        # Only check the server's own scope for enable/disable arrays
+        if scope not in self._scopes:
+            return ServerState.ENABLED
 
-        for scope_name in settings_scopes:
-            if scope_name in self._scopes:
-                handler = self._scopes[scope_name]
+        handler = self._scopes[scope]
 
-                if handler.exists():
-                    try:
-                        current_data = handler.reader.read(handler.config.path)
-                        enabled_servers = current_data.get("enabledMcpjsonServers", [])
-                        disabled_servers = current_data.get(
-                            "disabledMcpjsonServers", []
-                        )
+        # Only check if this scope supports enable/disable arrays
+        # user-global does NOT have these arrays, so servers there are always ENABLED
+        if not handler.exists():
+            return ServerState.ENABLED
 
-                        # If explicitly disabled, return DISABLED
-                        if server_id in disabled_servers:
-                            return ServerState.DISABLED
+        try:
+            current_data = handler.reader.read(handler.config.path)
 
-                        # If explicitly enabled, return ENABLED
-                        if server_id in enabled_servers:
-                            return ServerState.ENABLED
+            # Only check arrays if this scope format supports them
+            # project-local and user-local have these arrays
+            # user-global does NOT (it only has mcpServers)
+            enabled_servers = current_data.get("enabledMcpjsonServers", [])
+            disabled_servers = current_data.get("disabledMcpjsonServers", [])
 
-                    except Exception:
-                        # If we can't read the settings file, continue to next scope
-                        continue
+            # If explicitly disabled IN THIS SCOPE, return DISABLED
+            if server_id in disabled_servers:
+                return ServerState.DISABLED
+
+            # If explicitly enabled IN THIS SCOPE, return ENABLED
+            if server_id in enabled_servers:
+                return ServerState.ENABLED
+
+        except Exception:
+            # If we can't read the settings file, default to ENABLED
+            pass
 
         # If server exists in config but not in any enable/disable array, default to ENABLED
         # (This matches Claude's behavior where servers are enabled by default)
@@ -233,8 +243,9 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 # Create qualified server ID
                 qualified_id = f"{self.name}:{scope_name}:{server_id}"
 
-                # Determine server state using Claude's actual format
-                state = self._get_server_state(server_id)
+                # Determine server state using ONLY the server's own scope
+                # BUG-FIX: Pass the scope so we only check that scope's enable/disable arrays
+                state = self._get_server_state(server_id, scope_name)
 
                 # Create ServerInfo object
                 servers[qualified_id] = ServerInfo(
@@ -309,122 +320,161 @@ class ClaudeCodePlugin(MCPClientPlugin):
         """
         # Find server across all scopes first
         server_exists = False
-        for handler in self._scopes.values():
+        server_scope = None
+        for scope_name, handler in self._scopes.items():
             if handler.has_server(server_id):
                 server_exists = True
+                server_scope = scope_name
                 break
 
         if not server_exists:
             return ServerState.NOT_INSTALLED
 
         # Use the same logic as _get_server_state to check enabled/disabled arrays
-        return self._get_server_state(server_id)
+        # BUG-FIX: Pass the server's actual scope
+        return self._get_server_state(server_id, server_scope)
 
     def enable_server(self, server_id: str) -> OperationResult:
         """Enable a server using Claude's actual format.
 
+        BUG-FIX: This now finds the server's ACTUAL SCOPE first, then only modifies
+        that specific scope. Previously it modified the FIRST settings scope it found,
+        which could be wrong.
+
         Args:
             server_id: Server identifier
 
         Returns:
             Operation result
         """
-        # Find a Claude settings scope that can handle enable/disable
-        settings_scopes = ["project-local", "user-local", "user-global"]
+        # BUG-FIX: Find the server's actual scope first
+        server_scope = None
+        for scope_name, handler in self._scopes.items():
+            if handler.has_server(server_id):
+                server_scope = scope_name
+                break
 
-        for scope_name in settings_scopes:
-            if scope_name in self._scopes:
-                handler = self._scopes[scope_name]
+        if not server_scope:
+            return OperationResult.failure_result(
+                f"Server '{server_id}' not found in any scope"
+            )
 
-                # Read current settings file
-                if handler.exists():
-                    current_data = handler.reader.read(handler.config.path)
-                else:
-                    current_data = {}
+        # Check if this scope supports enable/disable arrays
+        # user-global does NOT support these arrays
+        if server_scope == "user-global":
+            # For user-global, servers are always enabled (no enable/disable arrays)
+            # Don't modify any other scope - that would be wrong!
+            return OperationResult.success_result(
+                f"Server '{server_id}' in user-global scope is always enabled "
+                "(user-global does not support enable/disable arrays)"
+            )
 
-                # Initialize arrays if they don't exist
-                enabled_servers = current_data.get("enabledMcpjsonServers", [])
-                disabled_servers = current_data.get("disabledMcpjsonServers", [])
+        # Only modify the server's actual scope
+        handler = self._scopes[server_scope]
 
-                # Remove from disabled array if present
-                if server_id in disabled_servers:
-                    disabled_servers.remove(server_id)
+        # Read current settings file
+        if handler.exists():
+            current_data = handler.reader.read(handler.config.path)
+        else:
+            current_data = {}
 
-                # Add to enabled array if not already there
-                if server_id not in enabled_servers:
-                    enabled_servers.append(server_id)
+        # Initialize arrays if they don't exist
+        enabled_servers = current_data.get("enabledMcpjsonServers", [])
+        disabled_servers = current_data.get("disabledMcpjsonServers", [])
 
-                # Update the data
-                current_data["enabledMcpjsonServers"] = enabled_servers
-                current_data["disabledMcpjsonServers"] = disabled_servers
+        # Remove from disabled array if present
+        if server_id in disabled_servers:
+            disabled_servers.remove(server_id)
 
-                # Write back to file
-                try:
-                    handler.writer.write(handler.config.path, current_data)
-                    return OperationResult.success_result(
-                        f"Enabled server '{server_id}' in scope '{scope_name}'"
-                    )
-                except Exception as e:
-                    return OperationResult.failure_result(
-                        f"Failed to enable server '{server_id}': {e}"
-                    )
+        # Add to enabled array if not already there
+        if server_id not in enabled_servers:
+            enabled_servers.append(server_id)
 
-        return OperationResult.failure_result(
-            "No suitable Claude settings scope found for enable/disable operations"
-        )
+        # Update the data
+        current_data["enabledMcpjsonServers"] = enabled_servers
+        current_data["disabledMcpjsonServers"] = disabled_servers
+
+        # Write back to file
+        try:
+            handler.writer.write(handler.config.path, current_data)
+            return OperationResult.success_result(
+                f"Enabled server '{server_id}' in scope '{server_scope}'"
+            )
+        except Exception as e:
+            return OperationResult.failure_result(
+                f"Failed to enable server '{server_id}': {e}"
+            )
 
     def disable_server(self, server_id: str) -> OperationResult:
         """Disable a server using Claude's actual format.
 
+        BUG-FIX: This now finds the server's ACTUAL SCOPE first, then only modifies
+        that specific scope. Previously it modified the FIRST settings scope it found,
+        which could be wrong.
+
         Args:
             server_id: Server identifier
 
         Returns:
             Operation result
         """
-        # Find a Claude settings scope that can handle enable/disable
-        settings_scopes = ["project-local", "user-local", "user-global"]
+        # BUG-FIX: Find the server's actual scope first
+        server_scope = None
+        for scope_name, handler in self._scopes.items():
+            if handler.has_server(server_id):
+                server_scope = scope_name
+                break
 
-        for scope_name in settings_scopes:
-            if scope_name in self._scopes:
-                handler = self._scopes[scope_name]
+        if not server_scope:
+            return OperationResult.failure_result(
+                f"Server '{server_id}' not found in any scope"
+            )
 
-                # Read current settings file
-                if handler.exists():
-                    current_data = handler.reader.read(handler.config.path)
-                else:
-                    current_data = {}
+        # Check if this scope supports enable/disable arrays
+        # user-global does NOT support these arrays
+        if server_scope == "user-global":
+            # For user-global, servers cannot be disabled (no enable/disable arrays)
+            # Don't modify any other scope - that would be wrong!
+            return OperationResult.success_result(
+                f"Server '{server_id}' in user-global scope cannot be disabled "
+                "(user-global does not support enable/disable arrays)"
+            )
 
-                # Initialize arrays if they don't exist
-                enabled_servers = current_data.get("enabledMcpjsonServers", [])
-                disabled_servers = current_data.get("disabledMcpjsonServers", [])
+        # Only modify the server's actual scope
+        handler = self._scopes[server_scope]
 
-                # Remove from enabled array if present
-                if server_id in enabled_servers:
-                    enabled_servers.remove(server_id)
+        # Read current settings file
+        if handler.exists():
+            current_data = handler.reader.read(handler.config.path)
+        else:
+            current_data = {}
 
-                # Add to disabled array if not already there
-                if server_id not in disabled_servers:
-                    disabled_servers.append(server_id)
+        # Initialize arrays if they don't exist
+        enabled_servers = current_data.get("enabledMcpjsonServers", [])
+        disabled_servers = current_data.get("disabledMcpjsonServers", [])
 
-                # Update the data
-                current_data["enabledMcpjsonServers"] = enabled_servers
-                current_data["disabledMcpjsonServers"] = disabled_servers
+        # Remove from enabled array if present
+        if server_id in enabled_servers:
+            enabled_servers.remove(server_id)
 
-                # Write back to file
-                try:
-                    handler.writer.write(handler.config.path, current_data)
-                    return OperationResult.success_result(
-                        f"Disabled server '{server_id}' in scope '{scope_name}'"
-                    )
-                except Exception as e:
-                    return OperationResult.failure_result(
-                        f"Failed to disable server '{server_id}': {e}"
-                    )
+        # Add to disabled array if not already there
+        if server_id not in disabled_servers:
+            disabled_servers.append(server_id)
 
-        return OperationResult.failure_result(
-            "No suitable Claude settings scope found for enable/disable operations"
-        )
+        # Update the data
+        current_data["enabledMcpjsonServers"] = enabled_servers
+        current_data["disabledMcpjsonServers"] = disabled_servers
+
+        # Write back to file
+        try:
+            handler.writer.write(handler.config.path, current_data)
+            return OperationResult.success_result(
+                f"Disabled server '{server_id}' in scope '{server_scope}'"
+            )
+        except Exception as e:
+            return OperationResult.failure_result(
+                f"Failed to disable server '{server_id}': {e}"
+            )
 
     def validate_server_config(self, config: ServerConfig) -> List[str]:
         """Validate server configuration for Claude Code.

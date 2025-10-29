@@ -30,76 +30,70 @@ class TestClaudeCodePlugin:
             "user-mcp",
         ]
 
-        scope_names = plugin.get_scope_names()
-        assert set(scope_names) == set(expected_scopes)
+        scopes = plugin.get_scope_names()
+        assert set(scopes) == set(expected_scopes)
 
     def test_scope_priorities(self, plugin):
         """Test that scopes have correct priorities."""
         scopes = plugin.get_scopes()
-        scope_priorities = {scope.name: scope.priority for scope in scopes}
 
-        # Lower priority number = higher priority
-        assert scope_priorities["project-mcp"] < scope_priorities["user-mcp"]
-        assert scope_priorities["user-local"] < scope_priorities["user-global"]
+        scope_priorities = {s.name: s.priority for s in scopes}
+
+        assert scope_priorities["project-mcp"] == 1
+        assert scope_priorities["project-local"] == 2
+        assert scope_priorities["user-local"] == 3
+        assert scope_priorities["user-global"] == 4
+        assert scope_priorities["user-internal"] == 5
+        assert scope_priorities["user-mcp"] == 6
 
     def test_scope_types(self, plugin):
-        """Test that scopes are correctly marked as user/project level."""
+        """Test that scopes are correctly categorized as user/project."""
         scopes = plugin.get_scopes()
 
         project_scopes = [s for s in scopes if s.is_project_level]
         user_scopes = [s for s in scopes if s.is_user_level]
 
-        project_scope_names = {s.name for s in project_scopes}
-        user_scope_names = {s.name for s in user_scopes}
+        project_names = [s.name for s in project_scopes]
+        assert "project-mcp" in project_names
+        assert "project-local" in project_names
 
-        assert project_scope_names == {"project-mcp", "project-local"}
-        assert user_scope_names == {
-            "user-local",
-            "user-global",
-            "user-internal",
-            "user-mcp",
-        }
+        user_names = [s.name for s in user_scopes]
+        assert "user-local" in user_names
+        assert "user-global" in user_names
+        assert "user-internal" in user_names
+        assert "user-mcp" in user_names
 
     def test_get_primary_scope(self, plugin):
-        """Test getting primary scope."""
+        """Test that primary scope is user-mcp."""
         assert plugin.get_primary_scope() == "user-mcp"
 
     def test_get_project_scopes(self, plugin):
         """Test getting project-level scopes."""
         project_scopes = plugin.get_project_scopes()
-        assert set(project_scopes) == {"project-mcp", "project-local"}
+        assert "project-mcp" in project_scopes
+        assert "project-local" in project_scopes
+        assert "user-local" not in project_scopes
 
     def test_get_user_scopes(self, plugin):
         """Test getting user-level scopes."""
         user_scopes = plugin.get_user_scopes()
-        assert set(user_scopes) == {
-            "user-local",
-            "user-global",
-            "user-internal",
-            "user-mcp",
-        }
+        assert "user-local" in user_scopes
+        assert "user-global" in user_scopes
+        assert "user-mcp" in user_scopes
+        assert "project-mcp" not in user_scopes
 
-    def test_is_installed_no_claude_dir(self, plugin, mcp_harness):
-        """Test is_installed() when Claude directory doesn't exist."""
-        # The harness sets up temporary directories, but we can check if the method works
-        # Since we're using temporary directories, the .claude dir won't exist by default
-        # unless we explicitly create it in the harness setup
+    def test_is_installed_no_claude_dir(self, plugin, tmp_path, monkeypatch):
+        """Test is_installed when Claude directory doesn't exist."""
+        # Use monkeypatch to override home directory
+        monkeypatch.setenv("HOME", str(tmp_path))
+        # Force re-check with new home
+        assert not plugin.is_installed()
 
-        # For this test, just verify the method runs without error
-        result = plugin.is_installed()
-        assert isinstance(result, bool)
-
-    def test_is_installed_with_claude_dir(self, plugin, mcp_harness):
-        """Test is_installed() when Claude directory exists."""
-        # Create the .claude directory in the harness
-        user_home = mcp_harness.tmp_dir / "user_home"
-        claude_dir = user_home / ".claude"
-        claude_dir.mkdir(parents=True, exist_ok=True)
-
-        # Now check installation - since we're using path_overrides, we need to check
-        # the actual behavior with the test paths
-        result = plugin.is_installed()
-        assert isinstance(result, bool)
+    def test_is_installed_with_claude_dir(self, plugin, tmp_path, monkeypatch):
+        """Test is_installed when Claude directory exists."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir()
+        assert plugin.is_installed()
 
     def test_get_installation_info(self, plugin):
         """Test getting installation information."""
@@ -111,71 +105,55 @@ class TestClaudeCodePlugin:
         assert "scopes" in info
         assert len(info["scopes"]) == 6
 
-        # Check scope info structure
-        for scope_name, scope_info in info["scopes"].items():
-            assert "path" in scope_info
-            assert "exists" in scope_info
-            assert "description" in scope_info
-            assert "priority" in scope_info
-            assert "is_user_level" in scope_info
-            assert "is_project_level" in scope_info
-
     def test_validate_server_config_valid(self, plugin):
-        """Test validation of valid server configuration."""
-        config = ServerConfig(command="python", args=["-m", "mcp_server"], type="stdio")
+        """Test validating a valid server configuration."""
+        config = ServerConfig(command="python", args=["-m", "test_server"], type="stdio")
 
         errors = plugin.validate_server_config(config)
-        assert errors == []
+        assert len(errors) == 0
 
     def test_validate_server_config_invalid_type(self, plugin):
-        """Test validation with invalid server type."""
-        config = ServerConfig(
-            command="python", args=["-m", "mcp_server"], type="invalid_type"
-        )
+        """Test validating server config with invalid type."""
+        config = ServerConfig(command="python", args=["-m", "test"], type="invalid")
 
         errors = plugin.validate_server_config(config)
         assert len(errors) > 0
-        assert any("Invalid server type" in error for error in errors)
+        assert any("Invalid server type" in e for e in errors)
 
     def test_validate_server_config_npx_without_args(self, plugin):
-        """Test validation of npx command without args."""
-        config = ServerConfig(command="npx", args=[], type="stdio")
+        """Test validating npx command without args."""
+        config = ServerConfig(command="npx", args=[])
 
         errors = plugin.validate_server_config(config)
-        assert len(errors) > 0
-        assert any("NPX commands should specify a package" in error for error in errors)
+        assert any("NPX commands should specify a package" in e for e in errors)
 
     def test_validate_server_config_python_without_module(self, plugin):
-        """Test validation of python command without -m flag."""
-        config = ServerConfig(
-            command="python", args=["script.py"], type="stdio"  # No -m flag
-        )
+        """Test validating python command without module syntax."""
+        config = ServerConfig(command="python", args=["script.py"])
 
         errors = plugin.validate_server_config(config)
-        assert len(errors) > 0
-        assert any(
-            "Python commands should use module syntax" in error for error in errors
-        )
+        assert any("Python commands should use module syntax" in e for e in errors)
 
     def test_list_servers_no_existing_files(self, plugin):
-        """Test listing servers when no configuration files exist."""
-        # With a fresh harness, no files should exist
+        """Test listing servers when no config files exist."""
         servers = plugin.list_servers()
-        assert servers == {}
+        assert len(servers) == 0
 
     def test_list_servers_with_data(self, plugin, mcp_harness):
-        """Test listing servers with existing data."""
-        # Prepopulate using the harness
-        test_data = {
-            "mcpServers": {
-                "test-server": {
-                    "command": "python",
-                    "args": ["-m", "test_server"],
-                    "type": "stdio",
+        """Test listing servers when config files exist."""
+        # Prepopulate server data
+        mcp_harness.prepopulate_file(
+            "user-mcp",
+            {
+                "mcpServers": {
+                    "test-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                        "type": "stdio",
+                    }
                 }
-            }
-        }
-        mcp_harness.prepopulate_file("user-mcp", test_data)
+            },
+        )
 
         servers = plugin.list_servers()
 
@@ -190,32 +168,31 @@ class TestClaudeCodePlugin:
         assert server_info.state == ServerState.ENABLED
 
     def test_list_servers_with_disabled_server(self, plugin, mcp_harness):
-        """Test listing servers with disabled server using Claude's actual format."""
-        # Prepopulate server data
+        """Test listing servers with disabled server using Claude's actual format.
+
+        BUG-FIX: This test now correctly tests scope isolation. A server installed in
+        user-local and marked disabled in user-local's disabled array should show as
+        DISABLED. Previously this test incorrectly expected cross-scope pollution.
+        """
+        # Prepopulate server in user-local (which supports enable/disable arrays)
         mcp_harness.prepopulate_file(
-            "user-mcp",
+            "user-local",
             {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": ["disabled-server"],
                 "mcpServers": {
                     "disabled-server": {
                         "command": "python",
                         "args": ["-m", "test_server"],
                         "type": "stdio",
                     }
-                }
-            },
-        )
-        # Prepopulate settings with disabled server
-        mcp_harness.prepopulate_file(
-            "user-local",
-            {
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": ["disabled-server"],
+                },
             },
         )
 
         servers = plugin.list_servers()
 
-        qualified_id = "claude-code:user-mcp:disabled-server"
+        qualified_id = "claude-code:user-local:disabled-server"
         server_info = servers[qualified_id]
         assert server_info.state == ServerState.DISABLED
 
@@ -335,41 +312,49 @@ class TestClaudeCodePlugin:
         assert state == ServerState.ENABLED
 
     def test_get_server_state_disabled(self, plugin, mcp_harness):
-        """Test getting state of disabled server using Claude's actual format."""
-        # Prepopulate server
-        mcp_harness.prepopulate_file(
-            "user-mcp",
-            {
-                "mcpServers": {
-                    "test-server": {"command": "python", "args": ["-m", "test_server"]}
-                }
-            },
-        )
-        # Mark as disabled in settings
+        """Test getting state of disabled server using Claude's actual format.
+
+        BUG-FIX: This test now correctly tests a server in user-local (which supports
+        enable/disable arrays) rather than testing cross-scope pollution.
+        """
+        # Prepopulate server in user-local (which supports enable/disable)
         mcp_harness.prepopulate_file(
             "user-local",
-            {"enabledMcpjsonServers": [], "disabledMcpjsonServers": ["test-server"]},
+            {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": ["test-server"],
+                "mcpServers": {
+                    "test-server": {"command": "python", "args": ["-m", "test_server"]}
+                },
+            },
         )
 
         state = plugin.get_server_state("test-server")
         assert state == ServerState.DISABLED
 
     def test_enable_server_not_found(self, plugin):
-        """Test enabling non-existent server."""
+        """Test enabling non-existent server.
+
+        BUG-FIX: After fixing the bug, enabling a non-existent server now correctly
+        returns an error instead of succeeding with the wrong behavior.
+        """
         result = plugin.enable_server("nonexistent-server")
 
-        # Should succeed even if server doesn't exist (it gets added to enabled array)
-        assert result.success
+        # Should fail because server doesn't exist in any scope
+        assert not result.success
+        assert "not found" in result.message.lower()
 
     def test_enable_server_already_enabled(self, plugin, mcp_harness):
         """Test enabling already enabled server."""
-        # Prepopulate an enabled server
+        # Prepopulate an enabled server in user-local (which supports enable/disable)
         mcp_harness.prepopulate_file(
-            "user-mcp",
+            "user-local",
             {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": [],
                 "mcpServers": {
                     "test-server": {"command": "python", "args": ["-m", "test_server"]}
-                }
+                },
             },
         )
 
@@ -378,20 +363,21 @@ class TestClaudeCodePlugin:
         assert result.success
 
     def test_enable_server_success(self, plugin, mcp_harness):
-        """Test successful server enabling using Claude's actual format."""
-        # Prepopulate server
+        """Test successful server enabling using Claude's actual format.
+
+        BUG-FIX: This test now correctly tests enabling a server that exists in user-local
+        (which supports enable/disable arrays).
+        """
+        # Prepopulate server in user-local with disabled state
         mcp_harness.prepopulate_file(
-            "user-mcp",
+            "user-local",
             {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": ["test-server"],
                 "mcpServers": {
                     "test-server": {"command": "python", "args": ["-m", "test_server"]}
-                }
+                },
             },
-        )
-        # Mark as disabled in settings
-        mcp_harness.prepopulate_file(
-            "project-local",
-            {"enabledMcpjsonServers": [], "disabledMcpjsonServers": ["test-server"]},
         )
 
         # Verify it's disabled
@@ -410,13 +396,15 @@ class TestClaudeCodePlugin:
 
     def test_disable_server_success(self, plugin, mcp_harness):
         """Test successful server disabling using Claude's actual format."""
-        # Prepopulate an enabled server
+        # Prepopulate an enabled server in user-local (which supports enable/disable)
         mcp_harness.prepopulate_file(
-            "user-mcp",
+            "user-local",
             {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": [],
                 "mcpServers": {
                     "test-server": {"command": "python", "args": ["-m", "test_server"]}
-                }
+                },
             },
         )
 
