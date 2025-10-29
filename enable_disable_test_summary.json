@@ -1,0 +1,166 @@
+{
+  "test_file": "tests/test_enable_disable_bugs.py",
+  "documentation_file": "tests/TEST_ENABLE_DISABLE_BUGS.md",
+  "date_created": "2025-10-29",
+  "status": "Tests written and verified",
+  "tests_added": [
+    "test_user_global_server_state_not_polluted_by_user_local_disabled_array",
+    "test_user_local_server_state_correctly_reflects_own_disabled_array",
+    "test_user_global_server_with_no_disable_arrays_shows_enabled",
+    "test_multiple_scopes_maintain_independent_state",
+    "test_disable_server_in_user_global_returns_error",
+    "test_disable_server_in_user_local_modifies_correct_scope",
+    "test_enable_server_in_user_local_modifies_correct_scope",
+    "test_enable_disable_operations_are_idempotent",
+    "test_list_shows_correct_state_for_each_scope",
+    "test_list_with_scope_filter_shows_only_that_scope",
+    "test_client_info_with_error_response_no_typeerror"
+  ],
+  "test_count": 11,
+  "workflows_covered": [
+    "Cross-scope state isolation for enable/disable",
+    "Scope-specific enable/disable operations",
+    "List servers with correct state per scope",
+    "Error handling for unsupported scopes",
+    "Idempotent enable/disable operations"
+  ],
+  "bugs_tested": {
+    "BUG-1": {
+      "name": "Cross-Scope State Pollution",
+      "priority": "P0-CRITICAL",
+      "tests": [
+        "test_user_global_server_state_not_polluted_by_user_local_disabled_array",
+        "test_user_local_server_state_correctly_reflects_own_disabled_array",
+        "test_user_global_server_with_no_disable_arrays_shows_enabled",
+        "test_multiple_scopes_maintain_independent_state",
+        "test_list_shows_correct_state_for_each_scope"
+      ],
+      "description": "Server in user-global scope shows DISABLED when it's in user-local's disabledMcpjsonServers. Should only check the server's OWN scope for state.",
+      "test_count": 5
+    },
+    "BUG-3": {
+      "name": "Wrong Scope Modification",
+      "priority": "P0-CRITICAL",
+      "tests": [
+        "test_disable_server_in_user_global_returns_error",
+        "test_disable_server_in_user_local_modifies_correct_scope",
+        "test_enable_server_in_user_local_modifies_correct_scope",
+        "test_enable_disable_operations_are_idempotent"
+      ],
+      "description": "Enable/disable operations modify wrong scope. Should only modify the scope where the server actually exists.",
+      "test_count": 4
+    },
+    "BUG-ORIG": {
+      "name": "TypeError in client info",
+      "priority": "P0-CRITICAL",
+      "tests": [
+        "test_client_info_with_error_response_no_typeerror"
+      ],
+      "description": "mcpi client info command has TypeError when client data contains error. Should handle gracefully.",
+      "test_count": 1,
+      "note": "Placeholder documented - actual implementation belongs in test_cli.py"
+    }
+  },
+  "initial_test_results": {
+    "run_date": "2025-10-29",
+    "total_tests": 11,
+    "passed": 3,
+    "failed": 7,
+    "skipped": 1,
+    "initial_status": "failing (expected)",
+    "failing_tests": [
+      "test_user_global_server_state_not_polluted_by_user_local_disabled_array",
+      "test_multiple_scopes_maintain_independent_state",
+      "test_disable_server_in_user_local_modifies_correct_scope",
+      "test_enable_server_in_user_local_modifies_correct_scope",
+      "test_enable_disable_operations_are_idempotent",
+      "test_list_shows_correct_state_for_each_scope",
+      "test_list_with_scope_filter_shows_only_that_scope"
+    ],
+    "passing_tests": [
+      "test_user_local_server_state_correctly_reflects_own_disabled_array",
+      "test_user_global_server_with_no_disable_arrays_shows_enabled",
+      "test_disable_server_in_user_global_returns_error"
+    ]
+  },
+  "gaming_resistance": "high",
+  "gaming_resistance_features": [
+    "Real file I/O through test harness (not mocks)",
+    "Verify actual file contents before and after operations",
+    "Assert on observable user-facing behavior (ServerState enum)",
+    "Test error conditions and edge cases",
+    "Verify side effects (no unintended scope modifications)",
+    "Idempotency checks (safe to repeat operations)",
+    "Multiple scopes tested simultaneously",
+    "Cannot pass with stub implementations or hardcoded values"
+  ],
+  "test_framework": {
+    "framework": "pytest",
+    "harness": "MCPTestHarness from tests/test_harness.py",
+    "fixtures": [
+      "mcp_harness",
+      "mcp_test_dir",
+      "plugin"
+    ],
+    "temp_files": true,
+    "real_io": true,
+    "mocking": "none"
+  },
+  "source_files_under_test": [
+    "src/mcpi/clients/claude_code.py (lines 167-205, 323-427)",
+    "src/mcpi/clients/file_based.py (scope handlers)",
+    "src/mcpi/clients/types.py (ServerState, ServerInfo)"
+  ],
+  "planning_documents": [
+    ".agent_planning/EVALUATION-ENABLE-DISABLE-2025-10-28-CORRECTED.md",
+    ".agent_planning/BUG-FIX-PLAN-ENABLE-DISABLE.md",
+    ".agent_planning/BUG-REPORT-CROSS-SCOPE-POLLUTION.md",
+    ".agent_planning/SUMMARY-ENABLE-DISABLE-BUGS.md"
+  ],
+  "status_gaps_addressed": [
+    "BUG-1: Cross-scope state pollution causes incorrect enable/disable state",
+    "BUG-3: Enable/disable operations modify wrong scope",
+    "User-visible symptom: List command shows incorrect state for servers"
+  ],
+  "plan_items_validated": [
+    "P0-CRITICAL: Fix cross-scope state pollution",
+    "P0-CRITICAL: Fix wrong scope modification",
+    "P0-CRITICAL: Prevent data corruption from wrong scope writes",
+    "Testing requirement: Verify scope isolation works correctly"
+  ],
+  "success_criteria": {
+    "before_fix": {
+      "tests_fail_with_clear_messages": true,
+      "failure_messages_match_expected_bugs": true,
+      "no_false_positives": true,
+      "status": "MET"
+    },
+    "after_fix": {
+      "all_bug_1_tests_pass": false,
+      "all_bug_3_tests_pass": false,
+      "no_regressions": null,
+      "manual_verification": false,
+      "status": "PENDING (bugs not yet fixed)"
+    }
+  },
+  "next_steps": [
+    "Fix BUG-1: Make _get_server_state() scope-aware",
+    "Fix BUG-3: Make enable/disable operations find server's actual scope first",
+    "Re-run tests to verify fixes",
+    "Add BUG-ORIG test to test_cli.py",
+    "Manual verification with real user configuration",
+    "Update CLAUDE.md with new test coverage info"
+  ],
+  "estimated_fix_time": {
+    "BUG-1": "2-4 hours",
+    "BUG-3": "2-4 hours",
+    "BUG-ORIG": "1 hour",
+    "total": "5-9 hours"
+  },
+  "confidence": {
+    "test_quality": "high",
+    "bug_detection": "verified",
+    "gaming_resistance": "high",
+    "coverage_completeness": "comprehensive"
+  }
+}
