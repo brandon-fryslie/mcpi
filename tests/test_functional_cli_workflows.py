@@ -487,43 +487,8 @@ class TestCLIRegistryCommands:
         """Set up CLI test runner."""
         self.runner = CliRunner()
 
-    def test_registry_list_command_workflow(self):
-        """Test 'mcpi registry list' command for browsing available servers.
-
-        STATUS Gap: Cannot verify registry list command
-        PLAN Item: P0-4 - Validate core functionality
-        Priority: MEDIUM
-
-        USER WORKFLOW:
-        1. User wants to see available MCP servers in registry
-        2. User runs 'mcpi registry list'
-        3. User sees list of servers with descriptions
-        4. User can identify servers to install
-
-        VALIDATION (what user observes):
-        - Command exits successfully
-        - Shows multiple server entries
-        - Each entry has name and description
-        - Output is formatted for readability
-
-        GAMING RESISTANCE:
-        - Uses real registry data loading
-        - Verifies actual registry.json content
-        - Cannot pass without proper catalog loading
-        """
-        # USER ACTION: List registry servers
-        result = self.runner.invoke(main, ["registry", "list"])
-
-        # USER OBSERVABLE OUTCOME 1: Command succeeds
-        assert result.exit_code == 0, f"Registry list command failed: {result.output}"
-
-        # USER OBSERVABLE OUTCOME 2: Shows server entries
-        output = result.output.lower()
-        assert len(result.output.split("\n")) > 5, "Should show multiple servers"
-        assert "server" in output, "Should mention servers"
-
-        # USER OBSERVABLE OUTCOME 3: Has meaningful content
-        assert len(result.output.strip()) > 50, "Should have substantial output"
+    # test_registry_list_command_workflow removed - command no longer exists
+    # Use 'mcpi search' instead to browse available servers
 
 
 class TestCLIRescopePreparation:

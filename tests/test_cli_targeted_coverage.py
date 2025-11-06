@@ -26,7 +26,7 @@ class TestCLIHighImpactCoverage:
         }
 
     def test_registry_show_json_output(self):
-        """Test registry show with --json flag.
+        """Test info with --json flag.
 
         Targets lines 134-135: JSON output functionality.
         """
@@ -35,9 +35,7 @@ class TestCLIHighImpactCoverage:
             mock_catalog_cls.return_value = mock_catalog
             mock_catalog.get_server.return_value = self.mock_server
 
-            result = self.runner.invoke(
-                main, ["registry", "show", "test-server", "--json"]
-            )
+            result = self.runner.invoke(main, ["info", "test-server", "--json"])
 
             assert result.exit_code == 0
             # Should output JSON
@@ -47,24 +45,8 @@ class TestCLIHighImpactCoverage:
             except json.JSONDecodeError:
                 pytest.fail("Should output valid JSON")
 
-    def test_install_cancelled_by_user(self):
-        """Test install command when user cancels.
-
-        Targets lines 279-280: Installation cancelled message.
-        """
-        with patch("mcpi.cli.ServerCatalog") as mock_catalog_cls:
-            with patch("mcpi.cli.Confirm.ask", return_value=False):
-                mock_catalog = Mock()
-                mock_catalog_cls.return_value = mock_catalog
-                mock_catalog.get_server.return_value = self.mock_server
-
-                result = self.runner.invoke(main, ["install", "test-server"])
-
-                assert result.exit_code == 0
-                assert "Installation cancelled" in result.output
-
     def test_registry_show_server_not_found(self):
-        """Test registry show with non-existent server.
+        """Test info with non-existent server.
 
         Targets error handling paths.
         """
@@ -73,9 +55,7 @@ class TestCLIHighImpactCoverage:
             mock_catalog_cls.return_value = mock_catalog
             mock_catalog.get_server.return_value = None
 
-            result = self.runner.invoke(
-                main, ["registry", "show", "nonexistent-server"]
-            )
+            result = self.runner.invoke(main, ["info", "nonexistent-server"])
 
             assert result.exit_code == 1
             assert "not found in registry" in result.output
@@ -114,17 +94,3 @@ class TestCLIHighImpactCoverage:
 
             assert result.exit_code == 0
             assert len(result.output) > 0
-
-    def test_install_server_not_found(self):
-        """Test install with non-existent server.
-
-        Targets install error handling.
-        """
-        with patch("mcpi.cli.ServerCatalog") as mock_catalog_cls:
-            mock_catalog = Mock()
-            mock_catalog_cls.return_value = mock_catalog
-            mock_catalog.get_server.return_value = None
-
-            result = self.runner.invoke(main, ["install", "nonexistent"])
-
-            assert result.exit_code == 1

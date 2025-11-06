@@ -7,7 +7,7 @@ from typing import List, Optional
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
@@ -164,18 +164,31 @@ class DynamicScopeType(click.ParamType):
     def shell_complete(self, ctx, param, incomplete):
         """Provide shell completion for scopes."""
         from click.shell_completion import CompletionItem
+        from mcpi.utils.completion_debug import log_completion, CompletionLogger
 
         completions = []
 
-        # Try to get available scopes for the current client
-        if ctx and ctx.obj:
-            try:
+        try:
+            log_completion(
+                "DynamicScopeType.shell_complete called",
+                ctx=ctx,
+                param_name=param.name if param else None,
+                incomplete=incomplete,
+            )
+
+            # Try to get available scopes for the current client
+            if ctx and ctx.obj:
                 # Initialize manager if not present
                 if "mcp_manager" not in ctx.obj:
+                    log_completion("Initializing MCPManager", ctx=ctx)
                     ctx.obj["mcp_manager"] = MCPManager()
 
                 manager = ctx.obj.get("mcp_manager")
                 client_name = ctx.params.get("client") if ctx.params else None
+
+                log_completion(
+                    "Getting scopes for client", ctx=ctx, client_name=client_name
+                )
 
                 if manager:
                     scopes_info = manager.get_scopes_for_client(client_name)
@@ -189,6 +202,14 @@ class DynamicScopeType(click.ParamType):
                         # If completing --from parameter, exclude the --to scope (if already set)
                         exclude_scope = ctx.params.get("to_scope")
 
+                    log_completion(
+                        "Scope filtering",
+                        ctx=ctx,
+                        param_name=param.name if param else None,
+                        exclude_scope=exclude_scope,
+                        available_scopes=len(scopes_info),
+                    )
+
                     # Show file paths for each scope
                     completions = [
                         CompletionItem(scope["name"], help=scope.get("path", "No path"))
@@ -196,8 +217,15 @@ class DynamicScopeType(click.ParamType):
                         if scope["name"].startswith(incomplete)
                         and scope["name"] != exclude_scope
                     ]
-            except Exception:
-                # If we can't get scopes from manager, use defaults
+
+                    log_completion(
+                        "Returning scope completions",
+                        ctx=ctx,
+                        result_count=len(completions),
+                    )
+            else:
+                log_completion("No context available, using defaults", ctx=ctx)
+                # No context available, use default scopes
                 default_scopes = [
                     "user",
                     "user-internal",
@@ -211,8 +239,18 @@ class DynamicScopeType(click.ParamType):
                     for scope in default_scopes
                     if scope.startswith(incomplete)
                 ]
-        else:
-            # No context available, use default scopes
+
+        except Exception as e:
+            logger = CompletionLogger.get_logger()
+            logger.log_error(
+                e,
+                ctx=ctx,
+                function="DynamicScopeType.shell_complete",
+                param_name=param.name if param else None,
+                incomplete=incomplete,
+            )
+
+            # Fallback: If we can't get scopes from manager, use defaults
             default_scopes = [
                 "user",
                 "user-internal",
@@ -252,8 +290,13 @@ def complete_client_names(
         return []
 
     try:
+        from mcpi.utils.completion_debug import log_completion
+
+        log_completion("complete_client_names called", ctx=ctx, incomplete=incomplete)
+
         # Initialize manager if not present
         if "mcp_manager" not in ctx.obj:
+            log_completion("Initializing MCPManager", ctx=ctx)
             ctx.obj["mcp_manager"] = MCPManager()
 
         manager = ctx.obj["mcp_manager"]
@@ -262,6 +305,8 @@ def complete_client_names(
         scope_param = (
             ctx.params.get("scope") if hasattr(ctx, "params") and ctx.params else None
         )
+
+        log_completion("Getting client info", ctx=ctx, scope_filter=scope_param)
 
         client_info = manager.get_client_info()
 
@@ -274,13 +319,30 @@ def complete_client_names(
                 if scope_param in scope_names:
                     filtered_clients[name] = info
             client_info = filtered_clients if filtered_clients else client_info
+            log_completion(
+                "Filtered by scope",
+                ctx=ctx,
+                original_count=len(manager.get_client_info()),
+                filtered_count=len(client_info),
+            )
 
-        return [
+        results = [
             CompletionItem(name, help=f"{info.get('server_count', 0)} servers")
             for name, info in client_info.items()
             if name.startswith(incomplete)
         ]
-    except Exception:
+
+        log_completion("Returning completions", ctx=ctx, result_count=len(results))
+
+        return results
+    except Exception as e:
+        from mcpi.utils.completion_debug import CompletionLogger
+
+        logger = CompletionLogger.get_logger()
+        logger.log_error(
+            e, ctx=ctx, function="complete_client_names", incomplete=incomplete
+        )
+
         # Fallback to common client names if initialization fails
         default_clients = ["claude-code", "cursor", "vscode"]
         return [
@@ -310,10 +372,23 @@ def complete_server_ids(
     """
     from click.shell_completion import CompletionItem
 
-    if not ctx or not ctx.obj:
+    # Initialize context object if needed
+    if not ctx:
         return []
 
+    if ctx.obj is None:
+        ctx.obj = {}
+
     try:
+        from mcpi.utils.completion_debug import log_completion
+
+        log_completion(
+            "complete_server_ids called",
+            ctx=ctx,
+            incomplete=incomplete,
+            has_ctx_obj=ctx.obj is not None,
+        )
+
         # Get command name for context-aware filtering
         # Try multiple methods to get the command name
         command_name = None
@@ -325,10 +400,17 @@ def complete_server_ids(
         if not command_name and ctx.parent and hasattr(ctx.parent, "info_name"):
             command_name = ctx.parent.info_name
 
+        log_completion("Command context", ctx=ctx, command_name=command_name)
+
         # For remove/enable/disable commands, show only installed servers
         if command_name in ["remove", "enable", "disable"]:
+            log_completion(
+                f"Using installed servers for '{command_name}' command", ctx=ctx
+            )
+
             # Initialize manager if not present
             if "mcp_manager" not in ctx.obj:
+                log_completion("Initializing MCPManager", ctx=ctx)
                 ctx.obj["mcp_manager"] = MCPManager()
 
             manager = ctx.obj["mcp_manager"]
@@ -340,18 +422,53 @@ def complete_server_ids(
             elif command_name == "disable":
                 state_filter = ServerState.ENABLED
 
+            log_completion("Querying servers", ctx=ctx, state_filter=state_filter)
+
             servers = manager.list_servers(state_filter=state_filter)
 
-            # Extract unique server IDs from installed servers
-            server_ids = set()
-            for qualified_id, info in servers.items():
-                server_ids.add(info.id)
+            log_completion("Retrieved servers", ctx=ctx, server_count=len(servers))
 
-            return [
-                CompletionItem(server_id)
-                for server_id in sorted(server_ids)
-                if server_id.startswith(incomplete)
-            ][:50]
+            # Create completions with scope information
+            # Note: If a server is in multiple scopes, it will appear multiple times
+            # IMPORTANT: Include server ID in help text to make each entry unique and prevent
+            # zsh from grouping multiple servers together
+            completions = []
+            for qualified_id, info in servers.items():
+                if info.id.startswith(incomplete):
+                    # Use qualified ID format to ensure uniqueness
+                    # Format: server-name in client:scope (enabled/disabled)
+                    # Add colors for better readability:
+                    # - Dim gray for server name (to de-emphasize since it's already in the completion)
+                    # - Cyan for scope (most important for user to see)
+                    # - Green for enabled, Yellow for disabled
+                    state_label = (
+                        "enabled" if info.state == ServerState.ENABLED else "disabled"
+                    )
+                    state_color = (
+                        "\033[32m" if info.state == ServerState.ENABLED else "\033[33m"
+                    )  # green : yellow
+                    reset = "\033[0m"
+                    dim = "\033[2m"
+                    cyan = "\033[36m"
+
+                    help_text = (
+                        f"{dim}{info.id}{reset} in "
+                        f"{cyan}{info.client}:{info.scope}{reset} "
+                        f"({state_color}{state_label}{reset})"
+                    )
+                    completions.append(CompletionItem(info.id, help=help_text))
+
+            # Sort by server ID, then by scope for consistent ordering
+            completions.sort(key=lambda c: (c.value, c.help or ""))
+
+            log_completion(
+                "Returning completions",
+                ctx=ctx,
+                completion_count=len(completions),
+                sample=[(c.value, c.help) for c in completions[:5]],
+            )
+
+            return completions[:50]
 
         # For add and other commands, show servers from registry
         # Initialize catalog if not present
@@ -378,13 +495,19 @@ def complete_server_ids(
 
         # Limit to 50 results to avoid overwhelming user
         return matches[:50]
-    except Exception:
+    except Exception as e:
+        from mcpi.utils.completion_debug import CompletionLogger
+
+        logger = CompletionLogger.get_logger()
+        logger.log_error(
+            e,
+            ctx=ctx,
+            function="complete_server_ids",
+            command_name=command_name if "command_name" in locals() else "unknown",
+            incomplete=incomplete,
+        )
+
         # Fallback to empty list if we can't load servers
-        # In development/testing, you might want to see the error:
-        # import sys
-        # print(f"Server completion error: {e}", file=sys.stderr)
-        # import traceback
-        # traceback.print_exc(file=sys.stderr)
         return []
 
 
@@ -410,6 +533,12 @@ def complete_rescope_server_name(
         return []
 
     try:
+        from mcpi.utils.completion_debug import log_completion
+
+        log_completion(
+            "complete_rescope_server_name called", ctx=ctx, incomplete=incomplete
+        )
+
         # Initialize manager if needed
         if "mcp_manager" not in ctx.obj:
             manager = get_mcp_manager(ctx)
@@ -424,6 +553,13 @@ def complete_rescope_server_name(
         # Get the --from scope if specified
         from_scope = ctx.params.get("from_scope")
 
+        log_completion(
+            "Rescope parameters",
+            ctx=ctx,
+            client_name=client_name,
+            from_scope=from_scope,
+        )
+
         if from_scope:
             # List servers from the specified source scope only
             servers = manager.list_servers(client=client_name, scope=from_scope)
@@ -431,24 +567,29 @@ def complete_rescope_server_name(
             # No scope specified - show all installed servers across all scopes
             servers = manager.list_servers(client=client_name)
 
+        log_completion("Retrieved servers", ctx=ctx, server_count=len(servers))
+
         # Return matching server IDs
-        return [
+        results = [
             CompletionItem(server_id)
             for server_id in sorted(servers.keys())
             if server_id.startswith(incomplete)
         ][:50]
 
-    except Exception as e:
-        # Log error for debugging
-        import traceback
-        from pathlib import Path
+        log_completion("Returning completions", ctx=ctx, result_count=len(results))
 
-        log_file = Path.home() / ".mcpi_completion_debug.log"
-        with open(log_file, "a") as f:
-            f.write("\n=== complete_rescope_server_name error ===\n")
-            f.write(f"Error: {e}\n")
-            f.write(traceback.format_exc())
-            f.write("\n")
+        return results
+
+    except Exception as e:
+        from mcpi.utils.completion_debug import CompletionLogger
+
+        logger = CompletionLogger.get_logger()
+        logger.log_error(
+            e,
+            ctx=ctx,
+            function="complete_rescope_server_name",
+            incomplete=incomplete,
+        )
         return []
 
 
@@ -457,9 +598,14 @@ def complete_rescope_server_name(
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without making changes"
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug logging (writes to ~/.mcpi_completion_debug.log)",
+)
 @click.version_option()
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, dry_run: bool) -> None:
+def main(ctx: click.Context, verbose: bool, dry_run: bool, debug: bool) -> None:
     """MCPI - MCP Server Package Installer (New Plugin Architecture)."""
     # Ensure context object exists
     ctx.ensure_object(dict)
@@ -467,6 +613,13 @@ def main(ctx: click.Context, verbose: bool, dry_run: bool) -> None:
     # Store options in context
     ctx.obj["verbose"] = verbose
     ctx.obj["dry_run"] = dry_run
+    ctx.obj["debug"] = debug
+
+    # Set environment variable for debug mode (used by completion)
+    if debug:
+        import os
+
+        os.environ["MCPI_DEBUG"] = "1"
 
 
 # CLIENT MANAGEMENT COMMANDS
@@ -850,7 +1003,7 @@ def add(
             command=server.command, args=server.args, env={}, type="stdio"
         )
 
-        # Show server info and ask for confirmation
+        # Show server info
         if not ctx.obj.get("dry_run", False):
             console.print(f"\n[bold]Server ID:[/bold] {server_id}")
             console.print(f"[bold]Description:[/bold] {server.description}")
@@ -859,10 +1012,6 @@ def add(
                 f"[bold]Target Client:[/bold] {client or manager.default_client}"
             )
             console.print(f"[bold]Target Scope:[/bold] {scope}")
-
-            if not Confirm.ask("Do you want to add this server?", default=True):
-                console.print(f"[yellow]Cancelled adding {server_id}[/yellow]")
-                return
 
         # Add the server
         if ctx.obj.get("dry_run", False):
@@ -937,15 +1086,6 @@ def remove(
                 scope = server_info.scope
             else:
                 console.print(f"[red]Server '{server_id}' not found[/red]")
-                return
-
-        # Ask for confirmation
-        if not ctx.obj.get("dry_run", False):
-            if not Confirm.ask(
-                f"Are you sure you want to remove '{server_id}' from {scope}?",
-                default=False,
-            ):
-                console.print(f"[yellow]Cancelled removing {server_id}[/yellow]")
                 return
 
         # Remove the server
@@ -1064,14 +1204,6 @@ def disable(
             console.print(f"[yellow]Server '{server_id}' is already disabled[/yellow]")
             return
 
-        # Ask for confirmation
-        if not ctx.obj.get("dry_run", False):
-            if not Confirm.ask(
-                f"Are you sure you want to disable '{server_id}'?", default=True
-            ):
-                console.print(f"[yellow]Cancelled disabling {server_id}[/yellow]")
-                return
-
         # Disable the server
         if ctx.obj.get("dry_run", False):
             console.print(f"[blue]Would disable: {server_id}[/blue]")
@@ -1099,13 +1231,6 @@ def disable(
 @main.command()
 @click.argument("server_name", shell_complete=complete_rescope_server_name)
 @click.option(
-    "--from",
-    "from_scope",
-    required=True,
-    type=DynamicScopeType(),
-    help="Source scope to move from",
-)
-@click.option(
     "--to",
     "to_scope",
     required=True,
@@ -1125,23 +1250,25 @@ def disable(
 def rescope(
     ctx: click.Context,
     server_name: str,
-    from_scope: str,
     to_scope: str,
     client: Optional[str],
     dry_run: bool,
 ) -> None:
-    """Move an MCP server configuration from one scope to another.
+    """Move an MCP server configuration to a target scope (OPTION A: AGGRESSIVE).
 
-    This command allows you to move a server configuration between different
-    scopes (e.g., from project-level to user-level). The operation is atomic
-    and will rollback if any errors occur.
+    This command automatically detects ALL scopes where the server is defined and
+    moves it to the target scope. The operation is atomic with ADD-FIRST, REMOVE-SECOND
+    ordering to prevent data loss.
+
+    IMPORTANT: This command does NOT require --from parameter. It automatically finds
+    the server in all scopes.
 
     Examples:
-        mcpi rescope my-server --from project-mcp --to user-global
+        mcpi rescope my-server --to user-global
 
-        mcpi rescope --from project-mcp --to user-internal my-server
+        mcpi rescope my-server --to project-mcp --client claude-code
 
-        mcpi rescope my-server --from user-global --to project-mcp --dry-run
+        mcpi rescope my-server --to user-global --dry-run
     """
     verbose = ctx.obj.get("verbose", False)
 
@@ -1160,14 +1287,7 @@ def rescope(
             )
             ctx.exit(1)
 
-        # Step 2: Validate scopes are different
-        if from_scope == to_scope:
-            console.print(
-                "[red]Error: Source and destination scopes cannot be the same[/red]"
-            )
-            ctx.exit(1)
-
-        # Step 3: Get client plugin to access scope handlers
+        # Step 2: Get client plugin to access scope handlers
         try:
             client_plugin = manager.registry.get_client(client_name)
         except Exception as e:
@@ -1176,94 +1296,117 @@ def rescope(
             )
             ctx.exit(1)
 
-        # Step 4: Get scope handlers
+        # Step 3: Validate target scope exists
         try:
-            source_handler = client_plugin.get_scope_handler(from_scope)
             dest_handler = client_plugin.get_scope_handler(to_scope)
         except Exception as e:
-            console.print(f"[red]Error: Failed to get scope handlers: {e}[/red]")
+            console.print(f"[red]Error: Invalid target scope '{to_scope}': {e}[/red]")
             if verbose:
                 import traceback
 
                 console.print(traceback.format_exc())
             ctx.exit(1)
 
-        # Step 5: Check server exists in source
-        servers_in_source = manager.list_servers(
-            client_name=client_name, scope=from_scope
+        # Step 4: Find ALL scopes where server currently exists
+        source_scopes = manager.find_all_server_scopes(server_name, client_name)
+
+        if not source_scopes:
+            console.print(
+                f"[red]Error: Server '{server_name}' not found in any scope[/red]"
+            )
+            ctx.exit(1)
+
+        # Extract scope names from tuples
+        source_scope_names = [scope_name for _, scope_name in source_scopes]
+
+        # Step 5: Get server configuration from any source scope
+        first_source_scope = source_scope_names[0]
+        servers_in_first_source = manager.list_servers(
+            client_name=client_name, scope=first_source_scope
         )
 
-        # Find server by checking .id property instead of dictionary keys
         source_server_info = None
-        for qualified_id, server_info in servers_in_source.items():
+        for qualified_id, server_info in servers_in_first_source.items():
             if server_info.id == server_name:
                 source_server_info = server_info
                 break
 
         if source_server_info is None:
             console.print(
-                f"[red]Error: Server '{server_name}' not found in scope '{from_scope}'[/red]"
+                f"[red]Error: Failed to get server configuration from '{first_source_scope}'[/red]"
             )
             ctx.exit(1)
 
-        # Step 6: Check server doesn't exist in destination
-        servers_in_dest = manager.list_servers(client_name=client_name, scope=to_scope)
-
-        # Check if server exists in destination
-        for qualified_id, server_info in servers_in_dest.items():
-            if server_info.id == server_name:
-                console.print(
-                    f"[red]Error: Server '{server_name}' already exists in scope '{to_scope}'[/red]"
-                )
-                ctx.exit(1)
-
-        # Step 7: Get server config from source
         server_config = ServerConfig.from_dict(source_server_info.config)
 
-        # Step 8: Dry-run mode
+        # Step 6: Dry-run mode
         if ctx.obj.get("dry_run", False):
             console.print(
                 f"[cyan]Dry-run mode: Would rescope server '{server_name}'[/cyan]"
             )
-            console.print(f"  From: {from_scope}")
-            console.print(f"  To: {to_scope}")
+            console.print(f"  Would add to: {to_scope}")
+            console.print(f"  Would remove from: {', '.join(s for s in source_scope_names if s != to_scope)}")
             console.print(f"  Client: {client_name}")
             console.print("\n[yellow]No changes made (dry-run mode)[/yellow]")
             ctx.exit(0)
 
-        # Step 9: Execute rescope with transaction safety
+        # Step 7: Execute rescope with ADD-FIRST, REMOVE-SECOND ordering
+        # This is the critical safety property: if add fails, sources remain unchanged
         try:
-            # Write to destination
+            # ADD to destination first (even if it might already be there)
+            # If it's already there, add will fail with "already exists" which we handle below
             add_result = dest_handler.add_server(server_name, server_config)
-            if not add_result.success:
+
+            # Determine which scopes to remove from
+            scopes_to_remove_from = []
+
+            if add_result.success:
+                # Add succeeded - remove from ALL source scopes (they're all "old" now)
+                scopes_to_remove_from = source_scope_names
+            elif "already exists" in add_result.message.lower():
+                # Idempotent case: server already in destination
+                # Remove from all OTHER scopes (not the destination)
+                scopes_to_remove_from = [s for s in source_scope_names if s != to_scope]
+
+                # If server is ONLY in target scope, we're done
+                if not scopes_to_remove_from:
+                    # No scopes to remove from, just skip to success output
+                    pass
+            else:
+                # Real failure: abort without touching sources
                 console.print(
-                    f"[red]Error: Failed to add server to destination: {add_result.message}[/red]"
+                    f"[red]Error: Failed to add server to '{to_scope}': {add_result.message}[/red]"
                 )
                 ctx.exit(1)
 
-            # Remove from source (with rollback on failure)
-            try:
-                remove_result = source_handler.remove_server(server_name)
-                if not remove_result.success:
-                    # Rollback: remove from destination
-                    dest_handler.remove_server(server_name)
-                    console.print(
-                        f"[red]Error: Failed to remove from source (rolled back): {remove_result.message}[/red]"
-                    )
-                    ctx.exit(1)
-            except Exception as e:
-                # Rollback: remove from destination
-                dest_handler.remove_server(server_name)
-                console.print(
-                    f"[red]Error during rescope (rolled back): {str(e)}[/red]"
-                )
-                if verbose:
-                    import traceback
+            # REMOVE from determined scopes (only after successful add or idempotent case)
+            failed_removals = []
+            for source_scope in scopes_to_remove_from:
+                try:
+                    source_handler = client_plugin.get_scope_handler(source_scope)
+                    remove_result = source_handler.remove_server(server_name)
+                    if not remove_result.success:
+                        failed_removals.append(
+                            (source_scope, remove_result.message)
+                        )
+                except Exception as e:
+                    failed_removals.append((source_scope, str(e)))
 
-                    console.print(traceback.format_exc())
+            # Check if any removals failed
+            if failed_removals:
+                console.print(
+                    f"[yellow]Warning: Server added to '{to_scope}' but failed to remove from some scopes:[/yellow]"
+                )
+                for scope, error in failed_removals:
+                    console.print(f"  - {scope}: {error}")
+
+                console.print(
+                    "\n[yellow]Server is now in multiple scopes. Run command again to clean up.[/yellow]"
+                )
                 ctx.exit(1)
+
         except Exception as e:
-            # If we failed during add, try to clean up if possible
+            # If we failed during add (before any removes), sources are unchanged
             console.print(f"[red]Error during rescope: {str(e)}[/red]")
             if verbose:
                 import traceback
@@ -1271,10 +1414,14 @@ def rescope(
                 console.print(traceback.format_exc())
             ctx.exit(1)
 
-        # Step 10: Success output
-        console.print(f"[green]✓[/green] Successfully Rescoped server '{server_name}'")
-        console.print(f"  From: {from_scope}")
-        console.print(f"  To: {to_scope}")
+
+        # Step 9: Success output
+        console.print(f"[green]✓[/green] Successfully rescoped server '{server_name}'")
+        if scopes_to_remove_from:
+            console.print(
+                f"  Removed from: {', '.join(scopes_to_remove_from)}"
+            )
+        console.print(f"  Now in: {to_scope}")
         console.print(f"  Client: {client_name}")
 
     except (SystemExit, click.exceptions.Exit):
@@ -1302,32 +1449,49 @@ def rescope(
 def info(ctx: click.Context, server_id: Optional[str], client: Optional[str]) -> None:
     """Show detailed information about a server or system status."""
     try:
-        manager = get_mcp_manager(ctx)
-
         if server_id:
-            # Show server info
+            # Get registry info
+            catalog = get_catalog(ctx)
+            registry_info = catalog.get_server(server_id)
+
+            if not registry_info:
+                console.print(f"[red]Server '{server_id}' not found in registry[/red]")
+                ctx.exit(1)
+
+            # Build registry section
+            info_text = "[bold cyan]Registry Information:[/bold cyan]\n"
+            info_text += f"[bold]ID:[/bold] {server_id}\n"
+            info_text += f"[bold]Description:[/bold] {registry_info.description}\n"
+            info_text += f"[bold]Command:[/bold] {registry_info.command}\n"
+
+            if registry_info.args:
+                info_text += f"[bold]Arguments:[/bold] {' '.join(registry_info.args)}\n"
+
+            if registry_info.repository:
+                info_text += f"[bold]Repository:[/bold] {registry_info.repository}\n"
+
+            # Get installation info
+            info_text += "\n[bold cyan]Local Installation:[/bold cyan]\n"
+            manager = get_mcp_manager(ctx)
             server_info = manager.get_server_info(server_id, client)
-            if not server_info:
-                console.print(f"[red]Server '{server_id}' not found[/red]")
-                return
 
-            info_text = f"[bold]Server ID:[/bold] {server_info.id}\n"
-            info_text += f"[bold]Client:[/bold] {server_info.client}\n"
-            info_text += f"[bold]Scope:[/bold] {server_info.scope}\n"
-            info_text += f"[bold]State:[/bold] {server_info.state.name}\n"
-            info_text += f"[bold]Command:[/bold] {server_info.command}\n"
+            if server_info:
+                info_text += f"[bold]Status:[/bold] [green]Installed[/green]\n"
+                info_text += f"[bold]Client:[/bold] {server_info.client}\n"
+                info_text += f"[bold]Scope:[/bold] {server_info.scope}\n"
+                info_text += f"[bold]State:[/bold] {server_info.state.name}\n"
 
-            if server_info.args:
-                info_text += f"[bold]Arguments:[/bold] {' '.join(server_info.args)}\n"
-
-            if server_info.env:
-                info_text += "[bold]Environment Variables:[/bold]\n"
-                for key, value in server_info.env.items():
-                    info_text += f"  {key}={value}\n"
+                if server_info.env:
+                    info_text += "[bold]Environment Variables:[/bold]\n"
+                    for key, value in server_info.env.items():
+                        info_text += f"  {key}={value}\n"
+            else:
+                info_text += f"[bold]Status:[/bold] [yellow]Not Installed[/yellow]\n"
 
             console.print(Panel(info_text, title=f"Server Information: {server_id}"))
         else:
             # Show system status
+            manager = get_mcp_manager(ctx)
             status = manager.get_status_summary()
 
             status_text = (
@@ -1361,53 +1525,7 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str]) ->
         console.print(f"[red]Error getting information: {e}[/red]")
 
 
-# REGISTRY COMMANDS (keep existing ones from old CLI)
-
-
-@main.group()
-@click.pass_context
-def registry(ctx: click.Context) -> None:
-    """Manage server registry."""
-    pass
-
-
-@registry.command("list")
-@click.pass_context
-def list_registry(ctx: click.Context) -> None:
-    """List all servers in the registry."""
-    try:
-        registry_manager = get_registry_manager(ctx)
-        servers = (
-            registry_manager.list_servers()
-        )  # Returns list of (server_id, MCPServer) tuples
-
-        if not servers:
-            console.print("[yellow]No servers found in registry[/yellow]")
-            return
-
-        table = Table(title="Registry Servers")
-        table.add_column("ID", style="cyan", no_wrap=True)
-        table.add_column("Command", style="magenta")
-        table.add_column("Description", style="white")
-
-        for server_id, server in servers:
-            table.add_row(
-                server_id,
-                server.command,
-                (
-                    server.description[:80] + "..."
-                    if len(server.description) > 80
-                    else server.description
-                ),
-            )
-
-        console.print(table)
-
-    except Exception as e:
-        console.print(f"[red]Error listing registry: {e}[/red]")
-
-
-@registry.command("search")
+@main.command()
 @click.argument("query", required=False)
 @click.option("--limit", default=20, help="Maximum number of results to show")
 @click.pass_context
@@ -1449,65 +1567,6 @@ def search(ctx: click.Context, query: Optional[str], limit: int) -> None:
 
     except Exception as e:
         console.print(f"[red]Error searching registry: {e}[/red]")
-
-
-@registry.command("info")
-@click.argument("server_id", shell_complete=complete_server_ids)
-@click.pass_context
-def registry_info(ctx: click.Context, server_id: str) -> None:
-    """Show detailed information about a server from the registry."""
-    try:
-        registry_manager = get_registry_manager(ctx)
-        server_info = registry_manager.get_server(server_id)
-
-        if not server_info:
-            console.print(f"[red]Server '{server_id}' not found in registry[/red]")
-            return
-
-        # Display MCPServer object information (simplified model)
-        info_text = f"[bold]ID:[/bold] {server_id}\n"
-        info_text += f"[bold]Description:[/bold] {server_info.description}\n"
-        info_text += f"[bold]Command:[/bold] {server_info.command}\n"
-
-        if server_info.args:
-            info_text += f"[bold]Arguments:[/bold] {' '.join(server_info.args)}\n"
-
-        if server_info.repository:
-            info_text += f"[bold]Repository:[/bold] {server_info.repository}\n"
-
-        console.print(Panel(info_text, title=f"Registry Information: {server_id}"))
-
-    except Exception as e:
-        console.print(f"[red]Error getting server info: {e}[/red]")
-
-
-@registry.command("categories")
-@click.pass_context
-def list_categories(ctx: click.Context) -> None:
-    """List all MCP server categories from the registry."""
-    try:
-        catalog = get_catalog(ctx)
-        category_counts = catalog.list_categories()
-
-        if not category_counts:
-            console.print("[yellow]No categories found in registry[/yellow]")
-            console.print(
-                "[dim]Tip: Categories are currently empty. Add category data to servers in registry.json[/dim]"
-            )
-            return
-
-        table = Table(title="MCP Server Categories")
-        table.add_column("Category", style="cyan", no_wrap=True)
-        table.add_column("Server Count", style="green", justify="right")
-
-        for category, count in sorted(category_counts.items()):
-            table.add_row(category, str(count))
-
-        console.print(table)
-        console.print(f"\n[dim]Total categories: {len(category_counts)}[/dim]")
-
-    except Exception as e:
-        console.print(f"[red]Error listing categories: {e}[/red]")
 
 
 # STATUS COMMAND
@@ -1556,6 +1615,78 @@ def status(ctx: click.Context, output_json: bool) -> None:
 
     except Exception as e:
         console.print(f"[red]Error getting status: {e}[/red]")
+
+
+# FZF TUI COMMAND
+
+
+@main.command()
+@click.pass_context
+def fzf(ctx: click.Context) -> None:
+    """Interactive fuzzy finder for managing MCP servers.
+
+    Launches an fzf-based TUI that allows you to:
+    - Browse all available MCP servers
+    - View installed servers (highlighted in green/yellow)
+    - Add, remove, enable, disable servers with keyboard shortcuts
+    - View detailed server information
+
+    Keyboard shortcuts:
+        ctrl-a: Add server (interactive scope selection)
+        ctrl-r: Remove server
+        ctrl-e: Enable server
+        ctrl-d: Disable server
+        ctrl-i/enter: Show detailed server info
+        esc: Exit
+
+    Requirements:
+        fzf must be installed (brew install fzf)
+    """
+    try:
+        # Import here to avoid circular dependency
+        from mcpi.tui import launch_fzf_interface
+
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+
+        launch_fzf_interface(manager, catalog)
+
+    except RuntimeError as e:
+        # Handle fzf not installed error
+        console.print(f"[red]{e}[/red]")
+        ctx.exit(1)
+    except Exception as e:
+        if ctx.obj.get("verbose", False):
+            console.print(f"[red]Error launching fzf interface: {e}[/red]")
+            import traceback
+
+            console.print(traceback.format_exc())
+        else:
+            console.print(f"[red]Failed to launch fzf interface: {e}[/red]")
+        ctx.exit(1)
+
+
+# TUI RELOAD COMMAND (hidden, used by fzf bindings)
+
+
+@main.command("tui-reload", hidden=True)
+@click.pass_context
+def tui_reload(ctx: click.Context) -> None:
+    """Reload server list for fzf TUI (internal command).
+
+    This command is used by fzf bindings to refresh the server list
+    after operations like add/remove/enable/disable. It's hidden from
+    help output as it's not intended for direct user invocation.
+    """
+    from mcpi.tui import reload_server_list
+
+    try:
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+        reload_server_list(catalog, manager)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
 
 
 # COMPLETION COMMAND
@@ -1616,6 +1747,36 @@ def completion(ctx: click.Context, shell: Optional[str]) -> None:
         )
         console.print("[yellow]eval (env _MCPI_COMPLETE=fish_source mcpi)[/yellow]\n")
         console.print("[dim]Then restart your shell[/dim]\n")
+
+
+# TUI RELOAD ENTRY POINT (for mcpi-tui-reload console script)
+
+
+def tui_reload_entry() -> None:
+    """Entry point for mcpi-tui-reload console script.
+    
+    This function is called when the user runs `mcpi-tui-reload` directly.
+    It creates a Click context and invokes the tui-reload command.
+    """
+    from mcpi.tui import reload_server_list
+    
+    try:
+        # Create a minimal Click context for initialization
+        ctx = click.Context(main)
+        ctx.ensure_object(dict)
+        ctx.obj["verbose"] = False
+        ctx.obj["dry_run"] = False
+        ctx.obj["debug"] = False
+        
+        # Initialize manager and catalog
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+        
+        # Call reload function
+        reload_server_list(catalog, manager)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

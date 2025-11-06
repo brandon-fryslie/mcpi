@@ -36,7 +36,6 @@ These tests cannot be gamed because:
 7. Cross-verify data between different scopes and file formats
 """
 
-
 import pytest
 
 from mcpi.clients.claude_code import ClaudeCodePlugin

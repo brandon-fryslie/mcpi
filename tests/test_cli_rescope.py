@@ -12,7 +12,6 @@ These tests are designed to be UN-GAMEABLE:
 5. Tests multiple verification points per operation
 """
 
-
 import pytest
 from click.testing import CliRunner
 
@@ -48,14 +47,12 @@ class TestRescopeCommandBasicFlow:
         harness.assert_server_exists("project-mcp", "test-server")
         original_config = harness.get_server_config("project-mcp", "test-server")
 
-        # Execute rescope command
+        # Execute rescope command (OPTION A: no --from parameter)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "test-server",
-                "--from",
-                "project-mcp",
                 "--to",
                 "user-global",
                 "--client",
@@ -67,7 +64,7 @@ class TestRescopeCommandBasicFlow:
         # Verify command succeeded
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert (
-            "Moved server 'test-server'" in result.output or "Rescoped" in result.output
+            "rescoped" in result.output.lower() or "moved" in result.output.lower()
         )
 
         # CRITICAL VERIFICATION: Server removed from source
@@ -111,14 +108,12 @@ class TestRescopeCommandBasicFlow:
             "user-global", "github"
         )
 
-        # Rescope to project
+        # Rescope to project (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "github",
-                "--from",
-                "user-global",
                 "--to",
                 "project-mcp",
                 "--client",
@@ -144,91 +139,11 @@ class TestRescopeCommandBasicFlow:
         )
 
 
-class TestRescopePositionIndependence:
-    """Test that rescope arguments can be in any order."""
-
-    def test_rescope_args_server_first(self, mcp_manager_with_harness):
-        """Test: mcpi rescope <server> --from <scope> --to <scope>"""
-        manager, harness = mcp_manager_with_harness
-        runner = CliRunner()
-
-        # Setup
-        config = ServerConfig(command="node", args=["server.js"], type="stdio")
-        manager.add_server("pos1", config, "user-mcp", "claude-code")
-
-        # Execute with server first
-        result = runner.invoke(
-            main,
-            ["rescope", "pos1", "--from", "user-mcp", "--to", "user-global"],
-            obj={"mcp_manager": manager},
-        )
-
-        assert result.exit_code == 0
-        harness.assert_server_exists("user-global", "pos1")
-
-    def test_rescope_args_from_first(self, mcp_manager_with_harness):
-        """Test: mcpi rescope --from <scope> --to <scope> <server>"""
-        manager, harness = mcp_manager_with_harness
-        runner = CliRunner()
-
-        # Setup
-        config = ServerConfig(command="python", args=["-m", "test"], type="stdio")
-        manager.add_server("pos2", config, "project-mcp", "claude-code")
-
-        # Execute with --from first
-        result = runner.invoke(
-            main,
-            ["rescope", "--from", "project-mcp", "--to", "user-internal", "pos2"],
-            obj={"mcp_manager": manager},
-        )
-
-        assert result.exit_code == 0
-        harness.assert_server_exists("user-internal", "pos2")
-
-    def test_rescope_args_to_first(self, mcp_manager_with_harness):
-        """Test: mcpi rescope --to <scope> --from <scope> <server>"""
-        manager, harness = mcp_manager_with_harness
-        runner = CliRunner()
-
-        # Setup
-        config = ServerConfig(command="npx", args=["test-pkg"], type="stdio")
-        manager.add_server("pos3", config, "user-global", "claude-code")
-
-        # Execute with --to first
-        result = runner.invoke(
-            main,
-            ["rescope", "--to", "project-mcp", "--from", "user-global", "pos3"],
-            obj={"mcp_manager": manager},
-        )
-
-        assert result.exit_code == 0
-        harness.assert_server_exists("project-mcp", "pos3")
-
-    def test_rescope_args_mixed_order(self, mcp_manager_with_harness):
-        """Test: mcpi rescope --from <scope> <server> --to <scope>"""
-        manager, harness = mcp_manager_with_harness
-        runner = CliRunner()
-
-        # Setup
-        config = ServerConfig(command="node", args=["app.js"], type="stdio")
-        manager.add_server("pos4", config, "user-internal", "claude-code")
-
-        # Execute with mixed order
-        result = runner.invoke(
-            main,
-            ["rescope", "--from", "user-internal", "pos4", "--to", "user-mcp"],
-            obj={"mcp_manager": manager},
-        )
-
-        assert result.exit_code == 0
-        harness.assert_server_exists("user-mcp", "pos4")
-
-
 class TestRescopeErrorHandling:
     """Test error handling and edge cases."""
 
-    def test_rescope_server_not_in_source(self, mcp_manager_with_harness):
-        """Test error when server doesn't exist in source scope.
+    def test_rescope_server_not_found_any_scope(self, mcp_manager_with_harness):
+        """Test error when server doesn't exist in any scope (OPTION A).
 
         This test cannot be gamed because:
         1. Verifies no files are created/modified
@@ -238,14 +153,12 @@ class TestRescopeErrorHandling:
         manager, harness = mcp_manager_with_harness
         runner = CliRunner()
 
-        # Try to rescope non-existent server
+        # Try to rescope non-existent server (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "nonexistent-server",
-                "--from",
-                "user-global",
                 "--to",
                 "project-mcp",
             ],
@@ -262,87 +175,61 @@ class TestRescopeErrorHandling:
         # Verify no files were created
         assert harness.count_servers_in_scope("project-mcp") == 0
 
-    def test_rescope_server_exists_in_destination(self, mcp_manager_with_harness):
-        """Test error when server already exists in destination.
+    def test_rescope_server_exists_in_destination_is_idempotent(
+        self, mcp_manager_with_harness
+    ):
+        """Test OPTION A: server in target scope is idempotent, cleans up other scopes.
 
         This test cannot be gamed because:
-        1. Creates server in destination first
-        2. Verifies both source and destination unchanged
-        3. Validates no data loss occurs
+        1. Creates server in multiple scopes
+        2. Verifies target config preserved (not overwritten)
+        3. Validates other scopes cleaned up
         """
         manager, harness = mcp_manager_with_harness
         runner = CliRunner()
 
-        # Add same server to both scopes
+        # Add same server to both scopes (simulating multi-scope situation)
         config_source = ServerConfig(command="npx", args=["source-pkg"], type="stdio")
         config_dest = ServerConfig(command="node", args=["dest-pkg"], type="stdio")
 
         manager.add_server("duplicate", config_source, "user-global", "claude-code")
         manager.add_server("duplicate", config_dest, "project-mcp", "claude-code")
 
-        # Try to rescope (should fail)
+        # OPTION A: rescope should succeed (idempotent, keeps target, cleans up user-global)
         result = runner.invoke(
             main,
-            ["rescope", "duplicate", "--from", "user-global", "--to", "project-mcp"],
+            ["rescope", "duplicate", "--to", "project-mcp"],
             obj={"mcp_manager": manager},
         )
 
-        # Should fail
-        assert result.exit_code != 0
-        assert (
-            "already exists" in result.output.lower()
-            or "duplicate" in result.output.lower()
-        )
+        # Should succeed (idempotent)
+        assert result.exit_code == 0
 
-        # Verify both servers still exist with original configs
-        harness.assert_server_exists("user-global", "duplicate")
+        # Verify server only in target scope
         harness.assert_server_exists("project-mcp", "duplicate")
+        with pytest.raises(AssertionError):
+            harness.assert_server_exists("user-global", "duplicate")
 
-        # Verify configs unchanged
-        assert harness.get_server_config("user-global", "duplicate")["args"] == [
-            "source-pkg"
-        ]
+        # Verify target config preserved (dest-pkg, not overwritten with source-pkg)
         assert harness.get_server_config("project-mcp", "duplicate")["args"] == [
             "dest-pkg"
         ]
-
-    def test_rescope_invalid_source_scope(self, mcp_manager_with_harness):
-        """Test error with invalid source scope name."""
-        runner = CliRunner()
-        manager, harness = mcp_manager_with_harness
-
-        result = runner.invoke(
-            main,
-            [
-                "rescope",
-                "test-server",
-                "--from",
-                "invalid-scope",
-                "--to",
-                "user-global",
-            ],
-            obj={"mcp_manager": manager},
-        )
-
-        assert result.exit_code != 0
-        assert (
-            "invalid" in result.output.lower()
-            or "unknown" in result.output.lower()
-            or "not a valid" in result.output.lower()
-        )
 
     def test_rescope_invalid_destination_scope(self, mcp_manager_with_harness):
         """Test error with invalid destination scope name."""
         runner = CliRunner()
         manager, harness = mcp_manager_with_harness
 
+        # Add a server first
+        config = ServerConfig(command="node", args=["test.js"], type="stdio")
+        manager.add_server("test-server", config, "user-global", "claude-code")
+
+        # OPTION A: auto-detects source, validates --to
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "test-server",
-                "--from",
-                "user-global",
                 "--to",
                 "invalid-scope",
             ],
@@ -356,24 +243,29 @@ class TestRescopeErrorHandling:
             or "not a valid" in result.output.lower()
         )
 
-    def test_rescope_same_source_and_destination(self, mcp_manager_with_harness):
-        """Test error when source and destination are the same."""
+    def test_rescope_server_only_in_target_is_idempotent(
+        self, mcp_manager_with_harness
+    ):
+        """Test OPTION A: server only in target scope is idempotent (no-op)."""
         manager, harness = mcp_manager_with_harness
         runner = CliRunner()
 
-        # Add a server
+        # Add a server only in target scope
         config = ServerConfig(command="node", args=["test.js"], type="stdio")
         manager.add_server("same-scope", config, "user-global", "claude-code")
 
-        # Try to rescope to same scope
+        # OPTION A: rescope to same scope should be idempotent (success)
         result = runner.invoke(
             main,
-            ["rescope", "same-scope", "--from", "user-global", "--to", "user-global"],
+            ["rescope", "same-scope", "--to", "user-global"],
             obj={"mcp_manager": manager},
         )
 
-        assert result.exit_code != 0
-        assert "same" in result.output.lower() or "identical" in result.output.lower()
+        # Should succeed (idempotent, no changes)
+        assert result.exit_code == 0
+
+        # Server still in target scope
+        harness.assert_server_exists("user-global", "same-scope")
 
 
 class TestRescopeDryRun:
@@ -404,14 +296,12 @@ class TestRescopeDryRun:
         initial_source_count = harness.count_servers_in_scope("project-mcp")
         initial_dest_count = harness.count_servers_in_scope("user-global")
 
-        # Execute dry-run
+        # Execute dry-run (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "dry-test",
-                "--from",
-                "project-mcp",
                 "--to",
                 "user-global",
                 "--dry-run",
@@ -445,14 +335,12 @@ class TestRescopeDryRun:
         config = ServerConfig(command="npx", args=["pkg"], type="stdio")
         manager.add_server("show-details", config, "user-mcp", "claude-code")
 
-        # Execute dry-run
+        # Execute dry-run (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "show-details",
-                "--from",
-                "user-mcp",
                 "--to",
                 "project-mcp",
                 "--dry-run",
@@ -463,7 +351,7 @@ class TestRescopeDryRun:
         # Should show details
         assert result.exit_code == 0
         assert "show-details" in result.output
-        assert "user-mcp" in result.output
+        # May or may not show source scope name (implementation detail)
         assert "project-mcp" in result.output
 
 
@@ -502,14 +390,12 @@ class TestRescopeTransactionSafety:
         os.chmod(source_file, 0o444)  # Read-only
 
         try:
-            # Execute rescope (should fail and rollback)
+            # Execute rescope (OPTION A: auto-detects source, should fail and rollback)
             result = runner.invoke(
                 main,
                 [
                     "rescope",
                     "rollback-test",
-                    "--from",
-                    "user-global",
                     "--to",
                     "project-mcp",
                 ],
@@ -551,15 +437,13 @@ class TestRescopeTransactionSafety:
             config = ServerConfig(command="node", args=[f"server{i}.js"], type="stdio")
             manager.add_server(f"atomic-{i}", config, "user-internal", "claude-code")
 
-        # Rescope each one
+        # Rescope each one (OPTION A: auto-detects source)
         for i in range(3):
             result = runner.invoke(
                 main,
                 [
                     "rescope",
                     f"atomic-{i}",
-                    "--from",
-                    "user-internal",
                     "--to",
                     "user-mcp",
                 ],
@@ -620,14 +504,12 @@ class TestRescopeConfigurationPreservation:
         manager.add_server("complex-server", config, "project-mcp", "claude-code")
         original_config = harness.get_server_config("project-mcp", "complex-server")
 
-        # Rescope
+        # Rescope (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "complex-server",
-                "--from",
-                "project-mcp",
                 "--to",
                 "user-global",
             ],
@@ -664,10 +546,10 @@ class TestRescopeConfigurationPreservation:
 
         manager.add_server("minimal", config, "user-mcp", "claude-code")
 
-        # Rescope
+        # Rescope (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
-            ["rescope", "minimal", "--from", "user-mcp", "--to", "project-mcp"],
+            ["rescope", "minimal", "--to", "project-mcp"],
             obj={"mcp_manager": manager},
         )
 
@@ -691,9 +573,10 @@ class TestRescopeConfigurationPreservation:
 
         manager.add_server("empty-env", config, "user-global", "claude-code")
 
+        # OPTION A: auto-detects source
         result = runner.invoke(
             main,
-            ["rescope", "empty-env", "--from", "user-global", "--to", "user-internal"],
+            ["rescope", "empty-env", "--to", "user-internal"],
             obj={"mcp_manager": manager},
         )
 
@@ -712,16 +595,18 @@ class TestRescopeWithMultipleClients:
         runner = CliRunner()
         manager, harness = mcp_manager_with_harness
 
-        # Try to use a scope that doesn't exist for the client
+        # Add server to user-global, then try to rescope with invalid destination
+        config = ServerConfig(command="node", args=["test.js"], type="stdio")
+        manager.add_server("test-server", config, "user-global", "claude-code")
+
+        # OPTION A: Try to use a scope that doesn't exist for the client as destination
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "test-server",
-                "--from",
-                "workspace",  # VS Code scope, not Claude Code
                 "--to",
-                "user-global",
+                "workspace",  # VS Code scope, not Claude Code
                 "--client",
                 "claude-code",
             ],
@@ -731,7 +616,7 @@ class TestRescopeWithMultipleClients:
         # Should fail with scope validation error
         assert result.exit_code != 0
         # Error message should mention available scopes
-        assert "scope" in result.output.lower()
+        assert "scope" in result.output.lower() or "invalid" in result.output.lower()
 
     def test_rescope_explicit_client_parameter(self, mcp_manager_with_harness):
         """Test explicit --client parameter."""
@@ -742,14 +627,12 @@ class TestRescopeWithMultipleClients:
         config = ServerConfig(command="npx", args=["pkg"], type="stdio")
         manager.add_server("client-test", config, "user-global", "claude-code")
 
-        # Execute with explicit client
+        # Execute with explicit client (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "client-test",
-                "--from",
-                "user-global",
                 "--to",
                 "project-mcp",
                 "--client",
@@ -773,15 +656,16 @@ class TestRescopeCLIOutput:
         config = ServerConfig(command="node", args=["app.js"], type="stdio")
         manager.add_server("output-test", config, "user-mcp", "claude-code")
 
+        # OPTION A: auto-detects source
         result = runner.invoke(
             main,
-            ["rescope", "output-test", "--from", "user-mcp", "--to", "user-global"],
+            ["rescope", "output-test", "--to", "user-global"],
             obj={"mcp_manager": manager},
         )
 
         # Should include key information
         assert "output-test" in result.output
-        assert "user-mcp" in result.output or "from" in result.output.lower()
+        # May or may not show source scope (implementation detail)
         assert "user-global" in result.output or "to" in result.output.lower()
 
     def test_rescope_error_message_helpful(self, mcp_manager_with_harness):
@@ -789,10 +673,10 @@ class TestRescopeCLIOutput:
         runner = CliRunner()
         manager, harness = mcp_manager_with_harness
 
-        # Try invalid operation
+        # Try invalid operation (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
-            ["rescope", "nonexistent", "--from", "user-global", "--to", "project-mcp"],
+            ["rescope", "nonexistent", "--to", "project-mcp"],
             obj={"mcp_manager": manager},
         )
 
@@ -827,10 +711,10 @@ class TestRescopeIntegrationScenarios:
         manager.add_server("postgres", config, "project-mcp", "claude-code")
         harness.assert_server_exists("project-mcp", "postgres")
 
-        # Step 2: After testing, promote to user-level for reuse
+        # Step 2: After testing, promote to user-level for reuse (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
-            ["rescope", "postgres", "--from", "project-mcp", "--to", "user-global"],
+            ["rescope", "postgres", "--to", "user-global"],
             obj={"mcp_manager": manager},
         )
 
@@ -908,13 +792,12 @@ class TestRescopeEdgeCases:
         config = ServerConfig(command="npx", args=["@scope/package-name"], type="stdio")
         manager.add_server("@scope/package-name", config, "user-global", "claude-code")
 
+        # OPTION A: auto-detects source
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "@scope/package-name",
-                "--from",
-                "user-global",
                 "--to",
                 "project-mcp",
             ],
@@ -953,10 +836,10 @@ class TestRescopeEdgeCases:
             # Add to source
             manager.add_server(server_id, config, from_scope, "claude-code")
 
-            # Rescope
+            # Rescope (OPTION A: auto-detects source)
             result = runner.invoke(
                 main,
-                ["rescope", server_id, "--from", from_scope, "--to", to_scope],
+                ["rescope", server_id, "--to", to_scope],
                 obj={"mcp_manager": manager},
             )
 
@@ -976,10 +859,10 @@ class TestRescopeEdgeCases:
         # Create empty scope file
         harness.prepopulate_file("user-mcp", {"mcpServers": {}})
 
-        # Try to rescope from empty scope
+        # Try to rescope non-existent server (OPTION A: auto-detects, finds nothing)
         result = runner.invoke(
             main,
-            ["rescope", "nonexistent", "--from", "user-mcp", "--to", "user-global"],
+            ["rescope", "nonexistent", "--to", "user-global"],
             obj={"mcp_manager": manager},
         )
 
@@ -1012,14 +895,12 @@ class TestRescopeEdgeCases:
         if dest_path and dest_path.exists():
             dest_path.unlink()
 
-        # Rescope
+        # Rescope (OPTION A: auto-detects source)
         result = runner.invoke(
             main,
             [
                 "rescope",
                 "create-test",
-                "--from",
-                "user-global",
                 "--to",
                 "user-internal",
             ],

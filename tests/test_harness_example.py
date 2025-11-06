@@ -1,6 +1,5 @@
 """Example tests demonstrating the MCP test harness."""
 
-
 import pytest
 
 from mcpi.clients.types import ServerConfig, ServerState
@@ -83,8 +82,8 @@ class TestMCPHarnessBasics:
         assert prepopulated_harness.count_servers_in_scope("project-mcp") == 1
         assert prepopulated_harness.count_servers_in_scope("user-internal") == 1
         assert (
-            prepopulated_harness.count_servers_in_scope("user-local") == 0
-        )  # Not populated
+            prepopulated_harness.count_servers_in_scope("user-local") == 1
+        )  # Has disabled-server
 
 
 class TestMCPManagerIntegration:

@@ -9,7 +9,13 @@ import yaml
 from jsonschema import ValidationError, validate
 
 from .base import ScopeHandler
-from .protocols import CommandExecutor, ConfigReader, ConfigWriter, SchemaValidator
+from .protocols import (
+    CommandExecutor,
+    ConfigReader,
+    ConfigWriter,
+    EnableDisableHandler,
+    SchemaValidator,
+)
 from .types import OperationResult, ScopeConfig, ServerConfig
 
 
@@ -151,6 +157,7 @@ class FileBasedScope(ScopeHandler):
         writer: Optional[ConfigWriter] = None,
         validator: Optional[SchemaValidator] = None,
         schema_path: Optional[Path] = None,
+        enable_disable_handler: Optional[EnableDisableHandler] = None,
     ) -> None:
         """Initialize file-based scope handler.
 
@@ -160,6 +167,7 @@ class FileBasedScope(ScopeHandler):
             writer: Configuration writer (defaults to JSONFileWriter)
             validator: Schema validator (optional)
             schema_path: Path to schema file (optional)
+            enable_disable_handler: Handler for enable/disable operations (optional)
         """
         super().__init__(config)
 
@@ -171,6 +179,7 @@ class FileBasedScope(ScopeHandler):
         self.writer = writer or JSONFileWriter()
         self.validator = validator
         self.schema_path = schema_path
+        self.enable_disable_handler = enable_disable_handler
 
     def exists(self) -> bool:
         """Check if configuration file exists.

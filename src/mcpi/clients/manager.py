@@ -1,7 +1,7 @@
 """Main MCP manager for unified client and server management."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .registry import ClientRegistry
 from .types import OperationResult, ServerConfig, ServerInfo, ServerState
@@ -330,6 +330,41 @@ class MCPManager:
                 }
 
         return None
+
+    def find_all_server_scopes(
+        self, server_id: str, client_name: Optional[str] = None
+    ) -> List[Tuple[str, str]]:
+        """Find ALL scopes where a server is defined.
+
+        Args:
+            server_id: Server identifier
+            client_name: Optional client name filter (uses default if not specified)
+
+        Returns:
+            List of (client_name, scope_name) tuples for all scopes containing the server
+        """
+        # Use default client if none specified
+        if client_name is None:
+            client_name = self._default_client
+
+        if not client_name:
+            return []
+
+        if not self.registry.has_client(client_name):
+            logger.warning(f"Client '{client_name}' not available")
+            return []
+
+        try:
+            client = self.registry.get_client(client_name)
+            scope_names = client.find_all_server_scopes(server_id)
+
+            # Return as list of (client, scope) tuples
+            return [(client_name, scope_name) for scope_name in scope_names]
+        except Exception as e:
+            logger.error(
+                f"Error finding server scopes in client '{client_name}': {e}"
+            )
+            return []
 
     def get_scopes_for_client(
         self, client_name: Optional[str] = None

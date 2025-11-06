@@ -41,6 +41,7 @@ dev = [
 
 [project.scripts]
 mcpi = "mcpi.cli:main"
+mcpi-tui-reload = "mcpi.cli:tui_reload_entry"
 
 [build-system]
 requires = ["setuptools>=70.0", "wheel"]

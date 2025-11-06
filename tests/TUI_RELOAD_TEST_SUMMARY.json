@@ -1,0 +1,299 @@
+{
+  "test_suite": "TUI Reload Functionality",
+  "purpose": "Verify fzf interactive TUI reload mechanism works correctly",
+  "philosophy": "Un-gameable tests that validate actual user workflows",
+
+  "tests_added": [
+    "test_reload_function_exists",
+    "test_reload_outputs_to_stdout",
+    "test_reload_format_matches_build_server_list",
+    "test_reload_with_empty_registry",
+    "test_reload_respects_server_states",
+    "test_tui_reload_command_exists_in_cli",
+    "test_tui_reload_command_executes_successfully",
+    "test_tui_reload_outputs_server_list",
+    "test_tui_reload_respects_client_context",
+    "test_tui_reload_command_via_subprocess",
+    "test_console_script_exists",
+    "test_console_script_executes",
+    "test_fzf_bindings_include_reload_command",
+    "test_reload_called_in_add_binding",
+    "test_reload_called_in_remove_binding",
+    "test_reload_called_in_enable_binding",
+    "test_reload_called_in_disable_binding",
+    "test_operation_changes_reflected_in_reload",
+    "test_reload_with_no_default_client",
+    "test_reload_with_corrupted_config",
+    "test_reload_with_permission_error",
+    "test_reload_completes_quickly"
+  ],
+
+  "test_classes": {
+    "TestReloadServerListFunction": {
+      "purpose": "Unit tests for reload_server_list() function",
+      "tests": 5,
+      "passing": 0,
+      "failing": 5,
+      "skipped": 0,
+      "gaming_resistance": "high",
+      "uses_real_objects": true,
+      "uses_real_files": true,
+      "key_validations": [
+        "Function exists and is callable",
+        "Outputs to stdout in correct format",
+        "Format matches build_server_list()",
+        "Handles empty registry gracefully",
+        "Shows correct status indicators for different states"
+      ]
+    },
+
+    "TestTuiReloadCLICommand": {
+      "purpose": "Integration tests for CLI command",
+      "tests": 5,
+      "passing": 0,
+      "failing": 5,
+      "skipped": 0,
+      "gaming_resistance": "high",
+      "uses_cli_runner": true,
+      "uses_subprocess": true,
+      "key_validations": [
+        "Command registered in Click CLI",
+        "Executes successfully via CliRunner",
+        "Outputs formatted server list",
+        "Respects client context",
+        "Works as subprocess (CRITICAL for fzf)"
+      ]
+    },
+
+    "TestReloadConsoleScriptEntry": {
+      "purpose": "Verify console script installation",
+      "tests": 2,
+      "passing": 0,
+      "failing": 0,
+      "skipped": 2,
+      "gaming_resistance": "very_high",
+      "uses_subprocess": true,
+      "key_validations": [
+        "mcpi-tui-reload exists in PATH",
+        "Console script is executable"
+      ]
+    },
+
+    "TestFzfIntegrationWithReload": {
+      "purpose": "Functional tests for fzf workflow",
+      "tests": 6,
+      "passing": 5,
+      "failing": 1,
+      "skipped": 0,
+      "gaming_resistance": "very_high",
+      "end_to_end": true,
+      "key_validations": [
+        "fzf bindings reference reload command",
+        "All operations (add/remove/enable/disable) call reload",
+        "Operations change state, reload reflects changes (END-TO-END)"
+      ]
+    },
+
+    "TestReloadEdgeCases": {
+      "purpose": "Error handling and edge cases",
+      "tests": 3,
+      "passing": 0,
+      "failing": 2,
+      "skipped": 1,
+      "gaming_resistance": "high",
+      "key_validations": [
+        "Handles missing client gracefully",
+        "Handles corrupted config gracefully",
+        "Handles permission errors gracefully"
+      ]
+    },
+
+    "TestReloadPerformance": {
+      "purpose": "Performance validation",
+      "tests": 1,
+      "passing": 0,
+      "failing": 1,
+      "skipped": 0,
+      "gaming_resistance": "very_high",
+      "key_validations": [
+        "Reload completes in < 1 second with 50 servers"
+      ]
+    }
+  },
+
+  "workflows_covered": [
+    "User launches fzf TUI",
+    "User adds server via ctrl-a, list refreshes automatically",
+    "User enables server via ctrl-e, status updates to green",
+    "User disables server via ctrl-d, status updates to yellow",
+    "User removes server via ctrl-r, server disappears from list",
+    "Multiple operations in single session without exit",
+    "Error handling for missing clients, corrupted configs",
+    "Performance for registries with many servers"
+  ],
+
+  "initial_status": "failing",
+  "initial_results": {
+    "total_tests": 22,
+    "passed": 5,
+    "failed": 14,
+    "skipped": 3,
+    "pass_rate": "23%",
+    "failure_reason": "reload functionality not implemented yet"
+  },
+
+  "expected_after_implementation": {
+    "total_tests": 22,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "pass_rate": "100%"
+  },
+
+  "commit": "005822e",
+
+  "gaming_resistance": "very_high",
+  "gaming_resistance_details": {
+    "cannot_fake_function_existence": "ImportError if function doesn't exist",
+    "cannot_fake_cli_command": "Click command list checked directly",
+    "cannot_fake_console_script": "Uses 'which' command and subprocess execution",
+    "cannot_fake_subprocess_execution": "Calls mcpi via subprocess.run()",
+    "cannot_fake_file_operations": "Creates and reads real files in temp dirs",
+    "cannot_fake_state_changes": "Verifies actual config file contents",
+    "cannot_fake_output_format": "Compares stdout from two real function calls",
+    "cannot_fake_timing": "Times actual execution with time.time()"
+  },
+
+  "status_gaps_addressed": [
+    "Missing mcpi-tui-reload command",
+    "Reload mechanism broken",
+    "No integration tests",
+    "End-to-end workflow untested",
+    "Real subprocess execution untested",
+    "No manual testing evidence"
+  ],
+
+  "plan_items_validated": [
+    "P0-1: Implement mcpi-tui-reload command",
+    "P0-2: Add integration tests for reload mechanism",
+    "Acceptance Criteria: Command exists",
+    "Acceptance Criteria: Outputs formatted list",
+    "Acceptance Criteria: Works in fzf context",
+    "Acceptance Criteria: Respects client context"
+  ],
+
+  "files_added": [
+    "tests/test_tui_reload.py",
+    "tests/TEST_TUI_RELOAD_README.md"
+  ],
+
+  "test_quality": {
+    "uses_real_objects": true,
+    "uses_mocks_appropriately": true,
+    "tests_observable_outcomes": true,
+    "tests_actual_workflows": true,
+    "verifies_multiple_aspects": true,
+    "includes_edge_cases": true,
+    "includes_performance_tests": true,
+    "cannot_be_satisfied_by_stubs": true,
+    "score": "9/10"
+  },
+
+  "next_steps": [
+    "Implement reload_server_list() function in src/mcpi/tui.py",
+    "Add CLI command 'tui-reload' in src/mcpi/cli.py",
+    "Add console script entry point in pyproject.toml",
+    "Run tests to verify implementation",
+    "Perform manual testing checklist",
+    "Update documentation once tests pass"
+  ],
+
+  "manual_testing_required": true,
+  "manual_testing_checklist": [
+    "Install with 'uv tool install --editable .'",
+    "Verify 'which mcpi-tui-reload' returns path",
+    "Run 'mcpi-tui-reload' directly, verify output",
+    "Launch 'mcpi fzf'",
+    "Press ctrl-a to add server, verify list refreshes",
+    "Press ctrl-e to enable, verify green checkmark appears",
+    "Press ctrl-d to disable, verify yellow X appears",
+    "Press ctrl-r to remove, verify server disappears",
+    "Test rapid operations (no crashes)",
+    "Test with empty registry (graceful handling)"
+  ],
+
+  "testing_strategy": {
+    "layer_1_unit": "Test individual components (reload function)",
+    "layer_2_integration": "Test CLI and subprocess execution",
+    "layer_3_functional": "Test end-to-end workflow with real operations",
+    "layer_4_performance": "Test reload speed for good UX",
+    "layer_5_manual": "Human verification of actual user experience"
+  },
+
+  "blocking_issues": [
+    {
+      "issue": "reload_server_list() function does not exist",
+      "impact": "All unit tests fail with ImportError",
+      "severity": "critical",
+      "blocks": "P0-1 implementation"
+    },
+    {
+      "issue": "CLI command 'tui-reload' not registered",
+      "impact": "CLI integration tests fail",
+      "severity": "critical",
+      "blocks": "P0-1 implementation"
+    },
+    {
+      "issue": "Console script 'mcpi-tui-reload' not installed",
+      "impact": "fzf bindings will fail to call reload",
+      "severity": "critical",
+      "blocks": "P0-1 implementation"
+    }
+  ],
+
+  "success_criteria": {
+    "minimum_viable": {
+      "all_unit_tests_pass": true,
+      "all_cli_tests_pass": true,
+      "console_script_tests_pass": true,
+      "end_to_end_test_passes": true,
+      "manual_testing_complete": true
+    },
+    "production_quality": {
+      "all_tests_pass": true,
+      "performance_test_passes": true,
+      "edge_case_tests_pass": true,
+      "manual_testing_complete": true,
+      "documentation_updated": true
+    }
+  },
+
+  "metrics": {
+    "total_tests_written": 22,
+    "total_test_classes": 6,
+    "lines_of_test_code": 850,
+    "test_documentation_pages": 2,
+    "coverage_target": "100% of reload functionality",
+    "estimated_implementation_time": "2-4 hours",
+    "estimated_testing_time": "30 minutes (after implementation)"
+  },
+
+  "quality_indicators": {
+    "tests_fail_before_implementation": true,
+    "tests_verify_real_behavior": true,
+    "tests_use_real_objects": true,
+    "tests_check_multiple_outcomes": true,
+    "tests_include_edge_cases": true,
+    "tests_include_performance": true,
+    "tests_include_integration": true,
+    "tests_include_end_to_end": true,
+    "tests_cannot_be_gamed": true
+  },
+
+  "traceability": {
+    "status_report": "STATUS-2025-11-05-162258.md",
+    "implementation_plan": "BACKLOG-FZF-IMPLEMENTATION-FIX-2025-11-05.md",
+    "existing_tests": "test_tui_fzf.py",
+    "specification": "CLAUDE.md Project Architecture"
+  }
+}

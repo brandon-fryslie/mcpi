@@ -54,18 +54,6 @@ class TestCliSmoke:
         except json.JSONDecodeError:
             pytest.fail("status --json did not output valid JSON")
 
-    def test_registry_list_help(self):
-        """Test that registry list --help works."""
-        code, stdout, stderr = run_cli_command(["registry", "list", "--help"])
-        assert code == 0
-        assert "List available MCP servers" in stdout
-
-    def test_registry_list_basic(self):
-        """Test that registry list works without crashing."""
-        code, stdout, stderr = run_cli_command(["registry", "list"])
-        # Should succeed even if no servers or registry doesn't exist
-        assert code == 0 or "No servers found" in stdout or "Error" in stderr
-
     def test_registry_validate(self):
         """Test that registry validate works without crashing."""
         code, stdout, stderr = run_cli_command(["registry", "validate"])
@@ -140,21 +128,21 @@ class TestCliSmoke:
         assert "Update registry from remote source" in stdout
 
     def test_registry_search_help(self):
-        """Test that registry search --help works."""
-        code, stdout, stderr = run_cli_command(["registry", "search", "--help"])
+        """Test that search --help works."""
+        code, stdout, stderr = run_cli_command(["search", "--help"])
         assert code == 0
         assert "Search for MCP servers" in stdout
 
     def test_registry_search_basic(self):
-        """Test that registry search works without crashing."""
-        code, stdout, stderr = run_cli_command(["registry", "search", "test"])
+        """Test that search works without crashing."""
+        code, stdout, stderr = run_cli_command(["search", "test"])
         # Should work even if no results
         assert code == 0
         assert "Search Results" in stdout or "No servers found" in stdout
 
-    def test_registry_show_help(self):
-        """Test that registry show --help works."""
-        code, stdout, stderr = run_cli_command(["registry", "show", "--help"])
+    def test_info_help(self):
+        """Test that info --help works."""
+        code, stdout, stderr = run_cli_command(["info", "--help"])
         assert code == 0
         assert "Show detailed information" in stdout
 
@@ -180,9 +168,9 @@ class TestCliSmoke:
 class TestCliEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_registry_show_nonexistent(self):
+    def test_info_nonexistent(self):
         """Test showing nonexistent server."""
-        code, stdout, stderr = run_cli_command(["registry", "show", "nonexistent"])
+        code, stdout, stderr = run_cli_command(["info", "nonexistent"])
         assert code == 1
         assert "not found" in stdout
 

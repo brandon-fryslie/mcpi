@@ -128,3 +128,47 @@ class APIClient(Protocol):
             True if request successful, False otherwise
         """
         ...
+
+
+@runtime_checkable
+class EnableDisableHandler(Protocol):
+    """Protocol for handling enable/disable operations on servers.
+
+    Different scopes have different mechanisms for enabling/disabling servers:
+    - Some use enabledMcpjsonServers/disabledMcpjsonServers arrays in settings
+    - Some use a separate disabled tracking file
+    - Some may not support enable/disable at all
+    """
+
+    def is_disabled(self, server_id: str) -> bool:
+        """Check if a server is disabled in this scope.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if server is disabled, False if enabled or unknown
+        """
+        ...
+
+    def disable(self, server_id: str) -> bool:
+        """Mark a server as disabled in this scope.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if operation succeeded, False otherwise
+        """
+        ...
+
+    def enable(self, server_id: str) -> bool:
+        """Mark a server as enabled in this scope.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if operation succeeded, False otherwise
+        """
+        ...

@@ -1,6 +1,5 @@
 """Tests for Claude Code client plugin."""
 
-
 import pytest
 
 from mcpi.clients.claude_code import ClaudeCodePlugin
@@ -107,7 +106,9 @@ class TestClaudeCodePlugin:
 
     def test_validate_server_config_valid(self, plugin):
         """Test validating a valid server configuration."""
-        config = ServerConfig(command="python", args=["-m", "test_server"], type="stdio")
+        config = ServerConfig(
+            command="python", args=["-m", "test_server"], type="stdio"
+        )
 
         errors = plugin.validate_server_config(config)
         assert len(errors) == 0

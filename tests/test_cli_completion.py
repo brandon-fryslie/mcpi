@@ -400,6 +400,107 @@ class TestContextAwareServerCompletion:
     # assert 'server2' in completion_values
     # assert 'server3' not in completion_values  # Already disabled
 
+    def test_disable_command_shows_scope_in_help_text(self):
+        """Test that 'disable' command shows scope information in help text.
+
+        Workflow: User types `mcpi disable <TAB>`
+        Expected: Each completion shows the scope where the server is enabled
+
+        Un-gameable because:
+        - Must extract actual scope information from ServerInfo
+        - Tests that help text provides useful context to user
+        - Verifies scope information is correctly displayed
+        """
+        from mcpi.cli import complete_server_ids
+        from mcpi.clients.types import ServerInfo
+
+        mock_manager = Mock()
+        mock_manager.list_servers.return_value = {
+            "client/user-global/server1": ServerInfo(
+                id="server1",
+                client="claude-code",
+                scope="user-global",
+                config={},
+                state=ServerState.ENABLED,
+            ),
+            "client/project-mcp/server1": ServerInfo(
+                id="server1",
+                client="claude-code",
+                scope="project-mcp",
+                config={},
+                state=ServerState.ENABLED,
+            ),
+            "client/user-global/server2": ServerInfo(
+                id="server2",
+                client="claude-code",
+                scope="user-global",
+                config={},
+                state=ServerState.ENABLED,
+            ),
+        }
+
+        mock_ctx = Mock()
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {}
+        mock_ctx.info_name = "disable"
+
+        completions = complete_server_ids(mock_ctx, None, "")
+        completion_dict = {(c.value, c.help): c for c in completions}
+
+        # server1 should appear twice with different scopes
+        # Check that the help text contains the key information (ignoring color codes for testing)
+        server1_helps = [c.help for c in completions if c.value == "server1"]
+        assert len(server1_helps) == 2
+        assert any("user-global" in h for h in server1_helps)
+        assert any("project-mcp" in h for h in server1_helps)
+
+        # server2 should appear once with its scope
+        server2_helps = [c.help for c in completions if c.value == "server2"]
+        assert len(server2_helps) == 1
+        assert "user-global" in server2_helps[0]
+
+        # Verify total count
+        assert len(completions) == 3
+
+    def test_enable_command_shows_scope_in_help_text(self):
+        """Test that 'enable' command shows scope information in help text.
+
+        Workflow: User types `mcpi enable <TAB>`
+        Expected: Each completion shows the scope where the server is disabled
+
+        Un-gameable because:
+        - Tests that scope help text works for enable command too
+        - Verifies consistency across commands
+        """
+        from mcpi.cli import complete_server_ids
+        from mcpi.clients.types import ServerInfo
+
+        mock_manager = Mock()
+        mock_manager.list_servers.return_value = {
+            "client/user-global/disabled-server": ServerInfo(
+                id="disabled-server",
+                client="claude-code",
+                scope="user-global",
+                config={},
+                state=ServerState.DISABLED,
+            ),
+        }
+
+        mock_ctx = Mock()
+        mock_ctx.obj = {"mcp_manager": mock_manager}
+        mock_ctx.params = {}
+        mock_ctx.info_name = "enable"
+
+        completions = complete_server_ids(mock_ctx, None, "")
+
+        # Verify the server appears with scope information
+        assert len(completions) == 1
+        assert completions[0].value == "disabled-server"
+        # Check for key content in help text (ignoring color codes)
+        assert "disabled-server" in completions[0].help
+        assert "user-global" in completions[0].help
+        assert "disabled" in completions[0].help
+
 
 class TestScopeCompletionIntegration:
     """Tests for scope completion (already implemented, verify it still works).

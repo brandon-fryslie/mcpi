@@ -169,11 +169,10 @@ mcpi/
 
 ### Core Features
 
-#### Registry Management
-- `mcpi registry list`: List all available MCP servers
-- `mcpi registry search <query>`: Search servers by name, description, or capability
-- `mcpi registry info <server>`: Show detailed information about a server
-- `mcpi registry categories`: List all server categories
+#### Discovery
+- `mcpi search <query>`: Search servers by name, description, or capability
+- `mcpi info <server>`: Show detailed information (registry + install status)
+- `mcpi fzf`: Interactive fuzzy finder interface for browsing and managing servers (requires fzf)
 
 #### Server Management
 - `mcpi list`: List installed servers across all scopes
@@ -186,7 +185,7 @@ mcpi/
 #### Scope Management
 - `mcpi scope list`: List available configuration scopes for current client
 - `mcpi scope show <scope>`: Show details about a specific scope
-- `mcpi rescope <server> --from <scope> --to <scope>`: Move server between scopes
+- `mcpi rescope <server> --to <scope>`: Consolidate server to target scope (auto-removes from all other scopes)
 
 #### Client Management
 - `mcpi client list`: List detected MCP clients

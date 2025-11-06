@@ -34,21 +34,17 @@ uv sync
 source .venv/bin/activate
 ```
 
+**Note for macOS iCloud Drive users**: If your project is in iCloud Drive, use `.venv.nosync` to avoid intermittent import issues. See [Troubleshooting](#troubleshooting) for details.
+
 ## Quick Start
 
 ### Discover MCP Servers
 ```bash
-# List all available servers from the registry
-mcpi registry list
-
 # Search for specific functionality
-mcpi registry search filesystem
+mcpi search filesystem
 
-# Get detailed information about a server
-mcpi registry info filesystem
-
-# List all categories
-mcpi registry categories
+# Get detailed information about a server (shows registry + install status)
+mcpi info filesystem
 ```
 
 ### Manage Installed Servers
@@ -83,8 +79,8 @@ mcpi scope list
 # List scopes for a specific client
 mcpi scope list --client claude-code
 
-# Move a server between scopes
-mcpi rescope filesystem --from project-mcp --to user-global
+# Consolidate a server to a specific scope (removes from all other scopes)
+mcpi rescope filesystem --to user-global
 ```
 
 ### Client Management
@@ -143,36 +139,50 @@ Each MCP client (Claude Code, Cursor, VS Code) is implemented as a **plugin** th
 
 ## CLI Commands
 
-### Registry Commands
+### Discovery Commands
 
-#### `mcpi registry list`
-List all servers in the registry.
+#### `mcpi search <query>`
+Search for servers by name or description in the registry.
 
 ```bash
-mcpi registry list
+mcpi search filesystem
+mcpi search "database operations"
 ```
 
-#### `mcpi registry search <query>`
-Search for servers by name or description.
+#### `mcpi info <server-id>`
+Show detailed information about a server, including registry info and local installation status.
 
 ```bash
-mcpi registry search filesystem
-mcpi registry search "database operations"
+mcpi info filesystem
+mcpi info brave-search
 ```
 
-#### `mcpi registry info <server-id>`
-Show detailed information about a server from the registry.
+### Interactive Interface
 
+#### `mcpi fzf`
+Launch an interactive fuzzy finder interface for managing MCP servers.
+
+**Features:**
+- Browse all servers from the registry with fuzzy search
+- Installed servers shown at top (green=enabled, yellow=disabled)
+- Real-time status updates after operations
+- Preview pane shows server details
+
+**Keyboard Shortcuts:**
+- `ctrl-a`: Add server to configuration
+- `ctrl-r`: Remove server from configuration
+- `ctrl-e`: Enable server
+- `ctrl-d`: Disable server
+- `ctrl-i` / `enter`: Show detailed info
+- `esc` / `ctrl-c`: Exit
+
+**Requirements:**
+- Requires `fzf` to be installed (`brew install fzf` on macOS, `apt install fzf` on Ubuntu)
+
+**Example:**
 ```bash
-mcpi registry info filesystem
-mcpi registry info brave-search
-```
-
-#### `mcpi registry categories`
-List all server categories with counts.
-
-```bash
-mcpi registry categories
+# Launch interactive interface
+mcpi fzf
 ```
 
 ### Server Management Commands
@@ -265,31 +275,37 @@ Disable an enabled MCP server.
 mcpi disable filesystem
 ```
 
-#### `mcpi rescope <server-name> --from <scope> --to <scope> [OPTIONS]`
-Move an MCP server configuration from one scope to another.
+#### `mcpi rescope <server-name> --to <scope> [OPTIONS]`
+Consolidate an MCP server configuration to a specific scope, automatically removing it from all other scopes.
 
 **Options:**
-- `--from TEXT`: Source scope (required)
-- `--to TEXT`: Destination scope (required)
+- `--to TEXT`: Target scope (required)
 - `--client TEXT`: MCP client to use (auto-detected if not specified)
 - `--dry-run`: Show what would happen without making changes
 
 **Examples:**
 ```bash
-# Move server from project to user scope
-mcpi rescope filesystem --from project-mcp --to user-global
+# Consolidate server to user-global scope (removes from all other scopes)
+mcpi rescope filesystem --to user-global
 
 # Preview the operation
-mcpi rescope filesystem --from project-mcp --to user-global --dry-run
+mcpi rescope filesystem --to user-global --dry-run
 
 # Specify a client explicitly
-mcpi rescope filesystem --from project-mcp --to user-global --client claude-code
+mcpi rescope filesystem --to user-global --client claude-code
 ```
 
+**How it works:**
+1. Automatically detects ALL scopes where the server is currently configured
+2. Adds the server to the target scope (preserving existing config if already present)
+3. Removes the server from all other scopes
+4. Operation is atomic: adds to target first, then removes from sources (prevents data loss)
+
 **Notes:**
-- The operation is atomic and will rollback if any errors occur
-- Both source and destination scopes must exist for the specified client
-- The server must not already exist in the destination scope
+- **Idempotent**: Safe to run multiple times - consolidates to target scope regardless of current state
+- **Automatic detection**: No need to specify source scope(s) - automatically finds them all
+- **Safety**: If server already in target scope, preserves target config and cleans up other scopes
+- **Multi-scope cleanup**: If server scattered across multiple scopes, consolidates to single target scope
 
 #### `mcpi info [server-id] [OPTIONS]`
 Show detailed information about a server or system status.
@@ -448,7 +464,7 @@ To add a new MCP server to the registry:
 - **github**: Interact with GitHub repositories, issues, and pull requests
 
 ### Community Servers
-The registry contains additional community-contributed servers. Use `mcpi registry list` to see all available servers.
+The registry contains additional community-contributed servers. Use `mcpi search` to find available servers.
 
 ## Integration with Claude Code
 
@@ -537,7 +553,7 @@ To add a new MCP server to the registry:
 
 1. Fork the repository
 2. Add server details to `data/registry.json`
-3. Test the server entry: `mcpi registry info <your-server-id>`
+3. Test the server entry: `mcpi info <your-server-id>`
 4. Submit a pull request
 
 ### Server Entry Format
@@ -599,6 +615,53 @@ mcpi completion --shell bash
 # Make sure to source your shell config
 source ~/.bashrc  # or ~/.zshrc for zsh
 ```
+
+**ImportError in development (macOS iCloud Drive):**
+
+If developing in iCloud Drive, you may encounter intermittent `ModuleNotFoundError: No module named 'mcpi'` due to iCloud setting hidden flags on `.pth` files.
+
+**Solution 1: Use .venv.nosync (Recommended for Development)**
+```bash
+cd ~/path/to/mcpi
+
+# Remove existing venv
+rm -rf .venv
+
+# Create .venv.nosync (excluded from iCloud sync)
+python -m venv .venv.nosync
+ln -s .venv.nosync .venv
+
+# Install in editable mode
+source .venv/bin/activate
+pip install -e .
+```
+
+The `.nosync` suffix tells iCloud to exclude the directory from sync, preventing hidden flag issues.
+
+**Solution 2: Use UV Tool Install (Recommended for CLI Usage)**
+```bash
+# Install as UV tool (stored in ~/.local/, not in iCloud)
+uv tool install --editable ~/path/to/mcpi
+
+# Use from anywhere without venv activation
+mcpi --help
+
+# For testing
+cd ~/path/to/mcpi
+pytest  # Uses pythonpath from pyproject.toml
+```
+
+**Emergency fix (temporary):**
+```bash
+# Remove hidden flags manually
+./scripts/fix-pth-flags.sh
+
+# Or manually:
+cd ~/path/to/mcpi
+chflags nohidden .venv/lib/python3.*/site-packages/*.pth
+```
+
+See `.agent_planning/ICLOUD-COMPATIBLE-FIX-2025-10-30.md` for technical details.
 
 ### Getting Help
 

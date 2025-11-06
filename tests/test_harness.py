@@ -65,6 +65,14 @@ class MCPTestHarness:
             file_path = self.tmp_dir / f"{client_name}_{scope_name}_{original}"
             self.path_overrides[scope_name] = file_path
 
+        # Add the disabled tracking file for user-global scope
+        # This is used to track disabled servers in user-global scope
+        disabled_tracking_file = (
+            self.tmp_dir
+            / f"{client_name}_user-global-disabled_.mcpi-disabled-servers.json"
+        )
+        self.path_overrides["user-global-disabled"] = disabled_tracking_file
+
         return self.path_overrides
 
     def prepopulate_file(self, scope_name: str, content: Dict[str, Any]) -> None:

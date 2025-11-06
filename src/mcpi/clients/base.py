@@ -273,6 +273,22 @@ class MCPClientPlugin(ABC):
 
         return None
 
+    def find_all_server_scopes(self, server_id: str) -> List[str]:
+        """Find ALL scopes that contain a specific server.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            List of scope names where server is found (may be empty)
+        """
+        found_scopes = []
+        for scope_name, handler in self._scopes.items():
+            if handler.has_server(server_id):
+                found_scopes.append(scope_name)
+
+        return found_scopes
+
     def enable_server(self, server_id: str) -> OperationResult:
         """Enable a disabled server.
 

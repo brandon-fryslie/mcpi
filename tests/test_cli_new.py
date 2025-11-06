@@ -42,85 +42,8 @@ class TestCLICommands:
         mock_config.return_value = Mock()
         mock_installer.return_value = Mock()
 
-        # Run command
-        result = self.runner.invoke(main, ["registry", "list"])
-
-        assert result.exit_code == 0
-        assert "Test Server" in result.output
-        assert "test_server" in result.output
-        assert mock_catalog_instance.list_servers.called
-
-    @patch("mcpi.cli.ServerCatalog")
-    @patch("mcpi.cli.ConfigManager")
-    @patch("mcpi.cli.ClaudeCodeInstaller")
-    def test_list_command_with_filters(self, mock_installer, mock_config, mock_catalog):
-        """Test list command with category and platform filters."""
-        mock_catalog_instance = Mock()
-        mock_catalog_instance.list_servers.return_value = []
-        mock_catalog.return_value = mock_catalog_instance
-
-        mock_config.return_value = Mock()
-        mock_installer.return_value = Mock()
-
-        # Test with category filter
-        result = self.runner.invoke(
-            main, ["registry", "list", "--category", "filesystem"]
-        )
-        assert result.exit_code == 0
-        mock_catalog_instance.list_servers.assert_called_with()
-
-        # Test with platform filter
-        result = self.runner.invoke(main, ["registry", "list", "--method", "npm"])
-        assert result.exit_code == 0
-
-        # Test with both filters
-        result = self.runner.invoke(
-            main, ["registry", "list", "--category", "database", "--method", "pip"]
-        )
-        assert result.exit_code == 0
-
-    @patch("mcpi.cli.ServerCatalog")
-    @patch("mcpi.cli.ConfigManager")
-    @patch("mcpi.cli.ClaudeCodeInstaller")
-    def test_list_command_json_output(self, mock_installer, mock_config, mock_catalog):
-        """Test list command with JSON output."""
-        mock_server = Mock(spec=MCPServer)
-        mock_server.id = "test_server"
-        mock_server.name = "Test Server"
-        mock_server.description = "A test server"
-        mock_server.category = ["test"]
-        mock_server.author = "Test Author"
-        mock_server.versions = Mock()
-        mock_server.versions.latest = "1.0.0"
-        mock_server.license = "MIT"
-        mock_server.installation = Mock()
-        mock_server.installation.method = "npm"
-        # Add model_dump method for JSON serialization
-        mock_server.model_dump.return_value = {
-            "id": "test_server",
-            "name": "Test Server",
-            "description": "A test server",
-            "category": ["test"],
-            "author": "Test Author",
-            "versions": {"latest": "1.0.0"},
-            "license": "MIT",
-            "installation": {"method": "npm"},
-        }
-
-        mock_catalog_instance = Mock()
-        mock_catalog_instance.list_servers.return_value = [mock_server]
-        mock_catalog.return_value = mock_catalog_instance
-
-        mock_config.return_value = Mock()
-        mock_installer.return_value = Mock()
-
-        result = self.runner.invoke(main, ["registry", "list", "--json"])
-
-        assert result.exit_code == 0
-        output_data = json.loads(result.output)
-        assert len(output_data) == 1
-        assert output_data[0]["id"] == "test_server"
-        assert output_data[0]["name"] == "Test Server"
+        # These registry list tests have been removed as the command no longer exists
+        pass
 
     @patch("mcpi.cli.ServerCatalog")
     @patch("mcpi.cli.ConfigManager")
@@ -147,7 +70,7 @@ class TestCLICommands:
         mock_config.return_value = Mock()
         mock_installer.return_value = Mock()
 
-        result = self.runner.invoke(main, ["registry", "search", "filesystem"])
+        result = self.runner.invoke(main, ["search", "filesystem"])
 
         assert result.exit_code == 0
         assert "Filesystem Server" in result.output
@@ -186,7 +109,7 @@ class TestCLICommands:
         mock_config.return_value = Mock()
         mock_installer.return_value = Mock()
 
-        result = self.runner.invoke(main, ["registry", "search", "test", "--json"])
+        result = self.runner.invoke(main, ["search", "test", "--json"])
 
         assert result.exit_code == 0
         output_data = json.loads(result.output)
@@ -205,7 +128,7 @@ class TestCLICommands:
         mock_config.return_value = Mock()
         mock_installer.return_value = Mock()
 
-        result = self.runner.invoke(main, ["registry", "search", "nonexistent"])
+        result = self.runner.invoke(main, ["search", "nonexistent"])
 
         assert result.exit_code == 0
         assert "No servers found" in result.output

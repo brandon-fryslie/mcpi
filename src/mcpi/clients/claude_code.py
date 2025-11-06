@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import MCPClientPlugin, ScopeHandler
+from .disabled_tracker import DisabledServersTracker
+from .enable_disable_handlers import (
+    ArrayBasedEnableDisableHandler,
+    FileTrackedEnableDisableHandler,
+)
 from .file_based import (
     FileBasedScope,
     JSONFileReader,
@@ -62,7 +67,12 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Get the schemas directory path
         schemas_dir = Path(__file__).parent / "schemas"
 
+        # Create readers/writers (reused across scopes)
+        json_reader = JSONFileReader()
+        json_writer = JSONFileWriter()
+
         # Project-level MCP configuration (.mcp.json)
+        # This scope does NOT support enable/disable (no arrays in .mcp.json format)
         scopes["project-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-mcp",
@@ -71,64 +81,86 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 path=self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json"),
                 is_project_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
+            enable_disable_handler=None,  # project-mcp doesn't support enable/disable
         )
 
         # Project-local Claude settings (.claude/settings.local.json)
+        # This scope DOES support enable/disable via arrays
+        project_local_path = self._get_scope_path(
+            "project-local", Path.cwd() / ".claude" / "settings.local.json"
+        )
         scopes["project-local"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-local",
                 description="Project-local Claude settings (.claude/settings.local.json)",
                 priority=2,
-                path=self._get_scope_path(
-                    "project-local", Path.cwd() / ".claude" / "settings.local.json"
-                ),
+                path=project_local_path,
                 is_project_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "claude-settings-schema.yaml",
+            enable_disable_handler=ArrayBasedEnableDisableHandler(
+                project_local_path, json_reader, json_writer
+            ),
         )
 
         # User-local Claude settings (~/.claude/settings.local.json)
+        # This scope DOES support enable/disable via arrays
+        user_local_path = self._get_scope_path(
+            "user-local", Path.home() / ".claude" / "settings.local.json"
+        )
         scopes["user-local"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-local",
                 description="User-local Claude settings (~/.claude/settings.local.json)",
                 priority=3,
-                path=self._get_scope_path(
-                    "user-local", Path.home() / ".claude" / "settings.local.json"
-                ),
+                path=user_local_path,
                 is_user_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "claude-settings-schema.yaml",
+            enable_disable_handler=ArrayBasedEnableDisableHandler(
+                user_local_path, json_reader, json_writer
+            ),
         )
 
         # User-global Claude settings (~/.claude/settings.json)
+        # This scope does NOT support enable/disable arrays in settings.json format
+        # Instead, use a separate disabled tracking file
+        user_global_path = self._get_scope_path(
+            "user-global", Path.home() / ".claude" / "settings.json"
+        )
+        disabled_tracker_path = self._get_scope_path(
+            "user-global-disabled",
+            Path.home() / ".claude" / ".mcpi-disabled-servers.json",
+        )
         scopes["user-global"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-global",
                 description="User-global Claude settings (~/.claude/settings.json)",
                 priority=4,
-                path=self._get_scope_path(
-                    "user-global", Path.home() / ".claude" / "settings.json"
-                ),
+                path=user_global_path,
                 is_user_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "claude-settings-schema.yaml",
+            enable_disable_handler=FileTrackedEnableDisableHandler(
+                DisabledServersTracker(disabled_tracker_path)
+            ),
         )
 
         # User internal configuration (~/.claude.json)
+        # This scope does NOT support enable/disable (no arrays in this format)
         scopes["user-internal"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-internal",
@@ -139,13 +171,15 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 ),
                 is_user_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "internal-config-schema.yaml",
+            enable_disable_handler=None,  # user-internal doesn't support enable/disable
         )
 
         # User MCP servers configuration (~/.claude/mcp_servers.json)
+        # This scope does NOT support enable/disable (no arrays in .mcp.json format)
         scopes["user-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-mcp",
@@ -156,10 +190,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 ),
                 is_user_level=True,
             ),
-            reader=JSONFileReader(),
-            writer=JSONFileWriter(),
+            reader=json_reader,
+            writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
+            enable_disable_handler=None,  # user-mcp doesn't support enable/disable
         )
 
         return scopes
@@ -167,51 +202,35 @@ class ClaudeCodePlugin(MCPClientPlugin):
     def _get_server_state(self, server_id: str, scope: str) -> ServerState:
         """Get the actual state of a server in a specific scope.
 
-        BUG-FIX: This now only checks the SERVER'S OWN SCOPE for enable/disable state,
-        preventing cross-scope pollution where a server in user-global would show as
-        DISABLED because it appeared in user-local's disabledMcpjsonServers array.
+        Uses the scope's enable/disable handler to determine state. Different scopes
+        have different mechanisms:
+        - project-local, user-local: Use enabledMcpjsonServers/disabledMcpjsonServers arrays
+        - user-global: Uses separate disabled tracking file
+        - Other scopes: Don't support enable/disable (always ENABLED)
 
         Args:
             server_id: Server identifier
-            scope: The scope where the server exists (ONLY check this scope's arrays)
+            scope: The scope where the server exists (ONLY check this scope)
 
         Returns:
             Server state (ENABLED, DISABLED, or NOT_INSTALLED)
         """
-        # Only check the server's own scope for enable/disable arrays
         if scope not in self._scopes:
             return ServerState.ENABLED
 
         handler = self._scopes[scope]
 
-        # Only check if this scope supports enable/disable arrays
-        # user-global does NOT have these arrays, so servers there are always ENABLED
-        if not handler.exists():
-            return ServerState.ENABLED
-
-        try:
-            current_data = handler.reader.read(handler.config.path)
-
-            # Only check arrays if this scope format supports them
-            # project-local and user-local have these arrays
-            # user-global does NOT (it only has mcpServers)
-            enabled_servers = current_data.get("enabledMcpjsonServers", [])
-            disabled_servers = current_data.get("disabledMcpjsonServers", [])
-
-            # If explicitly disabled IN THIS SCOPE, return DISABLED
-            if server_id in disabled_servers:
+        # If this scope has an enable/disable handler, use it
+        if (
+            hasattr(handler, "enable_disable_handler")
+            and handler.enable_disable_handler
+        ):
+            if handler.enable_disable_handler.is_disabled(server_id):
                 return ServerState.DISABLED
-
-            # If explicitly enabled IN THIS SCOPE, return ENABLED
-            if server_id in enabled_servers:
+            else:
                 return ServerState.ENABLED
 
-        except Exception:
-            # If we can't read the settings file, default to ENABLED
-            pass
-
-        # If server exists in config but not in any enable/disable array, default to ENABLED
-        # (This matches Claude's behavior where servers are enabled by default)
+        # No enable/disable handler means servers are always enabled
         return ServerState.ENABLED
 
     def list_servers(self, scope: Optional[str] = None) -> Dict[str, ServerInfo]:
@@ -335,11 +354,12 @@ class ClaudeCodePlugin(MCPClientPlugin):
         return self._get_server_state(server_id, server_scope)
 
     def enable_server(self, server_id: str) -> OperationResult:
-        """Enable a server using Claude's actual format.
+        """Enable a server in its current scope.
 
-        BUG-FIX: This now finds the server's ACTUAL SCOPE first, then only modifies
-        that specific scope. Previously it modified the FIRST settings scope it found,
-        which could be wrong.
+        Uses scope-specific enable/disable handlers:
+        - project-local, user-local: Modifies enabledMcpjsonServers/disabledMcpjsonServers arrays
+        - user-global: Removes from separate disabled tracking file (~/.claude/.mcpi-disabled-servers.json)
+        - Other scopes: Don't support enable/disable (return success as already enabled)
 
         Args:
             server_id: Server identifier
@@ -347,7 +367,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
         Returns:
             Operation result
         """
-        # BUG-FIX: Find the server's actual scope first
+        # Find the server's actual scope
         server_scope = None
         for scope_name, handler in self._scopes.items():
             if handler.has_server(server_id):
@@ -359,58 +379,37 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 f"Server '{server_id}' not found in any scope"
             )
 
-        # Check if this scope supports enable/disable arrays
-        # user-global does NOT support these arrays
-        if server_scope == "user-global":
-            # For user-global, servers are always enabled (no enable/disable arrays)
-            # Don't modify any other scope - that would be wrong!
-            return OperationResult.success_result(
-                f"Server '{server_id}' in user-global scope is always enabled "
-                "(user-global does not support enable/disable arrays)"
-            )
-
-        # Only modify the server's actual scope
+        # Get the scope handler
         handler = self._scopes[server_scope]
 
-        # Read current settings file
-        if handler.exists():
-            current_data = handler.reader.read(handler.config.path)
-        else:
-            current_data = {}
+        # Check if this scope supports enable/disable
+        if (
+            not hasattr(handler, "enable_disable_handler")
+            or not handler.enable_disable_handler
+        ):
+            # Scopes without enable/disable support have servers always enabled
+            return OperationResult.success_result(
+                f"Server '{server_id}' in scope '{server_scope}' is always enabled "
+                f"(scope does not support enable/disable)"
+            )
 
-        # Initialize arrays if they don't exist
-        enabled_servers = current_data.get("enabledMcpjsonServers", [])
-        disabled_servers = current_data.get("disabledMcpjsonServers", [])
-
-        # Remove from disabled array if present
-        if server_id in disabled_servers:
-            disabled_servers.remove(server_id)
-
-        # Add to enabled array if not already there
-        if server_id not in enabled_servers:
-            enabled_servers.append(server_id)
-
-        # Update the data
-        current_data["enabledMcpjsonServers"] = enabled_servers
-        current_data["disabledMcpjsonServers"] = disabled_servers
-
-        # Write back to file
-        try:
-            handler.writer.write(handler.config.path, current_data)
+        # Use the scope's enable/disable handler
+        if handler.enable_disable_handler.enable(server_id):
             return OperationResult.success_result(
                 f"Enabled server '{server_id}' in scope '{server_scope}'"
             )
-        except Exception as e:
+        else:
             return OperationResult.failure_result(
-                f"Failed to enable server '{server_id}': {e}"
+                f"Failed to enable server '{server_id}' in scope '{server_scope}'"
             )
 
     def disable_server(self, server_id: str) -> OperationResult:
-        """Disable a server using Claude's actual format.
+        """Disable a server in its current scope.
 
-        BUG-FIX: This now finds the server's ACTUAL SCOPE first, then only modifies
-        that specific scope. Previously it modified the FIRST settings scope it found,
-        which could be wrong.
+        Uses scope-specific enable/disable handlers:
+        - project-local, user-local: Modifies enabledMcpjsonServers/disabledMcpjsonServers arrays
+        - user-global: Writes to separate disabled tracking file (~/.claude/.mcpi-disabled-servers.json)
+        - Other scopes: Don't support disable (return failure)
 
         Args:
             server_id: Server identifier
@@ -418,7 +417,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
         Returns:
             Operation result
         """
-        # BUG-FIX: Find the server's actual scope first
+        # Find the server's actual scope
         server_scope = None
         for scope_name, handler in self._scopes.items():
             if handler.has_server(server_id):
@@ -430,50 +429,26 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 f"Server '{server_id}' not found in any scope"
             )
 
-        # Check if this scope supports enable/disable arrays
-        # user-global does NOT support these arrays
-        if server_scope == "user-global":
-            # For user-global, servers cannot be disabled (no enable/disable arrays)
-            # Don't modify any other scope - that would be wrong!
-            return OperationResult.success_result(
-                f"Server '{server_id}' in user-global scope cannot be disabled "
-                "(user-global does not support enable/disable arrays)"
-            )
-
-        # Only modify the server's actual scope
+        # Get the scope handler
         handler = self._scopes[server_scope]
 
-        # Read current settings file
-        if handler.exists():
-            current_data = handler.reader.read(handler.config.path)
-        else:
-            current_data = {}
+        # Check if this scope supports enable/disable
+        if (
+            not hasattr(handler, "enable_disable_handler")
+            or not handler.enable_disable_handler
+        ):
+            return OperationResult.failure_result(
+                f"Scope '{server_scope}' does not support enable/disable operations"
+            )
 
-        # Initialize arrays if they don't exist
-        enabled_servers = current_data.get("enabledMcpjsonServers", [])
-        disabled_servers = current_data.get("disabledMcpjsonServers", [])
-
-        # Remove from enabled array if present
-        if server_id in enabled_servers:
-            enabled_servers.remove(server_id)
-
-        # Add to disabled array if not already there
-        if server_id not in disabled_servers:
-            disabled_servers.append(server_id)
-
-        # Update the data
-        current_data["enabledMcpjsonServers"] = enabled_servers
-        current_data["disabledMcpjsonServers"] = disabled_servers
-
-        # Write back to file
-        try:
-            handler.writer.write(handler.config.path, current_data)
+        # Use the scope's enable/disable handler
+        if handler.enable_disable_handler.disable(server_id):
             return OperationResult.success_result(
                 f"Disabled server '{server_id}' in scope '{server_scope}'"
             )
-        except Exception as e:
+        else:
             return OperationResult.failure_result(
-                f"Failed to disable server '{server_id}': {e}"
+                f"Failed to disable server '{server_id}' in scope '{server_scope}'"
             )
 
     def validate_server_config(self, config: ServerConfig) -> List[str]:

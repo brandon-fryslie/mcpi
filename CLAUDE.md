@@ -5,6 +5,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Environment Setup
+
+**Important for macOS iCloud Drive**: This repository supports development in iCloud Drive with special configuration to avoid intermittent import issues caused by iCloud's hidden file flags.
+
+**Option 1: .venv.nosync (Recommended for full development)**
+```bash
+# Use .venv.nosync (excluded from iCloud sync)
+python -m venv .venv.nosync
+source .venv.nosync/bin/activate  # via symlink: source .venv/bin/activate
+pip install -e .
+pip install pytest pytest-cov black ruff mypy
+```
+
+**Option 2: UV Tool Install (Recommended for CLI development)**
+```bash
+# Install as UV tool (stored in ~/.local/, not in iCloud)
+uv tool install --editable .
+
+# Use from anywhere
+mcpi --help
+
+# For testing (no activation needed)
+pytest  # Uses pythonpath from pyproject.toml
+```
+
+**Standard setup (works outside iCloud Drive)**
 ```bash
 # Development installation
 uv sync
@@ -13,6 +38,8 @@ source .venv/bin/activate
 # Install development dependencies
 uv sync --dev
 ```
+
+**Current Configuration**: This project is configured with `.venv` as a symlink to `.venv.nosync`, making it safe for iCloud Drive development while maintaining compatibility with standard tooling.
 
 ### Testing
 ```bash

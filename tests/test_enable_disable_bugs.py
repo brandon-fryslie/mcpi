@@ -276,9 +276,9 @@ class TestCrossScopeStatePollution:
 
         # User-global should be ENABLED (not affected by user-local's disabled array)
         assert user_global_id in servers
-        assert servers[user_global_id].state == ServerState.ENABLED, (
-            "BUG-1: user-global server polluted by user-local's disabled array"
-        )
+        assert (
+            servers[user_global_id].state == ServerState.ENABLED
+        ), "BUG-1: user-global server polluted by user-local's disabled array"
 
         # User-local should be DISABLED (correctly reflects its own state)
         assert user_local_id in servers
@@ -286,9 +286,9 @@ class TestCrossScopeStatePollution:
 
         # Project-local should be ENABLED (not affected by user-local's disabled array)
         assert project_local_id in servers
-        assert servers[project_local_id].state == ServerState.ENABLED, (
-            "BUG-1: project-local server polluted by user-local's disabled array"
-        )
+        assert (
+            servers[project_local_id].state == ServerState.ENABLED
+        ), "BUG-1: project-local server polluted by user-local's disabled array"
 
 
 class TestWrongScopeModification:
@@ -362,7 +362,9 @@ class TestWrongScopeModification:
 
         if result.success:
             # If operation succeeded, verify user-local was NOT modified
-            assert "test-server" not in user_local_after.get("disabledMcpjsonServers", []), (
+            assert "test-server" not in user_local_after.get(
+                "disabledMcpjsonServers", []
+            ), (
                 "BUG-3: Disabling user-global server modified user-local scope! "
                 "This is wrong - should only modify the server's own scope."
             )
@@ -428,15 +430,15 @@ class TestWrongScopeModification:
 
         # Verify: user-local was modified correctly
         user_local_after = mcp_harness.read_scope_file("user-local")
-        assert "test-server" in user_local_after["disabledMcpjsonServers"], (
-            "Server was not added to disabledMcpjsonServers"
-        )
+        assert (
+            "test-server" in user_local_after["disabledMcpjsonServers"]
+        ), "Server was not added to disabledMcpjsonServers"
 
         # Verify: user-global was NOT modified
         user_global_after = mcp_harness.read_scope_file("user-global")
-        assert "disabledMcpjsonServers" not in user_global_after, (
-            "user-global should not have disabledMcpjsonServers array"
-        )
+        assert (
+            "disabledMcpjsonServers" not in user_global_after
+        ), "user-global should not have disabledMcpjsonServers array"
 
     def test_enable_server_in_user_local_modifies_correct_scope(
         self, plugin, mcp_harness
@@ -481,12 +483,12 @@ class TestWrongScopeModification:
 
         # Verify: user-local was modified correctly
         user_local_after = mcp_harness.read_scope_file("user-local")
-        assert "test-server" not in user_local_after.get("disabledMcpjsonServers", []), (
-            "Server was not removed from disabledMcpjsonServers"
-        )
-        assert "test-server" in user_local_after.get("enabledMcpjsonServers", []), (
-            "Server was not added to enabledMcpjsonServers"
-        )
+        assert "test-server" not in user_local_after.get(
+            "disabledMcpjsonServers", []
+        ), "Server was not removed from disabledMcpjsonServers"
+        assert "test-server" in user_local_after.get(
+            "enabledMcpjsonServers", []
+        ), "Server was not added to enabledMcpjsonServers"
 
         # Verify: user-global was NOT modified
         user_global_after = mcp_harness.read_scope_file("user-global")
@@ -528,7 +530,9 @@ class TestWrongScopeModification:
         # Verify: Server appears only once in disabled array
         user_local = mcp_harness.read_scope_file("user-local")
         disabled_count = user_local["disabledMcpjsonServers"].count("test-server")
-        assert disabled_count == 1, f"Server appears {disabled_count} times in disabled array"
+        assert (
+            disabled_count == 1
+        ), f"Server appears {disabled_count} times in disabled array"
 
         # Execute: Enable twice
         result3 = plugin.enable_server("test-server")
@@ -541,7 +545,9 @@ class TestWrongScopeModification:
         # Verify: Server appears only once in enabled array, not in disabled
         user_local = mcp_harness.read_scope_file("user-local")
         enabled_count = user_local["enabledMcpjsonServers"].count("test-server")
-        assert enabled_count == 1, f"Server appears {enabled_count} times in enabled array"
+        assert (
+            enabled_count == 1
+        ), f"Server appears {enabled_count} times in enabled array"
         assert "test-server" not in user_local["disabledMcpjsonServers"]
 
 
@@ -595,7 +601,9 @@ class TestListServersWithCorrectState:
             "user-local",
             {
                 "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": ["server-a"],  # Should NOT affect user-global!
+                "disabledMcpjsonServers": [
+                    "server-a"
+                ],  # Should NOT affect user-global!
                 "mcpServers": {
                     "server-c": {
                         "command": "npx",
@@ -611,9 +619,9 @@ class TestListServersWithCorrectState:
 
         # Verify: user-global servers show correct state
         assert "claude-code:user-global:server-a" in servers
-        assert servers["claude-code:user-global:server-a"].state == ServerState.ENABLED, (
-            "BUG-1: user-global:server-a shows wrong state (polluted by user-local)"
-        )
+        assert (
+            servers["claude-code:user-global:server-a"].state == ServerState.ENABLED
+        ), "BUG-1: user-global:server-a shows wrong state (polluted by user-local)"
 
         assert "claude-code:user-global:server-b" in servers
         assert servers["claude-code:user-global:server-b"].state == ServerState.ENABLED
@@ -668,7 +676,9 @@ class TestListServersWithCorrectState:
         assert "claude-code:user-local:test-server" not in servers
 
         # Verify: user-global server has correct state
-        assert servers["claude-code:user-global:test-server"].state == ServerState.ENABLED
+        assert (
+            servers["claude-code:user-global:test-server"].state == ServerState.ENABLED
+        )
 
 
 class TestOriginalBugClientInfo:
@@ -690,7 +700,9 @@ class TestOriginalBugClientInfo:
         """
         # This test is documented here but should be implemented in test_cli.py
         # See BUG-FIX-PLAN-ENABLE-DISABLE.md for details
-        pytest.skip("This test belongs in test_cli.py - documented here for completeness")
+        pytest.skip(
+            "This test belongs in test_cli.py - documented here for completeness"
+        )
 
 
 # Summary of Test Coverage

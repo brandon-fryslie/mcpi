@@ -44,7 +44,6 @@ These tests cannot be gamed because:
 5. They assert on OBSERVABLE outcomes (what users would see)
 """
 
-
 import pytest
 
 from mcpi.clients.claude_code import ClaudeCodePlugin

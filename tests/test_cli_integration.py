@@ -59,25 +59,6 @@ class TestCliIntegration:
                 assert isinstance(data, list)
                 assert len(data) == 0
 
-    def test_registry_list_with_real_data(self):
-        """Test registry list with actual registry data."""
-        result = self.runner.invoke(main, ["registry", "list"])
-        # Should succeed whether registry exists or not
-        assert result.exit_code == 0
-        # Should either show servers or "No servers found"
-        assert "servers" in result.output.lower() or "Total:" in result.output
-
-    def test_registry_list_json(self):
-        """Test registry list --json format."""
-        result = self.runner.invoke(main, ["registry", "list", "--json"])
-        assert result.exit_code == 0
-        # Should be valid JSON
-        try:
-            data = json.loads(result.output)
-            assert isinstance(data, list)
-        except json.JSONDecodeError:
-            assert False, "Output is not valid JSON"
-
     def test_registry_validate(self):
         """Test registry validation."""
         result = self.runner.invoke(main, ["registry", "validate"])
@@ -86,15 +67,15 @@ class TestCliIntegration:
         assert "Registry" in result.output or "Error" in result.output
 
     def test_registry_search(self):
-        """Test registry search functionality."""
-        result = self.runner.invoke(main, ["registry", "search", "filesystem"])
+        """Test search functionality."""
+        result = self.runner.invoke(main, ["search", "filesystem"])
         assert result.exit_code == 0
         # Should show search results or "No servers found"
         assert "Search Results" in result.output or "No servers found" in result.output
 
-    def test_registry_show_nonexistent(self):
+    def test_info_nonexistent(self):
         """Test showing a nonexistent server."""
-        result = self.runner.invoke(main, ["registry", "show", "nonexistent-server"])
+        result = self.runner.invoke(main, ["info", "nonexistent-server"])
         assert result.exit_code == 1
         assert "not found" in result.output
 
