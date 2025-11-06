@@ -186,10 +186,21 @@ def build_fzf_command() -> List[str]:
     # We use awk to extract the server-id (field 2)
     extract_id = "awk '{print $2}'"
 
+    # Multi-line header for better readability on narrow terminals
+    # Line 1: Title (19 chars)
+    # Line 2: Operation shortcuts (60 chars)
+    # Line 3: Info/Exit shortcuts (37 chars)
+    # All lines <= 80 chars to fit 80-column terminals
+    header = (
+        "MCPI Server Manager\n"
+        "ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable\n"
+        "ctrl-i:Info  enter:Info  esc:Exit"
+    )
+
     return [
         "fzf",
         "--ansi",  # Enable ANSI color codes
-        "--header=MCPI Server Manager | ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable  ctrl-i:Info  enter:Info  esc:Exit",
+        f"--header={header}",
         "--header-lines=0",
         "--layout=reverse",
         "--border",
