@@ -46,7 +46,15 @@ class InstallationResult:
 
 
 class BaseInstaller(ABC):
-    """Base class for MCP server installers."""
+    """Base class for MCP server installers.
+
+    Note: With the simplified MCPServer catalog format (command + args),
+    this installer no longer handles package installation. Servers in the
+    catalog are assumed to be runnable as-is (e.g., via npx).
+
+    The installer's job is simply to add server configurations to client
+    config files.
+    """
 
     def __init__(self, config_path: Optional[Path] = None, dry_run: bool = False):
         """Initialize the installer.
@@ -61,12 +69,16 @@ class BaseInstaller(ABC):
 
     @abstractmethod
     def install(
-        self, server: MCPServer, config_params: Optional[Dict[str, Any]] = None
+        self,
+        server: MCPServer,
+        server_id: str,
+        config_params: Optional[Dict[str, Any]] = None,
     ) -> InstallationResult:
         """Install an MCP server.
 
         Args:
             server: MCP server to install
+            server_id: Server ID (since MCPServer doesn't have id field)
             config_params: Configuration parameters
 
         Returns:
@@ -107,54 +119,26 @@ class BaseInstaller(ABC):
         """
         pass
 
-    def validate_installation(self, server: MCPServer) -> List[str]:
+    def validate_installation(self, server: MCPServer, server_id: str) -> List[str]:
         """Validate installation requirements.
+
+        With the simplified catalog format, validation is minimal - we just
+        check that the server has a valid command.
 
         Args:
             server: Server to validate
+            server_id: Server ID (since MCPServer doesn't have id field)
 
         Returns:
-            List of validation error messages
+            List of validation error messages (empty if valid)
         """
         errors = []
 
-        # Check system dependencies
-        for dep in server.installation.system_dependencies:
-            if not self._check_system_dependency(dep):
-                errors.append(f"Missing system dependency: {dep}")
-
-        # Check if installer can handle this installation method
-        if not self._supports_method(server.installation.method):
-            errors.append(
-                f"Installation method not supported: {server.installation.method}"
-            )
+        # Basic validation - ensure command exists
+        if not server.command or not server.command.strip():
+            errors.append("Server has no command specified")
 
         return errors
-
-    def _check_system_dependency(self, dependency: str) -> bool:
-        """Check if system dependency is available.
-
-        Args:
-            dependency: System dependency to check
-
-        Returns:
-            True if available, False otherwise
-        """
-        import shutil
-
-        return shutil.which(dependency) is not None
-
-    @abstractmethod
-    def _supports_method(self, method: str) -> bool:
-        """Check if installer supports the given method.
-
-        Args:
-            method: Installation method
-
-        Returns:
-            True if supported, False otherwise
-        """
-        pass
 
     def create_backup(self, file_path: Path) -> Optional[Path]:
         """Create backup of configuration file.

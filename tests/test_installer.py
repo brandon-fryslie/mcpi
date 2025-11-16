@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from mcpi.installer.base import BaseInstaller, InstallationResult, InstallationStatus
 from mcpi.installer.claude_code import ClaudeCodeInstaller
@@ -13,18 +14,22 @@ from mcpi.registry.catalog import MCPServer
 
 
 class MockInstaller(BaseInstaller):
-    """Mock installer for testing base functionality."""
+    """Mock installer for testing base functionality.
+
+    Note: Updated to work with simplified MCPServer schema (no server.id).
+    """
 
     def __init__(self, dry_run: bool = False):
         super().__init__(dry_run=dry_run)
         self.installed_servers = set()
 
-    def install(self, server, config_params=None):
-        if server.id in self.installed_servers:
-            return self._create_failure_result(server.id, "Already installed")
+    def install(self, server, server_id, config_params=None):
+        """Install with server_id parameter."""
+        if server_id in self.installed_servers:
+            return self._create_failure_result(server_id, "Already installed")
 
-        self.installed_servers.add(server.id)
-        return self._create_success_result(server.id, "Installed successfully")
+        self.installed_servers.add(server_id)
+        return self._create_success_result(server_id, "Installed successfully")
 
     def uninstall(self, server_id):
         if server_id not in self.installed_servers:
@@ -38,9 +43,6 @@ class MockInstaller(BaseInstaller):
 
     def get_installed_servers(self):
         return list(self.installed_servers)
-
-    def _supports_method(self, method):
-        return True
 
 
 class TestBaseInstaller:
@@ -109,36 +111,38 @@ class TestBaseInstaller:
         assert restored_content == test_content
 
     def test_validate_installation(self):
-        """Test installation validation."""
+        """Test installation validation with simplified MCPServer schema."""
         installer = MockInstaller()
 
-        # Create test server with system dependency
+        # Create test server with simplified schema (command + args only)
         server_data = {
-            "id": "test_server",
-            "name": "Test Server",
-            "description": "Test",
-            "command": "npx",  # Required field
-            "category": ["test"],
-            "author": "Test",
-            "versions": {"latest": "1.0.0", "supported": ["1.0.0"]},
-            "installation": {
-                "method": "npm",
-                "package": "test-package",
-                "system_dependencies": ["nonexistent-dependency"],
-                "python_dependencies": [],
-            },
-            "configuration": {},
-            "capabilities": [],
-            "platforms": ["linux"],
-            "license": "MIT",
+            "description": "Test MCP server",
+            "command": "npx",
+            "args": ["-y", "@test/mcp-server"],
         }
 
         server = MCPServer(**server_data)
-        errors = installer.validate_installation(server)
+        errors = installer.validate_installation(server, "test_server")
 
-        # Should have error for missing system dependency
-        assert len(errors) > 0
-        assert any("nonexistent-dependency" in error for error in errors)
+        # Should have no errors - simplified validation just checks command exists
+        assert len(errors) == 0
+
+    def test_validate_installation_missing_command(self):
+        """Test that Pydantic rejects servers with empty command."""
+        # With the simplified schema, Pydantic's validator prevents
+        # creating servers with empty commands
+        server_data = {
+            "description": "Test MCP server",
+            "command": "",  # Empty command should fail validation
+            "args": [],
+        }
+
+        # Should raise ValidationError during model creation
+        with pytest.raises(ValidationError) as exc_info:
+            MCPServer(**server_data)
+
+        # Verify error is about empty command
+        assert "command" in str(exc_info.value).lower()
 
 
 class TestClaudeCodeInstaller:
@@ -162,7 +166,7 @@ class TestClaudeCodeInstaller:
     def test_load_empty_config(self, tmp_path):
         """Test loading empty or non-existent config."""
         config_path = tmp_path / "mcp_servers.json"
-        installer = ClaudeCodeInstaller(config_path=config_path, dry_run=True)
+        installer = ClaudeCodeInstaller(config_path=config_path)
 
         config = installer._load_config()
         assert config == {"mcpServers": {}}
@@ -179,7 +183,7 @@ class TestClaudeCodeInstaller:
         with open(config_path, "w") as f:
             json.dump(test_config, f)
 
-        installer = ClaudeCodeInstaller(config_path=config_path, dry_run=True)
+        installer = ClaudeCodeInstaller(config_path=config_path)
         config = installer._load_config()
 
         assert config == test_config
@@ -197,7 +201,7 @@ class TestClaudeCodeInstaller:
         with open(config_path, "w") as f:
             json.dump(test_config, f)
 
-        installer = ClaudeCodeInstaller(config_path=config_path, dry_run=True)
+        installer = ClaudeCodeInstaller(config_path=config_path)
 
         assert installer.is_installed("installed_server") is True
         assert installer.is_installed("not_installed") is False
@@ -215,7 +219,7 @@ class TestClaudeCodeInstaller:
         with open(config_path, "w") as f:
             json.dump(test_config, f)
 
-        installer = ClaudeCodeInstaller(config_path=config_path, dry_run=True)
+        installer = ClaudeCodeInstaller(config_path=config_path)
         installed = installer.get_installed_servers()
 
         assert len(installed) == 2
@@ -236,7 +240,7 @@ class TestClaudeCodeInstaller:
         with open(config_path, "w") as f:
             json.dump(valid_config, f)
 
-        installer = ClaudeCodeInstaller(config_path=config_path, dry_run=True)
+        installer = ClaudeCodeInstaller(config_path=config_path)
         errors = installer.validate_config()
         assert len(errors) == 0
 
@@ -257,9 +261,75 @@ class TestClaudeCodeInstaller:
         assert len(errors) > 0
         assert any("Missing 'args' field" in error for error in errors)
 
+    def test_install_server(self, tmp_path):
+        """Test installing a server with simplified schema."""
+        config_path = tmp_path / "mcp_servers.json"
+        installer = ClaudeCodeInstaller(config_path=config_path)
+
+        # Create a simple server
+        server = MCPServer(
+            description="Test server",
+            command="npx",
+            args=["-y", "@test/mcp-server"],
+        )
+
+        result = installer.install(server, "test-server")
+
+        assert result.success is True
+        assert result.server_id == "test-server"
+        assert installer.is_installed("test-server") is True
+
+    def test_install_already_installed(self, tmp_path):
+        """Test installing a server that's already installed."""
+        config_path = tmp_path / "mcp_servers.json"
+        test_config = {
+            "mcpServers": {
+                "existing_server": {"command": "npx", "args": ["existing-package"]}
+            }
+        }
+
+        with open(config_path, "w") as f:
+            json.dump(test_config, f)
+
+        installer = ClaudeCodeInstaller(config_path=config_path)
+
+        server = MCPServer(
+            description="Existing server",
+            command="npx",
+            args=["-y", "existing-package"],
+        )
+
+        result = installer.install(server, "existing_server")
+
+        assert result.failed is True
+        assert "already installed" in result.message.lower()
+
+    def test_uninstall_server(self, tmp_path):
+        """Test uninstalling a server."""
+        config_path = tmp_path / "mcp_servers.json"
+        test_config = {
+            "mcpServers": {
+                "test_server": {"command": "npx", "args": ["test-package"]}
+            }
+        }
+
+        with open(config_path, "w") as f:
+            json.dump(test_config, f)
+
+        installer = ClaudeCodeInstaller(config_path=config_path)
+
+        result = installer.uninstall("test_server")
+
+        assert result.success is True
+        assert installer.is_installed("test_server") is False
+
 
 class TestNPMInstaller:
-    """Tests for NPMInstaller class."""
+    """Tests for NPMInstaller class.
+
+    Note: These tests are for the legacy NPM installer that's no longer
+    used by the CLI. Kept for backwards compatibility.
+    """
 
     @patch("mcpi.installer.npm.subprocess.run")
     def test_check_npm_available(self, mock_run):
@@ -309,63 +379,27 @@ class TestNPMInstaller:
         assert "[DRY RUN]" in result.stdout
         assert "npm install test-package" in result.stdout
 
-    def test_supports_method(self):
-        """Test installation method support."""
-        installer = NPMInstaller(dry_run=True)
 
-        assert installer._supports_method("npm") is True
-        assert installer._supports_method("pip") is False
-        assert installer._supports_method("git") is False
-
-
+# Simplified fixtures for new schema
 @pytest.fixture
 def sample_server():
-    """Fixture providing a sample MCP server for testing."""
+    """Fixture providing a sample MCP server with simplified schema."""
     return MCPServer(
-        **{
-            "id": "test_server",
-            "name": "Test Server",
-            "description": "A test MCP server",
-            "category": ["test"],
-            "author": "Test Author",
-            "versions": {"latest": "1.0.0", "supported": ["1.0.0"]},
-            "installation": {
-                "method": "npm",
-                "package": "test-mcp-server",
-                "system_dependencies": [],
-                "python_dependencies": [],
-            },
-            "configuration": {
-                "required_params": ["test_param"],
-                "optional_params": ["optional_param"],
-            },
-            "capabilities": ["test_capability"],
-            "platforms": ["linux", "darwin", "windows"],
-            "license": "MIT",
-        }
+        description="A test MCP server",
+        command="npx",
+        args=["-y", "@test/mcp-server"],
+        repository="https://github.com/test/mcp-server",
+        categories=["test", "development"],
     )
 
 
 @pytest.fixture
 def npm_server():
-    """Fixture providing an npm-based MCP server for testing."""
+    """Fixture providing an npm-based MCP server with simplified schema."""
     return MCPServer(
-        **{
-            "id": "npm_server",
-            "name": "NPM Test Server",
-            "description": "NPM-based test server",
-            "category": ["test"],
-            "author": "Test",
-            "versions": {"latest": "1.0.0", "supported": ["1.0.0"]},
-            "installation": {
-                "method": "npm",
-                "package": "@test/mcp-server",
-                "system_dependencies": [],
-                "python_dependencies": [],
-            },
-            "configuration": {},
-            "capabilities": [],
-            "platforms": ["linux", "darwin", "windows"],
-            "license": "MIT",
-        }
+        description="NPM-based test server",
+        command="npx",
+        args=["-y", "@anthropic/mcp-server-test"],
+        repository="https://github.com/test/npm-server",
+        categories=["npm", "test"],
     )

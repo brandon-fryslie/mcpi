@@ -7,17 +7,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcpi.installer.base import BaseInstaller, InstallationResult
-from mcpi.installer.git import GitInstaller
-from mcpi.installer.npm import NPMInstaller
-from mcpi.installer.python import PythonInstaller
-from mcpi.registry.catalog import InstallationMethod, MCPServer
+from mcpi.registry.catalog import MCPServer
 
 # Configuration constants
 MCP_SERVERS_KEY = "mcpServers"
 
 
 class ClaudeCodeInstaller(BaseInstaller):
-    """Installer for Claude Code MCP server integration."""
+    """Installer for Claude Code MCP server integration.
+
+    Note: With the simplified MCPServer catalog format, this installer
+    no longer handles package installation. It simply adds server
+    configurations to Claude Code's MCP config file.
+    """
 
     def __init__(self, config_path: Optional[Path] = None, dry_run: bool = False):
         """Initialize Claude Code installer.
@@ -30,11 +32,6 @@ class ClaudeCodeInstaller(BaseInstaller):
             config_path = self._find_claude_code_config()
 
         super().__init__(config_path=config_path, dry_run=dry_run)
-
-        # Initialize method-specific installers
-        self.npm_installer = NPMInstaller(dry_run=dry_run)
-        self.python_installer = PythonInstaller(dry_run=dry_run)
-        self.git_installer = GitInstaller(dry_run=dry_run)
 
     def _find_claude_code_config(self) -> Path:
         """Find Claude Code MCP configuration file.
@@ -95,12 +92,16 @@ class ClaudeCodeInstaller(BaseInstaller):
             return False
 
     def install(
-        self, server: MCPServer, config_params: Optional[Dict[str, Any]] = None
+        self,
+        server: MCPServer,
+        server_id: str,
+        config_params: Optional[Dict[str, Any]] = None,
     ) -> InstallationResult:
         """Install MCP server for Claude Code.
 
         Args:
             server: MCP server to install
+            server_id: Server ID (catalog key)
             config_params: Configuration parameters
 
         Returns:
@@ -110,26 +111,21 @@ class ClaudeCodeInstaller(BaseInstaller):
             config_params = {}
 
         # Validate installation requirements
-        validation_errors = self.validate_installation(server)
+        validation_errors = self.validate_installation(server, server_id)
         if validation_errors:
             return self._create_failure_result(
-                server.id,
+                server_id,
                 f"Validation failed: {'; '.join(validation_errors)}",
                 validation_errors=validation_errors,
             )
 
         # Check if already installed
-        if self.is_installed(server.id):
+        if self.is_installed(server_id):
             return self._create_failure_result(
-                server.id,
-                f"Server {server.id} is already installed",
+                server_id,
+                f"Server {server_id} is already installed",
                 already_installed=True,
             )
-
-        # Install the server package using appropriate method
-        package_result = self._install_package(server)
-        if not package_result.success:
-            return package_result
 
         # Create backup of existing configuration
         backup_path = self.create_backup(self.config_path)
@@ -137,130 +133,54 @@ class ClaudeCodeInstaller(BaseInstaller):
         # Load current configuration
         config = self._load_config()
 
-        # Generate server configuration
-        server_config = self._generate_server_config(
-            server, config_params, package_result.details
-        )
+        # Generate server configuration from catalog entry
+        server_config = self._generate_server_config(server, config_params)
 
         # Add server to configuration
-        config[MCP_SERVERS_KEY][server.id] = server_config
+        config[MCP_SERVERS_KEY][server_id] = server_config
 
         # Save updated configuration
         if not self._save_config(config):
             return self._create_failure_result(
-                server.id,
+                server_id,
                 "Failed to save Claude Code configuration",
                 backup_path=backup_path,
             )
 
         return self._create_success_result(
-            server.id,
-            f"Successfully installed {server.name} for Claude Code",
+            server_id,
+            f"Successfully installed {server_id} for Claude Code",
             config_path=self.config_path,
             backup_path=backup_path,
             server_config=server_config,
-            package_details=package_result.details,
         )
-
-    def _install_package(self, server: MCPServer) -> InstallationResult:
-        """Install the server package using appropriate method.
-
-        Args:
-            server: Server to install
-
-        Returns:
-            Installation result
-        """
-        if server.installation.method == InstallationMethod.NPM:
-            return self.npm_installer.install(server)
-        elif server.installation.method == InstallationMethod.PIP:
-            return self.python_installer.install(server)
-        elif server.installation.method == InstallationMethod.GIT:
-            return self.git_installer.install(server)
-        else:
-            return self._create_failure_result(
-                server.id,
-                f"Unsupported installation method: {server.installation.method}",
-            )
 
     def _generate_server_config(
         self,
         server: MCPServer,
         config_params: Dict[str, Any],
-        package_details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate Claude Code server configuration.
 
         Args:
-            server: MCP server
+            server: MCP server (from catalog)
             config_params: User-provided configuration parameters
-            package_details: Details from package installation
 
         Returns:
             Claude Code server configuration
         """
-        if package_details is None:
-            package_details = {}
+        # Start with command and args from catalog
+        config = {"command": server.command, "args": server.args.copy()}
 
-        config = {}
-
-        if server.installation.method == InstallationMethod.NPM:
-            config["command"] = "npx"
-            config["args"] = [server.installation.package]
-        elif server.installation.method == InstallationMethod.PIP:
-            # For Python packages, we need to determine the executable path
-            python_path = package_details.get("python_path", "python3")
-            module_path = package_details.get(
-                "module_path", server.installation.package
-            )
-            config["command"] = python_path
-            config["args"] = ["-m", module_path]
-        elif server.installation.method == InstallationMethod.GIT:
-            # For Git installations, use the installed script
-            script_path = package_details.get("script_path")
-            if script_path:
-                config["command"] = str(script_path)
-                config["args"] = []
-            else:
-                config["command"] = "python3"
-                config["args"] = [str(package_details.get("install_path", ""))]
-
-        # Add configuration parameters as arguments
-        for param in server.configuration.required_params:
-            if param in config_params:
-                config["args"].append(str(config_params[param]))
-            else:
-                # Use default values or prompt user
-                default_value = self._get_default_param_value(param)
-                if default_value:
-                    config["args"].append(default_value)
-
-        # Add optional parameters
-        for param in server.configuration.optional_params:
-            if param in config_params:
-                config["args"].extend([f"--{param}", str(config_params[param])])
-
-        # Add environment variables if needed
+        # Add environment variables if provided
         if "env" in config_params:
             config["env"] = config_params["env"]
 
+        # Add any additional args from config_params
+        if "args" in config_params:
+            config["args"].extend(config_params["args"])
+
         return config
-
-    def _get_default_param_value(self, param: str) -> Optional[str]:
-        """Get default value for a configuration parameter.
-
-        Args:
-            param: Parameter name
-
-        Returns:
-            Default value or None
-        """
-        defaults = {
-            "root_path": str(Path.home()),
-            "database_path": "./database.db",
-            "repository_path": ".",
-        }
-        return defaults.get(param)
 
     def uninstall(self, server_id: str) -> InstallationResult:
         """Uninstall MCP server from Claude Code.
@@ -384,18 +304,3 @@ class ClaudeCodeInstaller(BaseInstaller):
                 errors.append(f"Server {server_id}: 'args' must be an array")
 
         return errors
-
-    def _supports_method(self, method: str) -> bool:
-        """Check if installer supports the given method.
-
-        Args:
-            method: Installation method
-
-        Returns:
-            True if supported, False otherwise
-        """
-        return method in [
-            InstallationMethod.NPM,
-            InstallationMethod.PIP,
-            InstallationMethod.GIT,
-        ]
