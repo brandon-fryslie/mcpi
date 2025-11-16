@@ -100,13 +100,15 @@ class TestInstallerWorkflowsWithHarness:
         project_mcp_content = harness.read_scope_file("project-mcp")
         assert project_mcp_content is not None, "project-mcp file should exist"
         assert "mcpServers" in project_mcp_content, "project-mcp should have mcpServers"
-        assert "state-test" in project_mcp_content["mcpServers"], \
-            "state-test should still be in project-mcp after disable"
+        assert (
+            "state-test" in project_mcp_content["mcpServers"]
+        ), "state-test should still be in project-mcp after disable"
 
         # Verify inline disabled field (project-mcp scope mechanism)
         server_config = project_mcp_content["mcpServers"]["state-test"]
-        assert "disabled" in server_config and server_config["disabled"] is True, \
-            "Server should have disabled=true field in project-mcp scope"
+        assert (
+            "disabled" in server_config and server_config["disabled"] is True
+        ), "Server should have disabled=true field in project-mcp scope"
 
         # Verify the server now shows as disabled
         servers_after_disable = manager.list_servers("claude-code", "project-mcp")
@@ -122,10 +124,13 @@ class TestInstallerWorkflowsWithHarness:
 
         # Verify the disabled field is removed or set to false
         project_mcp_content_after_enable = harness.read_scope_file("project-mcp")
-        server_config_after_enable = project_mcp_content_after_enable["mcpServers"]["state-test"]
+        server_config_after_enable = project_mcp_content_after_enable["mcpServers"][
+            "state-test"
+        ]
         # The disabled field should either be absent or set to false
-        assert server_config_after_enable.get("disabled", False) is False, \
-            "Server should not have disabled=true after enable"
+        assert (
+            server_config_after_enable.get("disabled", False) is False
+        ), "Server should not have disabled=true after enable"
 
         # Verify the server is now enabled
         servers_after_enable = manager.list_servers("claude-code", "project-mcp")

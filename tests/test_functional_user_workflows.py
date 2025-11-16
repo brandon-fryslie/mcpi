@@ -48,7 +48,7 @@ from click.testing import CliRunner
 from mcpi.clients.claude_code import ClaudeCodePlugin
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.registry import ClientRegistry
-from mcpi.clients.types import ServerState
+from mcpi.clients.types import ServerConfig, ServerState
 
 
 class TestServerLifecycleWorkflows:
@@ -100,12 +100,11 @@ class TestServerLifecycleWorkflows:
         assert (
             project_config["command"] == "python"
         ), "Project server should use python command"
-        assert (
-            project_config["args"] == ["-m", "project_mcp_server"]
-        ), "Project server should have module args"
-        assert (
-            project_config["type"] == "stdio"
-        ), "Project server should use stdio type"
+        assert project_config["args"] == [
+            "-m",
+            "project_mcp_server",
+        ], "Project server should have module args"
+        assert project_config["type"] == "stdio", "Project server should use stdio type"
 
         # Verify config matches what's in the actual file
         raw_project_file = prepopulated_harness.read_scope_file("project-mcp")
@@ -118,9 +117,7 @@ class TestServerLifecycleWorkflows:
         user_global_scope = plugin.get_scope_handler("user-global")
         global_config = user_global_scope.get_server_config("filesystem")
 
-        assert (
-            global_config["command"] == "npx"
-        ), "Global server should use npx command"
+        assert global_config["command"] == "npx", "Global server should use npx command"
         assert "@modelcontextprotocol/server-filesystem" in " ".join(
             global_config["args"]
         ), "Global server should have filesystem package"
@@ -135,11 +132,11 @@ class TestServerLifecycleWorkflows:
         internal_config = user_internal_scope.get_server_config("internal-server")
 
         assert (
-            internal_config["command"] == "npx"
-        ), "Internal server should use npx command"
-        assert "@modelcontextprotocol/server-memory" in " ".join(
-            internal_config["args"]
-        ), "Internal server should have memory package"
+            internal_config["command"] == "node"
+        ), "Internal server should use node command"
+        assert (
+            "internal-server.js" in internal_config["args"]
+        ), "Internal server should have internal-server.js arg"
 
         # Verify against raw file
         raw_internal_file = prepopulated_harness.read_scope_file("user-internal")
@@ -192,14 +189,14 @@ class TestServerLifecycleWorkflows:
         assert len(user_global_servers) == 0, "Should start with no user-global servers"
 
         # STEP 2: Add a server
-        server_config = {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-            "type": "stdio",
-        }
+        server_config = ServerConfig(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+            type="stdio",
+        )
 
         add_result = manager.add_server(
-            "filesystem", "claude-code", "user-global", server_config
+            "filesystem", server_config, "user-global", "claude-code"
         )
         assert add_result.success, f"Add operation failed: {add_result.message}"
 
@@ -215,19 +212,19 @@ class TestServerLifecycleWorkflows:
         # STEP 4: Verify file was actually created/modified
         user_global_file = mcp_harness.read_scope_file("user-global")
         assert user_global_file is not None, "User-global file should exist after add"
-        assert (
-            "mcpServers" in user_global_file
-        ), "File should have mcpServers section"
+        assert "mcpServers" in user_global_file, "File should have mcpServers section"
         assert (
             "filesystem" in user_global_file["mcpServers"]
         ), "File should contain filesystem server"
         file_config = user_global_file["mcpServers"]["filesystem"]
         assert (
-            file_config["command"] == server_config["command"]
+            file_config["command"] == server_config.command
         ), "File config should match added config"
 
         # STEP 5: Remove the server
-        remove_result = manager.remove_server("filesystem", "claude-code", "user-global")
+        remove_result = manager.remove_server(
+            "filesystem", "user-global", "claude-code"
+        )
         assert (
             remove_result.success
         ), f"Remove operation failed: {remove_result.message}"
@@ -330,13 +327,15 @@ class TestServerLifecycleWorkflows:
         project_mcp_content = prepopulated_harness.read_scope_file("project-mcp")
         assert project_mcp_content is not None, "project-mcp file should exist"
         assert "mcpServers" in project_mcp_content, "project-mcp should have mcpServers"
-        assert "project-tool" in project_mcp_content["mcpServers"], \
-            "project-tool should still be in project-mcp after disable"
+        assert (
+            "project-tool" in project_mcp_content["mcpServers"]
+        ), "project-tool should still be in project-mcp after disable"
 
         # Check for inline disabled field (project-mcp scope mechanism)
         server_config = project_mcp_content["mcpServers"]["project-tool"]
-        assert "disabled" in server_config and server_config["disabled"] is True, \
-            "Server should have disabled=true field in project-mcp scope"
+        assert (
+            "disabled" in server_config and server_config["disabled"] is True
+        ), "Server should have disabled=true field in project-mcp scope"
 
         # USER ACTION 3: Re-enable server
         enable_result = manager.enable_server("project-tool", "claude-code")

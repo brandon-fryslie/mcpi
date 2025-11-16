@@ -74,9 +74,7 @@ class TestRescopeAggressiveSingleScope:
                 "filesystem" not in user_global_content["mcpServers"]
             ), "Server should be removed from source scope"
 
-    def test_rescope_from_project_mcp_to_user_internal(
-        self, mcp_manager_with_harness
-    ):
+    def test_rescope_from_project_mcp_to_user_internal(self, mcp_manager_with_harness):
         """Test moving server from project-mcp to user-internal scope.
 
         This test cannot be gamed because:
@@ -88,7 +86,9 @@ class TestRescopeAggressiveSingleScope:
         runner = CliRunner()
 
         # Setup: Server in project-mcp
-        config = ServerConfig(command="python", args=["-m", "test_server"], type="stdio")
+        config = ServerConfig(
+            command="python", args=["-m", "test_server"], type="stdio"
+        )
         manager.add_server("test-server", config, "project-mcp", "claude-code")
 
         # Verify initial state
@@ -368,9 +368,7 @@ class TestRescopeAggressiveDryRun:
         final_project_mcp = harness.read_scope_file("project-mcp")
 
         assert initial_user_global == final_user_global, "Dry-run modified source"
-        assert (
-            initial_project_mcp == final_project_mcp
-        ), "Dry-run modified destination"
+        assert initial_project_mcp == final_project_mcp, "Dry-run modified destination"
 
     def test_rescope_dry_run_no_changes_multi_scope(self, mcp_manager_with_harness):
         """Test that dry-run makes no changes when server in multiple scopes.
