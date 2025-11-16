@@ -1,0 +1,214 @@
+{
+  "feature": "Environment Variable Support in MCPI Registry",
+  "test_file": "tests/test_registry_env_vars.py",
+  "documentation": "tests/TEST_ENV_VARS_DOCUMENTATION.md",
+  "initial_status": "failing",
+  "expected_failures": "All tests will fail until implementation complete",
+  "tests_added": [
+    "test_load_server_with_env_vars_from_catalog",
+    "test_load_server_without_env_vars_backward_compat",
+    "test_load_server_with_empty_env_dict",
+    "test_load_multiple_servers_mixed_env_presence",
+    "test_get_run_command_includes_env_vars_from_registry",
+    "test_get_run_command_merges_user_config_env_vars",
+    "test_get_run_command_without_env_backward_compat",
+    "test_add_server_with_env_vars_to_config_file",
+    "test_add_multiple_servers_with_different_env_configs",
+    "test_add_server_across_different_scopes_with_env",
+    "test_pydantic_accepts_valid_env_dict",
+    "test_pydantic_accepts_missing_env_field",
+    "test_pydantic_rejects_invalid_env_type",
+    "test_pydantic_accepts_empty_env_dict",
+    "test_save_and_reload_catalog_with_env_vars",
+    "test_save_catalog_mixed_env_presence"
+  ],
+  "test_count": 16,
+  "test_classes": [
+    {
+      "name": "TestRegistryEnvVarLoading",
+      "purpose": "Validate loading servers with env vars from catalog.json",
+      "tests": 4,
+      "critical": true
+    },
+    {
+      "name": "TestEnvVarConfigurationGeneration",
+      "purpose": "Validate env vars included in get_run_command() output",
+      "tests": 3,
+      "critical": true
+    },
+    {
+      "name": "TestEnvVarEndToEndInstallation",
+      "purpose": "Validate complete workflow from registry to config file on disk",
+      "tests": 3,
+      "critical": true,
+      "most_important": "test_add_server_with_env_vars_to_config_file"
+    },
+    {
+      "name": "TestEnvVarSchemaValidation",
+      "purpose": "Validate Pydantic schema accepts/rejects env configurations",
+      "tests": 4,
+      "critical": false
+    },
+    {
+      "name": "TestEnvVarCatalogPersistence",
+      "purpose": "Validate round-trip save/load preserves env vars",
+      "tests": 2,
+      "critical": false
+    }
+  ],
+  "workflows_covered": [
+    "Developer adds server with env vars to catalog.json",
+    "User discovers server with env requirements in registry",
+    "User installs server via mcpi add command",
+    "MCPI generates config file with env vars",
+    "User overrides env var values in config",
+    "Claude Code launches server with environment variables",
+    "Catalog save/load round-trip preserves env vars"
+  ],
+  "gaming_resistance": "high",
+  "gaming_resistance_mechanisms": [
+    "Uses REAL file I/O via tmp_path (no mocked file operations)",
+    "Validates ACTUAL files written to disk (cannot fake with stubs)",
+    "Checks MULTIPLE side effects per test (file exists, valid JSON, correct content)",
+    "Cross-validates data across layers (registry → model → config → file)",
+    "Tests COMPLETE workflows (input → processing → output → persistence)",
+    "Asserts on OBSERVABLE outcomes (what users would see)",
+    "Tests ERROR conditions with real exceptions",
+    "Uses actual ServerCatalog, MCPServer, ClaudeCodePlugin classes (not mocks)"
+  ],
+  "status_gaps_addressed": [
+    "No env var support in registry",
+    "Cannot configure servers requiring environment variables",
+    "Manual config editing required for env-dependent servers",
+    "Users cannot discover env requirements for servers",
+    "Installation doesn't preserve env vars from registry"
+  ],
+  "plan_items_validated": [
+    "Add env field to MCPServer model in registry/catalog.py",
+    "Update CUE schema (data/catalog.cue) to allow optional env field",
+    "Update Pydantic model to accept env dict",
+    "Modify get_run_command() to include env vars in output",
+    "Ensure backward compatibility (env field is optional)",
+    "Support user config env var override",
+    "Test env vars work across all Claude Code scopes"
+  ],
+  "implementation_requirements": [
+    {
+      "file": "src/mcpi/registry/catalog.py",
+      "changes": [
+        "Add env: Optional[Dict[str, str]] = None to MCPServer model",
+        "Update get_run_command() to include env in output dict",
+        "Handle env var merging with user config"
+      ]
+    },
+    {
+      "file": "data/catalog.cue",
+      "changes": [
+        "Add optional env field to #MCPServer schema",
+        "Define env as map of string to string"
+      ]
+    },
+    {
+      "file": "src/mcpi/clients/types.py",
+      "changes": [
+        "Add env: Optional[Dict[str, str]] = None to ServerConfig if not present",
+        "Ensure env vars passed through to config files"
+      ]
+    }
+  ],
+  "test_execution": {
+    "run_all": "pytest tests/test_registry_env_vars.py -v",
+    "run_critical": "pytest tests/test_registry_env_vars.py::TestEnvVarEndToEndInstallation -v",
+    "run_most_important": "pytest tests/test_registry_env_vars.py::TestEnvVarEndToEndInstallation::test_add_server_with_env_vars_to_config_file -v",
+    "run_with_coverage": "pytest tests/test_registry_env_vars.py --cov=src/mcpi/registry --cov=src/mcpi/clients -v"
+  },
+  "expected_results": {
+    "before_implementation": {
+      "status": "all_failing",
+      "typical_errors": [
+        "AttributeError: 'MCPServer' object has no attribute 'env'",
+        "KeyError: 'env'",
+        "ValidationError: env field not defined in model",
+        "Config files missing env vars"
+      ]
+    },
+    "after_implementation": {
+      "status": "all_passing",
+      "test_count": 16,
+      "execution_time": "< 5 seconds",
+      "warnings": 0
+    }
+  },
+  "backward_compatibility": {
+    "verified": true,
+    "tests": [
+      "test_load_server_without_env_vars_backward_compat",
+      "test_get_run_command_without_env_backward_compat",
+      "test_pydantic_accepts_missing_env_field"
+    ],
+    "requirement": "Existing servers without env field must continue working"
+  },
+  "edge_cases_covered": [
+    "Server with env vars",
+    "Server without env vars (backward compat)",
+    "Server with empty env dict ({})",
+    "Multiple servers with mixed env configurations",
+    "User config env override",
+    "User config additional env vars",
+    "Invalid env types (string, list)",
+    "Round-trip save/load preservation",
+    "Env vars across different scopes"
+  ],
+  "integration_with_existing_tests": {
+    "test_harness": "Uses MCPTestHarness from test_harness.py",
+    "fixtures": [
+      "mcp_harness",
+      "tmp_path"
+    ],
+    "helpers_used": [
+      "assert_valid_json()",
+      "assert_server_exists()",
+      "get_server_config()",
+      "prepopulate_file()"
+    ]
+  },
+  "quality_metrics": {
+    "gaming_resistance": "high",
+    "user_workflow_coverage": "complete",
+    "observable_outcomes": "validated",
+    "real_file_io": true,
+    "mocks_used": "minimal (only test infrastructure)",
+    "error_path_testing": true,
+    "backward_compatibility": true,
+    "cross_validation": true
+  },
+  "deliverables": [
+    {
+      "file": "tests/test_registry_env_vars.py",
+      "lines": 700,
+      "description": "Complete functional test suite for env var support"
+    },
+    {
+      "file": "tests/TEST_ENV_VARS_DOCUMENTATION.md",
+      "lines": 400,
+      "description": "Comprehensive test documentation and usage guide"
+    },
+    {
+      "file": "tests/test_env_vars_summary.json",
+      "description": "Test suite summary and traceability matrix"
+    }
+  ],
+  "next_steps": [
+    "1. Review test file and documentation",
+    "2. Run tests to verify they fail as expected (pytest tests/test_registry_env_vars.py)",
+    "3. Implement env field in MCPServer model (src/mcpi/registry/catalog.py)",
+    "4. Update CUE schema (data/catalog.cue)",
+    "5. Update get_run_command() to include env vars",
+    "6. Run tests again to verify implementation",
+    "7. Add sample server with env vars to catalog.json (e.g., design-patterns)",
+    "8. Test manually: mcpi add design-patterns --scope user-global",
+    "9. Verify env vars in generated config file",
+    "10. Commit with message: 'test(registry): add functional tests for env var support'"
+  ],
+  "commit_message": "test(registry): add functional tests for environment variable support\n\nAdd comprehensive functional test suite for optional env field in registry:\n- 16 tests across 5 test classes\n- Complete workflow coverage: registry → model → config → file\n- Backward compatibility validated\n- Un-gameable (real file I/O, observable outcomes)\n- Documentation included\n\nTests currently fail (expected) - implementation in next commit.\n\nTraceability:\n- Addresses gap: servers requiring env vars need manual config editing\n- Validates: env field optional, user override, backward compat\n- Most critical test: test_add_server_with_env_vars_to_config_file"
+}

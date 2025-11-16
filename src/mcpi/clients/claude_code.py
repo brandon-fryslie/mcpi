@@ -321,15 +321,13 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Add the server to the scope
         result = handler.add_server(server_id, config)
 
-        if result:
+        # BUG FIX: Check result.success instead of truthy result object
+        if result.success:
             return OperationResult(
                 success=True, message=f"Server '{server_id}' added to scope '{scope}'"
             )
         else:
-            return OperationResult(
-                success=False,
-                message=f"Failed to add server '{server_id}' to scope '{scope}'",
-            )
+            return result  # Return the actual failure result with errors
 
     def update_server(
         self, server_id: str, config: ServerConfig, scope: str
@@ -352,16 +350,14 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Update the server
         result = handler.update_server(server_id, config)
 
-        if result:
+        # BUG FIX: Check result.success instead of truthy result object
+        if result.success:
             return OperationResult(
                 success=True,
                 message=f"Server '{server_id}' updated in scope '{scope}'",
             )
         else:
-            return OperationResult(
-                success=False,
-                message=f"Failed to update server '{server_id}' in scope '{scope}'",
-            )
+            return result  # Return the actual failure result with errors
 
     def remove_server(self, server_id: str, scope: str) -> OperationResult:
         """Remove a server from the specified scope.
@@ -381,16 +377,14 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Remove the server
         result = handler.remove_server(server_id)
 
-        if result:
+        # BUG FIX: Check result.success instead of truthy result object
+        if result.success:
             return OperationResult(
                 success=True,
                 message=f"Server '{server_id}' removed from scope '{scope}'",
             )
         else:
-            return OperationResult(
-                success=False,
-                message=f"Failed to remove server '{server_id}' from scope '{scope}'",
-            )
+            return result  # Return the actual failure result with errors
 
     def enable_server(
         self, server_id: str, scope: Optional[str] = None
@@ -432,6 +426,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Enable the server
         result = handler.enable_disable_handler.enable_server(server_id)
 
+        # BUG FIX: Check result (boolean) correctly
         if result:
             return OperationResult(
                 success=True, message=f"Server '{server_id}' enabled in scope '{scope}'"
@@ -482,6 +477,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
         # Disable the server
         result = handler.enable_disable_handler.disable_server(server_id)
 
+        # BUG FIX: Check result (boolean) correctly
         if result:
             return OperationResult(
                 success=True,

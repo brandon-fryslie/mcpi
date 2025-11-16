@@ -63,9 +63,7 @@ class TestRescopeCommandBasicFlow:
 
         # Verify command succeeded
         assert result.exit_code == 0, f"Command failed: {result.output}"
-        assert (
-            "rescoped" in result.output.lower() or "moved" in result.output.lower()
-        )
+        assert "rescoped" in result.output.lower() or "moved" in result.output.lower()
 
         # CRITICAL VERIFICATION: Server removed from source
         with pytest.raises(AssertionError, match="not found"):

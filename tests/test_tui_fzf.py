@@ -211,7 +211,10 @@ class TestBuildServerList:
         """Test that servers are sorted with installed first."""
         # Create mock servers
         servers = [
-            ("not-installed-server", MCPServer(description="Not installed", command="npx")),
+            (
+                "not-installed-server",
+                MCPServer(description="Not installed", command="npx"),
+            ),
             ("enabled-server", MCPServer(description="Enabled", command="npx")),
             ("disabled-server", MCPServer(description="Disabled", command="npx")),
         ]
@@ -286,11 +289,12 @@ class TestBuildFzfCommand:
                     else:
                         continue
 
-                # Should contain keyboard shortcuts
-                assert "ctrl-a" in header_content.lower()
-                assert "ctrl-r" in header_content.lower()
-                assert "ctrl-e" in header_content.lower()
-                assert "ctrl-d" in header_content.lower()
+                # Should contain keyboard shortcuts (header uses ^X notation)
+                assert "^a" in header_content.lower()
+                assert "^r" in header_content.lower()
+                assert "^e" in header_content.lower()
+                assert "^d" in header_content.lower()
+                assert "^s" in header_content.lower()  # Scope cycling
                 break
 
         assert header_found
@@ -382,12 +386,12 @@ class TestFzfHeaderMultiline:
             f"Current header: {header!r}"
         )
 
-    def test_header_has_exactly_three_lines(self):
-        """Verify header spans exactly 3 lines.
+    def test_header_has_exactly_four_lines(self):
+        """Verify header spans exactly 4 lines.
 
         Un-gameable because:
         - Tests actual line count after splitting real header
-        - Enforces specific format: title line, operations line, info/exit line
+        - Enforces specific format: title+scope, scope cycling+ops, ops, info/exit
         - Cannot pass by changing assertion - must match requirement
         """
         cmd = build_fzf_command()
@@ -395,9 +399,9 @@ class TestFzfHeaderMultiline:
 
         lines = header.split("\n")
 
-        assert len(lines) == 3, (
-            f"Header must have exactly 3 lines. Found {len(lines)}: {lines}"
-        )
+        assert (
+            len(lines) == 4
+        ), f"Header must have exactly 4 lines. Found {len(lines)}: {lines}"
 
     def test_all_lines_fit_80_columns(self):
         """Verify each line is <= 80 characters to fit narrow terminals.
@@ -414,16 +418,16 @@ class TestFzfHeaderMultiline:
         lines = header.split("\n")
 
         for i, line in enumerate(lines, 1):
-            assert len(line) <= 80, (
-                f"Line {i} is too long ({len(line)} chars, max 80): {line!r}"
-            )
+            assert (
+                len(line) <= 80
+            ), f"Line {i} is too long ({len(line)} chars, max 80): {line!r}"
 
-    def test_line1_contains_title_only(self):
-        """Verify line 1 contains only the title.
+    def test_line1_contains_title_and_scope(self):
+        """Verify line 1 contains title and current scope display.
 
         Un-gameable because:
         - Tests actual content of first line
-        - Verifies logical grouping: title separate from shortcuts
+        - Verifies logical grouping: title + scope indicator
         - Cannot pass by moving title elsewhere - requirement is specific
         """
         cmd = build_fzf_command()
@@ -432,23 +436,24 @@ class TestFzfHeaderMultiline:
         lines = header.split("\n")
         line1 = lines[0]
 
-        # Line 1 should be the title
-        assert "MCPI Server Manager" in line1, (
-            f"Line 1 must contain title. Found: {line1!r}"
-        )
+        # Line 1 should contain MCPI identifier
+        assert "MCPI" in line1, f"Line 1 must contain MCPI identifier. Found: {line1!r}"
 
-        # Line 1 should NOT contain shortcuts (title only)
-        assert "ctrl-" not in line1.lower(), (
-            f"Line 1 should be title only, no shortcuts. Found: {line1!r}"
-        )
+        # Line 1 should contain scope indicator
+        assert "Scope:" in line1, f"Line 1 must show current scope. Found: {line1!r}"
 
-    def test_line2_contains_operation_shortcuts(self):
-        """Verify line 2 contains operation shortcuts (add, remove, enable, disable).
+        # Line 1 should NOT contain operation shortcuts
+        assert (
+            "^A:" not in line1 and "^R:" not in line1
+        ), f"Line 1 should be title+scope only, no operation shortcuts. Found: {line1!r}"
+
+    def test_line2_contains_scope_cycling_and_some_operations(self):
+        """Verify line 2 contains scope cycling and some operation shortcuts.
 
         Un-gameable because:
-        - Tests actual presence of all 4 operation shortcuts
-        - Verifies logical grouping: operations on one line
-        - Cannot pass by omitting shortcuts - users need all operations
+        - Tests actual presence of scope cycling (^S) and operations
+        - Verifies logical grouping: scope management + operations
+        - Cannot pass by omitting shortcuts - users need these operations
         """
         cmd = build_fzf_command()
         header = self._extract_header_from_command(cmd)
@@ -456,15 +461,43 @@ class TestFzfHeaderMultiline:
         lines = header.split("\n")
         line2 = lines[1]
 
-        # Line 2 should contain all operation shortcuts
-        required_operations = ["ctrl-a", "ctrl-r", "ctrl-e", "ctrl-d"]
-        for op in required_operations:
-            assert op.lower() in line2.lower(), (
-                f"Line 2 must contain {op}. Found: {line2!r}"
-            )
+        # Line 2 should contain scope cycling (uses ^S format, not ctrl-s)
+        assert (
+            "^S" in line2 or "Scope" in line2
+        ), f"Line 2 must contain scope cycling shortcut. Found: {line2!r}"
 
-    def test_line3_contains_info_and_exit_shortcuts(self):
-        """Verify line 3 contains info and exit shortcuts.
+        # Line 2 should contain some operation shortcuts (uses ^A, ^R format)
+        assert (
+            "^A" in line2 or "Add" in line2
+        ), f"Line 2 must contain Add operation. Found: {line2!r}"
+        assert (
+            "^R" in line2 or "Remove" in line2
+        ), f"Line 2 must contain Remove operation. Found: {line2!r}"
+
+    def test_line3_contains_remaining_operations(self):
+        """Verify line 3 contains remaining operation shortcuts (enable, disable).
+
+        Un-gameable because:
+        - Tests actual presence of enable/disable operations
+        - Verifies logical grouping: state management operations
+        - Cannot pass by omitting shortcuts - users need these operations
+        """
+        cmd = build_fzf_command()
+        header = self._extract_header_from_command(cmd)
+
+        lines = header.split("\n")
+        line3 = lines[2]
+
+        # Line 3 should contain enable/disable shortcuts (uses ^E, ^D format)
+        assert (
+            "^E" in line3 or "Enable" in line3
+        ), f"Line 3 must contain Enable operation. Found: {line3!r}"
+        assert (
+            "^D" in line3 or "Disable" in line3
+        ), f"Line 3 must contain Disable operation. Found: {line3!r}"
+
+    def test_line4_contains_info_and_exit_shortcuts(self):
+        """Verify line 4 contains info and exit shortcuts.
 
         Un-gameable because:
         - Tests actual presence of info and exit shortcuts
@@ -475,17 +508,17 @@ class TestFzfHeaderMultiline:
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
-        line3 = lines[2]
+        line4 = lines[3]
 
-        # Line 3 should contain info shortcuts
-        assert "ctrl-i" in line3.lower() or "enter" in line3.lower(), (
-            f"Line 3 must contain info shortcuts (ctrl-i or enter). Found: {line3!r}"
-        )
+        # Line 4 should contain info shortcuts (^I or Enter)
+        assert (
+            "^I" in line4 or "Enter" in line4 or "Info" in line4
+        ), f"Line 4 must contain info shortcuts (^I or Enter). Found: {line4!r}"
 
-        # Line 3 should contain exit shortcut
-        assert "esc" in line3.lower(), (
-            f"Line 3 must contain exit shortcut (esc). Found: {line3!r}"
-        )
+        # Line 4 should contain exit shortcut
+        assert (
+            "Esc" in line4 or "Exit" in line4
+        ), f"Line 4 must contain exit shortcut (Esc). Found: {line4!r}"
 
     def test_header_contains_all_required_shortcuts(self):
         """Verify header contains all critical keyboard shortcuts.
@@ -500,12 +533,14 @@ class TestFzfHeaderMultiline:
         header = self._extract_header_from_command(cmd)
 
         # All required shortcuts from spec
+        # Header uses ^X notation (e.g., ^A, ^R) instead of ctrl-x
         required_shortcuts = {
-            "ctrl-a": "Add server",
-            "ctrl-r": "Remove server",
-            "ctrl-e": "Enable server",
-            "ctrl-d": "Disable server",
-            "ctrl-i": "Show info",
+            "^s": "Scope cycling (NEW)",
+            "^a": "Add server",
+            "^r": "Remove server",
+            "^e": "Enable server",
+            "^d": "Disable server",
+            "^i": "Show info",
             "enter": "Show info (alternative)",
             "esc": "Exit interface",
         }
@@ -539,9 +574,9 @@ class TestFzfHeaderMultiline:
             )
 
         # Must have all content split across lines
-        assert len(lines) >= 2, (
-            "Single-line header would be truncated. Must be multi-line."
-        )
+        assert (
+            len(lines) >= 2
+        ), "Single-line header would be truncated. Must be multi-line."
 
     def test_header_included_in_fzf_command(self):
         """Verify header is properly included in fzf command structure.
@@ -562,8 +597,7 @@ class TestFzfHeaderMultiline:
                 break
 
         assert header_found, (
-            "Header must be included in fzf command. "
-            f"Command: {cmd}"
+            "Header must be included in fzf command. " f"Command: {cmd}"
         )
 
         # Header must be valid (can be extracted)
@@ -592,9 +626,9 @@ class TestFzfHeaderMultiline:
         # Test that multi-line format uses \n (not \r\n or other)
         if "\n" in header:
             # Should use Unix line endings
-            assert "\r\n" not in header, (
-                "Header should use Unix line endings (\\n), not Windows (\\r\\n)"
-            )
+            assert (
+                "\r\n" not in header
+            ), "Header should use Unix line endings (\\n), not Windows (\\r\\n)"
 
 
 class TestLaunchFzfInterface:
@@ -602,21 +636,26 @@ class TestLaunchFzfInterface:
 
     def test_launch_fails_if_fzf_not_installed(self):
         """Test that launch fails gracefully if fzf is not installed."""
-        with patch("mcpi.tui.check_fzf_installed", return_value=False):
+        with patch(
+            "mcpi.tui.adapters.fzf.FzfAdapter._check_fzf_installed", return_value=False
+        ):
             from mcpi.tui import launch_fzf_interface
 
             mock_manager = Mock()
+            mock_manager.default_client = "claude-code"
+            mock_manager.get_scopes_for_client.return_value = [
+                {"name": "project-mcp", "priority": 1}
+            ]
             mock_catalog = Mock()
+            mock_catalog.list_servers.return_value = []
 
             # Should raise or handle error gracefully
             with pytest.raises(RuntimeError, match="fzf"):
                 launch_fzf_interface(mock_manager, mock_catalog)
 
-    @patch("mcpi.tui.check_fzf_installed", return_value=True)
+    @patch("mcpi.tui.adapters.fzf.FzfAdapter._check_fzf_installed", return_value=True)
     @patch("subprocess.run")
-    def test_launch_calls_fzf_with_server_list(
-        self, mock_run, mock_check_fzf
-    ):
+    def test_launch_calls_fzf_with_server_list(self, mock_run, mock_check_fzf):
         """Test that launch calls fzf with properly formatted server list."""
         from mcpi.tui import launch_fzf_interface
 
@@ -628,6 +667,10 @@ class TestLaunchFzfInterface:
 
         # Mock manager
         mock_manager = Mock()
+        mock_manager.default_client = "claude-code"
+        mock_manager.get_scopes_for_client.return_value = [
+            {"name": "project-mcp", "priority": 1}
+        ]
         mock_manager.get_server_state.return_value = ServerState.NOT_INSTALLED
         mock_manager.get_server_info.return_value = None
 
@@ -645,17 +688,19 @@ class TestLaunchFzfInterface:
             input_data = call_args.kwargs["input"]
             assert "test-server" in input_data
 
-    @patch("mcpi.tui.check_fzf_installed", return_value=True)
+    @patch("mcpi.tui.adapters.fzf.FzfAdapter._check_fzf_installed", return_value=True)
     @patch("subprocess.run")
-    def test_launch_handles_user_cancellation(
-        self, mock_run, mock_check_fzf
-    ):
+    def test_launch_handles_user_cancellation(self, mock_run, mock_check_fzf):
         """Test that launch handles user cancellation (Ctrl-C) gracefully."""
         from mcpi.tui import launch_fzf_interface
 
         mock_catalog = Mock()
         mock_catalog.list_servers.return_value = []
         mock_manager = Mock()
+        mock_manager.default_client = "claude-code"
+        mock_manager.get_scopes_for_client.return_value = [
+            {"name": "project-mcp", "priority": 1}
+        ]
 
         # Simulate user cancellation (exit code 130)
         mock_run.return_value = Mock(returncode=130, stdout="")

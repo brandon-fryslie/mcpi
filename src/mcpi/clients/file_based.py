@@ -204,14 +204,14 @@ class FileBasedScope(ScopeHandler):
         except Exception:
             return {}
 
-    def get_server_config(self, server_id: str) -> ServerConfig:
+    def get_server_config(self, server_id: str) -> Dict[str, Any]:
         """Get the full configuration for a specific server.
 
         Args:
             server_id: The ID of the server to retrieve
 
         Returns:
-            ServerConfig object with full server configuration
+            Dictionary with full server configuration
 
         Raises:
             ValueError: If server doesn't exist in this scope
@@ -223,7 +223,7 @@ class FileBasedScope(ScopeHandler):
             )
 
         server_data = servers[server_id]
-        return ServerConfig.from_dict(server_data)
+        return server_data
 
     def add_server(self, server_id: str, config: ServerConfig) -> OperationResult:
         """Add a server to this scope.
@@ -436,14 +436,14 @@ class CommandBasedScope(ScopeHandler):
         except Exception:
             return {}
 
-    def get_server_config(self, server_id: str) -> ServerConfig:
+    def get_server_config(self, server_id: str) -> Dict[str, Any]:
         """Get the full configuration for a specific server.
 
         Args:
             server_id: The ID of the server to retrieve
 
         Returns:
-            ServerConfig object with full server configuration
+            Dictionary with full server configuration
 
         Raises:
             ValueError: If server doesn't exist in this scope
@@ -455,7 +455,7 @@ class CommandBasedScope(ScopeHandler):
             )
 
         server_data = servers[server_id]
-        return ServerConfig.from_dict(server_data)
+        return server_data
 
     def add_server(self, server_id: str, config: ServerConfig) -> OperationResult:
         """Add a server using command.

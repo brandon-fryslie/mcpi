@@ -1,0 +1,686 @@
+# FZF TUI Header Fix - Focused Backlog
+
+**Generated**: 2025-11-05 23:32:12
+**Source STATUS**: STATUS-2025-11-05-232752.md
+**Spec Reference**: CLAUDE.md (TUI functionality)
+**Project**: mcpi - Model Context Protocol Interface
+
+---
+
+## Executive Summary
+
+**Current State**: FZF TUI feature is 90% complete and functionally working
+- Issue 1 (reload command): RESOLVED via `uv tool install --force`
+- Issue 2 (header truncation): CONFIRMED defect, needs fix
+
+**Gap to Ship**: Single cosmetic/UX issue preventing full discoverability
+
+**Effort to Ship**: 45-75 minutes (P0 + P1 tasks only)
+
+**Risk Level**: VERY LOW - isolated change, no API modifications
+
+---
+
+## Priority Summary
+
+- **P0 (REQUIRED)**: Fix header truncation - 30-60 minutes
+- **P1 (VERIFICATION)**: Verify installation and functionality - 15 minutes
+- **P2 (OPTIONAL)**: Add packaging test - 30 minutes
+- **P3 (OPTIONAL)**: Documentation updates - 15 minutes
+
+**TOTAL TIME TO SHIP** (P0 + P1): 45-75 minutes
+
+---
+
+## P0: Fix Header Truncation (REQUIRED)
+
+**Status**: Not Started
+**Effort**: Small (30-60 minutes)
+**Dependencies**: None
+**Spec Reference**: TUI keyboard shortcuts (user discoverability) • **Status Reference**: STATUS-2025-11-05-232752.md section "Issue 2: Help Text Truncated"
+
+### Description
+
+Current single-line header (113 characters) gets truncated on standard 80-120 column terminals, hiding critical keyboard shortcuts (ctrl-d, ctrl-i, enter, esc). This severely impacts discoverability - users cannot see how to disable servers, view info, or exit the interface without resizing their terminal.
+
+**Evidence from STATUS**:
+- Screenshot shows header as: "MCPI Server Manager | ctrl-a:Add  ctrl-r:Remove  ctrl-e:En..."
+- Last 4 shortcuts are completely hidden on narrow terminals
+- User cannot discover disable (ctrl-d), info (ctrl-i/enter), or exit (esc) functionality
+
+### Acceptance Criteria
+
+- [ ] Header spans multiple lines (3 lines recommended)
+- [ ] All keyboard shortcuts visible without truncation on 80-column terminal
+- [ ] All keyboard shortcuts visible on 120-column terminal
+- [ ] fzf operations continue to work correctly (add, remove, enable, disable, info)
+- [ ] Existing unit tests continue to pass (18 tests in test_tui_fzf.py)
+- [ ] Manual test: Launch `mcpi fzf`, verify all 3 header lines visible and correctly formatted
+
+### Technical Notes
+
+**Location**: `src/mcpi/tui.py`, function `build_fzf_command()`, line 192
+
+**Current Code**:
+```python
+"--header=MCPI Server Manager | ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable  ctrl-i:Info  enter:Info  esc:Exit"
+```
+
+**Recommended Implementation** (Option A - Compact):
+```python
+# Multi-line header with logical grouping
+header = (
+    "MCPI Server Manager\n"
+    "ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable\n"
+    "ctrl-i:Info  enter:Info  esc:Exit"
+)
+
+# Then in fzf command args:
+f"--header={header}"
+```
+
+**Line Lengths** (all fit in 80-column terminals):
+- Line 1: 19 characters ✅
+- Line 2: 60 characters ✅
+- Line 3: 41 characters ✅
+
+**Alternative Implementation** (Option B - Grouped):
+```python
+header = (
+    "MCPI Server Manager\n"
+    "Operations: ctrl-a=Add  ctrl-r=Remove  ctrl-e=Enable  ctrl-d=Disable\n"
+    "Info: ctrl-i=Details  enter=Details  Navigation: esc=Exit"
+)
+```
+
+**Line Lengths**:
+- Line 1: 19 characters ✅
+- Line 2: 68 characters ✅
+- Line 3: 59 characters ✅
+
+**Recommendation**: Use Option A (more compact, maintains current style)
+
+**Testing Strategy**:
+1. **Unit Test Update** (if needed): Update `test_build_fzf_command_basic()` in `tests/test_tui_fzf.py` to verify header contains newlines
+   ```python
+   def test_build_fzf_command_has_multiline_header():
+       """Test that header is multi-line to prevent truncation."""
+       cmd = build_fzf_command()
+       cmd_str = " ".join(cmd)
+
+       # Find header content
+       for item in cmd:
+           if item.startswith("--header="):
+               header_content = item.split("=", 1)[1]
+               # Should contain newlines for multi-line display
+               assert "\n" in header_content
+               # Should contain all required shortcuts
+               assert "ctrl-a" in header_content
+               assert "ctrl-d" in header_content
+               assert "ctrl-i" in header_content
+               assert "esc" in header_content
+               break
+   ```
+
+2. **Manual Test**:
+   ```bash
+   # Test in narrow terminal (80 cols)
+   cd ~/icode/mcpi
+   mcpi fzf
+   # Verify all 3 header lines are visible and complete
+
+   # Test in wide terminal (120 cols)
+   # Resize terminal to 120 columns
+   mcpi fzf
+   # Verify header displays correctly without wrapping issues
+   ```
+
+3. **Regression Test**: Verify all fzf operations still work:
+   - ctrl-a: Add server (list refreshes)
+   - ctrl-r: Remove server (server disappears)
+   - ctrl-e: Enable server (green checkmark appears)
+   - ctrl-d: Disable server (yellow X appears)
+   - ctrl-i/enter: Show info (info displayed in less)
+   - esc: Exit (fzf closes)
+
+**Expected Behavior After Fix**:
+
+Before (truncated):
+```
+MCPI Server Manager | ctrl-a:Add  ctrl-r:Remove  ctrl-e:En...
+```
+
+After (multi-line, all visible):
+```
+MCPI Server Manager
+ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable
+ctrl-i:Info  enter:Info  esc:Exit
+```
+
+**Implementation Steps**:
+1. Edit `src/mcpi/tui.py` line 192
+2. Replace single-line header with multi-line header (Option A recommended)
+3. Run unit tests: `pytest tests/test_tui_fzf.py -v`
+4. Manual test in 80-col terminal: `mcpi fzf`
+5. Manual test in 120-col terminal: `mcpi fzf`
+6. Test all keyboard shortcuts work
+7. Commit changes
+
+**Time Breakdown**:
+- Code change: 5 minutes
+- Unit test verification: 5 minutes
+- Manual testing (80-col): 5 minutes
+- Manual testing (120-col): 5 minutes
+- Regression testing (all shortcuts): 10 minutes
+- Commit: 5 minutes
+- **Total**: 35 minutes
+
+---
+
+## P1: Verify Installation and Functionality (REQUIRED)
+
+**Status**: Not Started
+**Effort**: Small (15 minutes)
+**Dependencies**: None (independent of P0)
+**Spec Reference**: TUI installation and operation • **Status Reference**: STATUS-2025-11-05-232752.md section "Issue 1: Command Failed - mcpi-tui-reload"
+
+### Description
+
+Verify that Issue 1 (reload command failure) is truly resolved by running manual tests of the complete fzf TUI workflow. The STATUS report indicates the command now exists and works (`mcpi-tui-reload` installed after `uv tool install --force`), but actual fzf integration has not been manually verified.
+
+**Evidence from STATUS**:
+- Command now exists: `which mcpi-tui-reload` → `/Users/bmf/.local/bin/mcpi-tui-reload` ✅
+- Command executes: `mcpi-tui-reload | head -5` produces formatted output ✅
+- **GAP**: fzf integration not manually tested (needs verification)
+
+### Acceptance Criteria
+
+- [ ] `mcpi-tui-reload` command is in PATH (verify with `which mcpi-tui-reload`)
+- [ ] Command executes successfully: `mcpi-tui-reload` produces formatted server list
+- [ ] Launch `mcpi fzf` - interface opens without errors
+- [ ] Add operation triggers reload: Select server → ctrl-a → list refreshes immediately
+- [ ] Enable operation triggers reload: Select server → ctrl-e → green checkmark appears, list refreshes
+- [ ] Disable operation triggers reload: Select enabled server → ctrl-d → yellow X appears, list refreshes
+- [ ] Remove operation triggers reload: Select installed server → ctrl-r → server disappears from list
+- [ ] Preview pane shows server info correctly
+- [ ] No "Command failed: mcpi-tui-reload" errors appear
+
+### Technical Notes
+
+**Testing Checklist** (from STATUS report):
+
+```bash
+# 1. Verify installation
+which mcpi-tui-reload
+# Expected: /Users/bmf/.local/bin/mcpi-tui-reload
+
+# 2. Test command directly
+mcpi-tui-reload | head -10
+# Expected: Formatted server list with ANSI colors
+
+# 3. Launch fzf interface
+mcpi fzf
+# Expected: fzf opens, shows server list, header visible
+
+# 4. Test add operation + reload
+# In fzf: Select a not-installed server → ctrl-a
+# Expected: Installation process runs, list refreshes, server now shows as installed
+
+# 5. Test enable operation + reload
+# In fzf: Select an installed but disabled server → ctrl-e
+# Expected: Server enabled, green checkmark appears, list refreshes
+
+# 6. Test disable operation + reload
+# In fzf: Select an enabled server → ctrl-d
+# Expected: Server disabled, yellow X appears, list refreshes
+
+# 7. Test remove operation + reload
+# In fzf: Select an installed server → ctrl-r
+# Expected: Server removed, disappears from list, list refreshes
+
+# 8. Test info/preview
+# In fzf: Navigate to any server, press enter or ctrl-i
+# Expected: Server info displayed in less/preview pane
+
+# 9. Test exit
+# In fzf: Press esc
+# Expected: fzf closes gracefully, no errors
+```
+
+**Known Good State** (from STATUS):
+- Console scripts installed: `mcpi`, `mcpi-tui-reload` ✅
+- Code implemented: commit 7570251 ✅
+- Unit tests passing: 18 tests, 91% coverage ✅
+- **Unknown**: End-to-end fzf integration (needs manual verification)
+
+**What Could Go Wrong**:
+1. fzf bindings might call wrong command (unlikely - verified in code)
+2. Environment-specific PATH issues (5% risk per STATUS)
+3. Race conditions in reload (unlikely - synchronous subprocess calls)
+4. Permission issues (unlikely - command executes successfully standalone)
+
+**If Issues Found**:
+- Check `which mcpi-tui-reload` returns valid path
+- Check `echo $PATH` includes `~/.local/bin` or `/Users/bmf/.local/bin`
+- Re-run `uv tool install --editable . --force`
+- Check for errors in fzf output (stderr)
+
+**Time Breakdown**:
+- Verify installation: 1 minute
+- Test reload command directly: 1 minute
+- Launch fzf: 1 minute
+- Test add + reload: 2 minutes
+- Test enable + reload: 2 minutes
+- Test disable + reload: 2 minutes
+- Test remove + reload: 2 minutes
+- Test preview/info: 2 minutes
+- Test exit: 1 minute
+- Document results: 1 minute
+- **Total**: 15 minutes
+
+---
+
+## P2: Add Packaging Test (OPTIONAL)
+
+**Status**: Not Started
+**Effort**: Small (30 minutes)
+**Dependencies**: None
+**Spec Reference**: Testing strategy • **Status Reference**: STATUS-2025-11-05-232752.md section "Testing Strategy to Prevent Regression"
+
+### Description
+
+Add automated tests to verify console scripts (defined in `pyproject.toml` `[project.scripts]`) are correctly installed and executable. This prevents regression of the "stale installation" issue where `mcpi-tui-reload` was implemented in code but not installed because package wasn't reinstalled after `pyproject.toml` changes.
+
+**Evidence from STATUS**:
+- Issue 1 root cause: Console script defined in pyproject.toml but not installed
+- Gap in test coverage: No test verifies packaging/installation works
+- Existing tests have 91% coverage but all test code directly, not installed commands
+
+### Acceptance Criteria
+
+- [ ] New test file created: `tests/test_packaging.py`
+- [ ] Test verifies all console scripts are in PATH: `test_console_scripts_installed()`
+- [ ] Test verifies `mcpi-tui-reload` executes successfully: `test_mcpi_tui_reload_executes()`
+- [ ] Tests pass in CI (where fresh installation occurs)
+- [ ] Tests provide clear error messages if console scripts missing
+
+### Technical Notes
+
+**File**: `tests/test_packaging.py` (NEW FILE)
+
+**Implementation**:
+```python
+"""Tests for packaging and installation integrity."""
+
+import subprocess
+import pytest
+
+
+class TestConsoleScripts:
+    """Verify console scripts are installed correctly."""
+
+    def test_console_scripts_in_path(self):
+        """Verify all console scripts from pyproject.toml are in PATH."""
+        # These should match [project.scripts] in pyproject.toml
+        scripts = ["mcpi", "mcpi-tui-reload"]
+
+        for script in scripts:
+            result = subprocess.run(
+                ["which", script],
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 0, (
+                f"Console script '{script}' not found in PATH. "
+                f"Run: uv tool install --editable . --force"
+            )
+            assert script in result.stdout, (
+                f"Unexpected output from 'which {script}': {result.stdout}"
+            )
+
+    def test_mcpi_tui_reload_executes(self):
+        """Verify mcpi-tui-reload command works."""
+        result = subprocess.run(
+            ["mcpi-tui-reload"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, (
+            f"mcpi-tui-reload failed with exit code {result.returncode}\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+        # Should output server list (at least one line)
+        assert len(result.stdout) > 0, "mcpi-tui-reload produced no output"
+        # Should contain server formatting (either ANSI codes or server names)
+        assert "[" in result.stdout or "\033[" in result.stdout, (
+            "mcpi-tui-reload output doesn't look like server list"
+        )
+
+    def test_mcpi_executes(self):
+        """Verify mcpi command works."""
+        result = subprocess.run(
+            ["mcpi", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, (
+            f"mcpi --help failed with exit code {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+        # Should contain help text
+        assert "Usage:" in result.stdout or "usage:" in result.stdout.lower(), (
+            "mcpi --help doesn't show usage information"
+        )
+```
+
+**Why This Matters**:
+- Prevents regression of Issue 1 (console script not installed)
+- Catches packaging problems early (in CI)
+- Documents expected installation state
+- Provides clear error messages for developers
+
+**CI Integration**:
+- Already handled - CI runs `pytest` which will pick up new test file
+- Fresh installation occurs in CI, so tests will always verify current state
+- Failure in CI indicates packaging regression
+
+**Local Development**:
+- Test may fail locally if developer hasn't run `uv tool install --force` after changes
+- Error message guides developer to fix: "Run: uv tool install --editable . --force"
+
+**Time Breakdown**:
+- Create test file: 5 minutes
+- Write test_console_scripts_in_path: 10 minutes
+- Write test_mcpi_tui_reload_executes: 10 minutes
+- Run tests locally: 3 minutes
+- Commit: 2 minutes
+- **Total**: 30 minutes
+
+---
+
+## P3: Update Documentation (OPTIONAL)
+
+**Status**: Not Started
+**Effort**: Small (15 minutes)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md • **Status Reference**: STATUS-2025-11-05-232752.md section "Documentation Updates"
+
+### Description
+
+Update CLAUDE.md with troubleshooting guidance about reinstalling after `pyproject.toml` changes. This prevents future developers from encountering Issue 1 (stale installation state) and provides clear resolution steps.
+
+**Evidence from STATUS**:
+- Issue 1 was caused by stale installation (pyproject.toml changed, package not reinstalled)
+- Documentation gap: CLAUDE.md doesn't mention `--force` flag requirement
+- Developer confusion: Manual testing worked (PYTHONPATH) but installation didn't (PATH)
+
+### Acceptance Criteria
+
+- [ ] CLAUDE.md updated with reinstallation guidance
+- [ ] Troubleshooting section added or updated
+- [ ] Clear explanation of when `--force` is needed
+- [ ] Examples provided for common scenarios
+
+### Technical Notes
+
+**File**: `CLAUDE.md`
+
+**Section to Add/Update**: After "Environment Setup" section (around line 40)
+
+**Content**:
+```markdown
+### Troubleshooting: Reinstalling After Changes
+
+**Issue**: Console scripts (like `mcpi-tui-reload`) not found in PATH after code changes
+
+**Cause**: When `pyproject.toml` `[project.scripts]` is modified, UV doesn't automatically reinstall console scripts if the package version hasn't changed.
+
+**Solution**:
+```bash
+# Force reinstallation to regenerate console scripts
+uv tool install --editable . --force
+```
+
+**When to Reinstall**:
+- After modifying `[project.scripts]` in `pyproject.toml`
+- After pulling changes that modify `pyproject.toml`
+- When console scripts are missing from PATH
+- After switching branches that modify entry points
+
+**Verification**:
+```bash
+# Check that both console scripts are installed
+which mcpi
+which mcpi-tui-reload
+
+# Both should return paths like:
+# /Users/username/.local/bin/mcpi
+# /Users/username/.local/bin/mcpi-tui-reload
+```
+
+**Note**: This is NOT needed when only code changes (`.py` files) are made. Editable installs automatically pick up code changes. Only reinstall when `pyproject.toml` changes affect entry points or dependencies.
+```
+
+**Alternative Location**: Could add to existing troubleshooting section if one exists
+
+**Benefits**:
+- Prevents developer confusion
+- Reduces debugging time for similar issues
+- Documents expected behavior
+- Provides clear resolution steps
+
+**Time Breakdown**:
+- Locate insertion point: 2 minutes
+- Write content: 8 minutes
+- Review and edit: 3 minutes
+- Commit: 2 minutes
+- **Total**: 15 minutes
+
+---
+
+## Recommended Execution Order
+
+### Phase 1: Ship-Ready (45-75 minutes)
+1. **P0**: Fix header truncation (30-60 min)
+2. **P1**: Verify installation and functionality (15 min)
+
+**After Phase 1**: Feature is production-ready and can ship
+
+### Phase 2: Quality Improvements (Optional, 45 minutes)
+3. **P2**: Add packaging test (30 min)
+4. **P3**: Update documentation (15 min)
+
+**After Phase 2**: Feature has regression prevention and better developer experience
+
+---
+
+## Commit Strategy
+
+### For P0 (Header Fix):
+```bash
+git add src/mcpi/tui.py
+git commit -m "fix(tui): use multi-line header to prevent truncation
+
+Current single-line header (113 chars) gets truncated on standard
+terminals, hiding important shortcuts (ctrl-d, ctrl-i, enter, esc).
+
+Changes:
+- Split header into 3 logical lines (max 60 chars each)
+- Group operations, info, and navigation shortcuts
+- Improves discoverability and UX
+
+Issue: Header text truncated on narrow terminals (80-120 cols)
+Fix: Multi-line header with logical grouping
+Status: Tested on 80-col and 120-col terminals
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+### For P2 (Packaging Test):
+```bash
+git add tests/test_packaging.py
+git commit -m "test(packaging): add console script installation verification
+
+Prevents regression of issue where mcpi-tui-reload console script
+was defined in pyproject.toml but not installed due to stale
+installation state.
+
+Tests:
+- Verify all console scripts are in PATH
+- Verify mcpi-tui-reload executes successfully
+- Verify mcpi executes successfully
+
+Root cause of previous issue:
+- Console script added to pyproject.toml
+- Package not reinstalled with --force flag
+- Script definition existed but binary not generated
+- Manual testing with PYTHONPATH worked, but PATH didn't
+
+This test catches such issues in CI before they reach users.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+### For P3 (Documentation):
+```bash
+git add CLAUDE.md
+git commit -m "docs(dev): add troubleshooting for console script installation
+
+Documents the need to run 'uv tool install --force' after modifying
+pyproject.toml [project.scripts] section.
+
+Prevents confusion when:
+- Console scripts defined but not installed
+- Manual testing works (PYTHONPATH) but commands fail (PATH)
+- Installation state becomes stale after config changes
+
+Provides clear verification and resolution steps.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+---
+
+## Success Metrics
+
+### P0 (Header Fix)
+- [ ] All keyboard shortcuts visible on 80-column terminal
+- [ ] All keyboard shortcuts visible on 120-column terminal
+- [ ] No user complaints about truncated help text
+- [ ] Improved discoverability (users can see all shortcuts)
+
+### P1 (Verification)
+- [ ] Manual testing checklist 100% complete
+- [ ] All fzf operations work with reload
+- [ ] No errors or warnings during usage
+- [ ] Can confidently ship feature to users
+
+### P2 (Packaging Test)
+- [ ] CI detects packaging regressions automatically
+- [ ] Clear error messages guide developers
+- [ ] Test passes consistently in CI
+
+### P3 (Documentation)
+- [ ] Developers know when to reinstall
+- [ ] Troubleshooting time reduced
+- [ ] Fewer questions about "command not found" errors
+
+---
+
+## Risk Assessment
+
+### P0 (Header Fix)
+- **Risk**: VERY LOW
+- **Scope**: Isolated to header string only
+- **Impact**: High (improves UX significantly)
+- **Regression Risk**: None (change doesn't affect functionality)
+- **Test Coverage**: Covered by existing tests + manual verification
+
+### P1 (Verification)
+- **Risk**: VERY LOW
+- **Scope**: Manual testing only, no code changes
+- **Impact**: High (confirms feature works)
+- **Value**: Builds confidence for shipping
+
+### P2 (Packaging Test)
+- **Risk**: VERY LOW
+- **Scope**: New test file, doesn't modify existing code
+- **Impact**: Medium (prevents future regressions)
+- **Value**: Catches packaging issues early
+
+### P3 (Documentation)
+- **Risk**: NONE
+- **Scope**: Documentation only
+- **Impact**: Low (helps future developers)
+- **Value**: Reduces support burden
+
+---
+
+## Alignment with Project Spec
+
+**From CLAUDE.md**:
+- "Focus on simplicity, reliability, and principle of least surprise" ✅
+  - Multi-line header is simpler to read
+  - Prevents surprise of hidden shortcuts
+
+- "Doing it right the first time is far more efficient" ✅
+  - P0 fixes UX issue properly (multi-line, not just shorter text)
+  - P2 prevents regression permanently (test coverage)
+
+- "Testable code is highly valued" ✅
+  - Header change is testable (unit test + manual)
+  - P2 adds packaging test (valuable regression prevention)
+
+**From STATUS Report**:
+- Issue 1: RESOLVED (verified in P1)
+- Issue 2: FIX REQUIRED (addressed in P0)
+- Overall Status: 90% → 100% after P0+P1
+- Time to Ship: 45-75 minutes (realistic estimate)
+
+---
+
+## Provenance
+
+**Input Documents**:
+- STATUS-2025-11-05-232752.md (latest project status)
+- CLAUDE.md (development guidelines)
+- src/mcpi/tui.py (implementation to modify)
+- tests/test_tui_fzf.py (existing test coverage)
+- pyproject.toml (console script definitions)
+
+**Assessment Methodology**:
+- Consumed STATUS report as single source of truth
+- Verified claims through code review
+- Cross-referenced with git history
+- Aligned with project specification principles
+
+**Generation Timestamp**: 2025-11-05 23:32:12
+
+**Backlog Owner**: Development team
+
+**Next Action**: Execute P0 (30-60 min) then P1 (15 min) to ship feature
+
+---
+
+## File Management
+
+This backlog creates the following planning artifact:
+- **PLAN-2025-11-05-233212.md** (this file)
+
+**Retention Policy**: Keep last 4 PLAN files, archive older ones to `.agent_planning/archive/`
+
+**Related Files**:
+- STATUS-2025-11-05-232752.md (input, authoritative current state)
+- BACKLOG-FZF-IMPLEMENTATION-FIX-2025-11-05.md (previous assessment, outdated)
+- BACKLOG.md (general backlog, may need status update)
+
+**After Completion**: Update status in BACKLOG.md to reflect Issue 2 resolution and 100% TUI completion.

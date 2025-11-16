@@ -73,6 +73,16 @@ class MCPTestHarness:
         )
         self.path_overrides["user-global-disabled"] = disabled_tracking_file
 
+        # Add the disabled tracking file for user-internal scope
+        # This is used to track disabled servers in user-internal scope
+        user_internal_disabled_tracking_file = (
+            self.tmp_dir
+            / f"{client_name}_user-internal-disabled_.mcpi-disabled-servers.json"
+        )
+        self.path_overrides["user-internal-disabled"] = (
+            user_internal_disabled_tracking_file
+        )
+
         return self.path_overrides
 
     def prepopulate_file(self, scope_name: str, content: Dict[str, Any]) -> None:
@@ -279,7 +289,7 @@ def mcp_manager_with_harness(mcp_harness):
     custom_plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
 
     # Create a registry and inject our custom plugin
-    registry = ClientRegistry()
+    registry = ClientRegistry(auto_discover=False)
     registry.inject_client_instance("claude-code", custom_plugin)
 
     # Create manager with our custom registry
@@ -335,7 +345,7 @@ def prepopulated_harness(mcp_harness):
         },
     )
 
-    # User-internal with a regular server
+    # User-internal with a regular server and a disabled server
     mcp_harness.prepopulate_file(
         "user-internal",
         {
@@ -344,7 +354,13 @@ def prepopulated_harness(mcp_harness):
                     "command": "node",
                     "args": ["internal-server.js"],
                     "type": "stdio",
-                }
+                },
+                "disabled-server": {
+                    "command": "node",
+                    "args": ["disabled-server.js"],
+                    "type": "stdio",
+                    "disabled": True,
+                },
             }
         },
     )

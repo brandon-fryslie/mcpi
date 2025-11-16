@@ -1,0 +1,374 @@
+# Planning Summary - Post-DIP Phase 1 Backlog
+
+**Generated**: 2025-11-07 02:42:00
+**Source**: STATUS-2025-11-07-023418.md
+**Action**: Created comprehensive backlog reflecting DIP Phase 1 completion
+
+---
+
+## Summary
+
+Successfully created updated backlog following completion of DIP Phase 1 (P0-1 and P0-2). The project is at 87% completion with all core features functional and production-ready pending documentation updates.
+
+---
+
+## Actions Taken
+
+### 1. Created New BACKLOG.md
+
+**File**: `.agent_planning/BACKLOG.md`
+
+**Contents**:
+- **P0 (Critical - 1 item)**: Documentation update (2-3 hours) - BLOCKER for release
+- **P1 (High - 4 items)**: Manual fzf verification, CLI factory injection, preview pane UX, test harness fixes (1-2 weeks total)
+- **P2 (Medium - 7 items)**: Phase 2 DIP work, installer/TUI tests, UX enhancements (3-5 weeks total)
+- **P3 (Low - 4 items)**: Phase 3-4 DIP work, coverage increases, cleanup (8-12 weeks total)
+
+**Key Features**:
+- Prioritized by impact and urgency
+- Clear effort estimates
+- Dependencies mapped
+- Acceptance criteria for each item
+- Sprint planning recommendations
+- Risk assessment
+
+---
+
+### 2. Archived Obsolete Planning Files
+
+**Archived Files**:
+1. `BACKLOG-2025-11-06-010234.md` → `archive/BACKLOG-2025-11-06-010234.md.archived`
+   - Reason: Superseded by new backlog, focused on pre-DIP state
+
+2. `PLAN-DIP-REMEDIATION-2025-11-07-010528.md` → `archive/PLAN-DIP-REMEDIATION-2025-11-07-010528.md.archived`
+   - Reason: Phase 1 (P0-1, P0-2) complete, remaining phases integrated into new backlog
+
+---
+
+### 3. Cleaned Up STATUS Files
+
+**Deleted**: `STATUS-2025-11-05-232752.md` (oldest)
+
+**Remaining STATUS Files** (4, per retention policy):
+1. STATUS-2025-11-05-235152.md
+2. STATUS-2025-11-06-164217.md
+3. STATUS-2025-11-07-010000.md (before DIP implementation)
+4. STATUS-2025-11-07-023418.md (latest - after DIP Phase 1 complete)
+
+---
+
+## Key Insights from STATUS Report
+
+### Completed Work (Since Last Planning)
+
+**DIP Phase 1 - 100% COMPLETE**:
+- ✅ P0-1: ServerCatalog refactored (13 passing tests)
+- ✅ P0-2: MCPManager refactored (15 passing tests)
+- ✅ All production code migrated to factory pattern
+- ✅ 26 comprehensive DIP tests (all passing)
+- ✅ Zero test regressions (maintained 85% pass rate)
+
+**Evidence of Success**:
+- Test pass rate: 583/682 (85%) - no regression from pre-DIP 86%
+- DIP tests: 26/30 passing (4 intentionally skipped awaiting P1-2)
+- Production code: 100% migrated (grep verified)
+- Code quality: Anti-patterns eliminated
+- Breaking changes: Well-documented in audit, need user-facing docs
+
+---
+
+### Critical Blocker Identified
+
+**Documentation Outdated** (TD-1):
+- **Impact**: BLOCKING release
+- **Effort**: 2-3 hours
+- **Files**: README.md, CLAUDE.md, CHANGELOG.md
+- **Issue**: Breaking changes from P0-1/P0-2 not documented for users
+- **Risk**: Users cannot upgrade without migration guide
+
+**This is the ONLY blocker** preventing immediate release.
+
+---
+
+### Remaining Work Breakdown
+
+**P0 (This Week)**:
+- Documentation update: 2-3 hours
+
+**P1 (Next 2 Weeks)**:
+- Manual fzf verification: 15 minutes
+- CLI factory injection: 3-5 days
+- Preview pane UX: 1.5-2.5 hours
+- Test harness fixes: 1-2 hours
+
+**P2 (Next Month)**:
+- Phase 2 DIP work: 2-3 weeks
+- Installer test coverage: 5-10 days
+- TUI test coverage: 3-5 days
+- UX enhancements: 2 hours total
+
+**P3 (Next Quarter)**:
+- Phase 3 DIP: 1-2 weeks
+- Phase 4 DIP: 2-4 weeks
+- Coverage increase: 2-4 weeks
+- Code cleanup: 1-2 hours
+
+---
+
+## Backlog Structure
+
+### Organization
+
+The backlog is organized by priority level with clear sections:
+
+1. **Executive Summary**: Current state, completion %, remaining work by priority
+2. **P0 (Critical)**: Work blocking release or critical functionality
+3. **P1 (High)**: Work needed in next 2 weeks for quality and completeness
+4. **P2 (Medium)**: Work needed in next month for architectural improvements
+5. **P3 (Low)**: Work for next quarter for polish and optimization
+6. **Dependency Graph**: Visual representation of work dependencies
+7. **Sprint Planning**: Recommended breakdown into executable sprints
+8. **Risk Assessment**: Analysis of release and technical risks
+9. **Comparison**: How this backlog relates to previous planning
+10. **Success Metrics**: Clear criteria for short/medium/long-term success
+
+---
+
+### Work Item Format
+
+Each backlog item follows this structure:
+
+```markdown
+### [Priority]-[Number]: [Title]
+
+**Status**: Not Started | In Progress | Blocked
+**Effort**: Small (hours) | Medium (days) | Large (weeks)
+**Dependencies**: [List of prerequisite items]
+**Impact**: [Description of why this matters]
+**Spec Reference**: [CLAUDE.md section] • **Status Reference**: [STATUS file section]
+
+#### Description
+[Clear explanation of what needs to be done and why]
+
+#### Acceptance Criteria
+- [ ] Specific, testable criterion 1
+- [ ] Specific, testable criterion 2
+...
+
+#### Technical Notes
+[Implementation hints, file references, search patterns, etc.]
+```
+
+---
+
+## Key Decisions
+
+### 1. Documentation is P0 (Not P1)
+
+**Rationale**: Breaking changes without documentation are a release blocker. Users cannot upgrade without knowing how to migrate. This is higher priority than feature work.
+
+### 2. Phase 2-4 DIP Work is P2-P3 (Not P1)
+
+**Rationale**: Phase 1 DIP provides the critical architectural foundation. Phase 2-4 are important for long-term code quality but don't block release or critical features.
+
+### 3. Installer/TUI Tests are P2 (Not P1)
+
+**Rationale**: These modules work in practice, but lack test safety net. Risk is moderate, not high. Can address after more pressing work.
+
+### 4. Small UX Enhancements Bundled in P2
+
+**Rationale**: Items like persistent scope memory, color-coded scopes, and bidirectional cycling are quick wins (30 min each) that can be bundled together for efficient execution.
+
+---
+
+## Next Steps
+
+### Immediate (Today)
+
+1. **Complete P0 Documentation Update** (2-3 hours)
+   - Update README.md with factory function examples
+   - Add DIP migration guide to CLAUDE.md
+   - Document breaking changes in CHANGELOG.md
+   - Review for accuracy
+
+2. **Manual fzf Verification** (15 minutes) - RECOMMENDED
+   - Follow test workflow in P1-1
+   - Verify scope cycling works in real terminal
+   - Confirm all keyboard shortcuts functional
+
+### This Week
+
+3. **Tag Release** (after P0 complete)
+   - Create git tag for v1.0 (or appropriate version)
+   - Update version in pyproject.toml
+   - Push to repository
+
+### Next 2 Weeks
+
+4. **Begin P1 Work**
+   - CLI factory injection (3-5 days)
+   - Preview pane UX fixes (1.5-2.5 hours)
+   - Test harness fixes (1-2 hours)
+
+---
+
+## Quality Gates
+
+### Release Gate (v1.0)
+
+**MUST COMPLETE**:
+- [ ] P0: Documentation update (2-3 hours)
+
+**RECOMMENDED**:
+- [ ] P1: Manual fzf verification (15 minutes)
+
+**After Gate**: Ready to tag and release
+
+---
+
+### Next Release Gate (v1.0.1)
+
+**SHOULD COMPLETE**:
+- [ ] P1: CLI factory injection (enables 4 skipped tests)
+- [ ] P1: Preview pane UX fixes (professional polish)
+- [ ] P1: Test harness fixes (87%+ test pass rate)
+
+**After Gate**: All Phase 1 DIP work complete, UX polished
+
+---
+
+## Success Metrics
+
+### Immediate Success (This Week)
+
+- Documentation complete and accurate
+- Breaking changes clearly communicated
+- Migration path documented
+- Ready to release
+
+### Short-Term Success (2 Weeks)
+
+- All Phase 1 DIP tests passing (no skipped tests)
+- fzf UX polished
+- Test pass rate at 87%+
+
+### Medium-Term Success (1 Month)
+
+- Phase 2 DIP complete
+- Installer coverage at 60%+
+- TUI coverage at 60%+
+
+### Long-Term Success (3 Months)
+
+- Full DIP compliance
+- Overall coverage at 40%+
+- Clean, maintainable codebase
+
+---
+
+## Risk Assessment
+
+### Release Risk: LOW
+
+**Blocker**: Documentation (2-3 hours)
+
+**After Blocker**: No technical risks, all features functional
+
+**Confidence**: 95%
+
+---
+
+### Technical Debt Risk: MODERATE
+
+**High-Priority Debt** (P1): ~1 week of work
+**Medium-Priority Debt** (P2): ~4-6 weeks of work
+**Low-Priority Debt** (P3): ~8-12 weeks of work
+
+**Assessment**: Well-documented, prioritized, manageable
+
+---
+
+### Test Quality Risk: LOW
+
+**Evidence**:
+- 85% pass rate stable for weeks
+- DIP tests un-gameable (verified)
+- Core paths well-covered
+- No recent regressions
+
+**Issues**:
+- 84 failing tests (pre-existing)
+- 13 TUI failures (mock issues)
+
+**Assessment**: Core quality excellent, peripheral debt known
+
+---
+
+## Comparison to Previous Plans
+
+### vs. BACKLOG-2025-11-06-010234.md
+
+**Major Differences**:
+1. ✅ Scope cycling now complete (was in progress)
+2. ✅ DIP Phase 1 now complete (was not started)
+3. 🆕 Documentation is now P0 blocker (was not mentioned)
+4. 🆕 Added Phase 2-4 DIP work items
+5. 🆕 Added installer/TUI test coverage items
+
+**Assessment**: Significant progress made, new work items identified
+
+---
+
+### vs. PLAN-DIP-REMEDIATION-2025-11-07-010528.md
+
+**DIP Plan Integration**:
+- Phase 1 (P0-1, P0-2): ✅ Complete - removed from backlog
+- Phase 2 (5 items): → Moved to P2-1 in new backlog
+- Phase 3 (4 items): → Moved to P3-1 in new backlog
+- Phase 4 (4 items): → Moved to P3-2 in new backlog
+
+**Assessment**: DIP work successfully integrated into unified backlog
+
+---
+
+## File Reference
+
+### Planning Files (Active)
+
+**Primary**: `BACKLOG.md` - Main prioritized work list
+
+**Supporting**:
+- `DIP_AUDIT-2025-11-07-010149.md` - Reference for Phase 2-4 DIP details
+- `ANALYSIS-FZF-UX-ISSUES-2025-11-06.md` - Reference for UX improvements
+- `MANUAL_TEST_CHECKLIST.md` - Reference for manual testing workflows
+
+### Planning Files (Archived)
+
+**Recently Archived**:
+- `archive/BACKLOG-2025-11-06-010234.md.archived` - Pre-DIP backlog
+- `archive/PLAN-DIP-REMEDIATION-2025-11-07-010528.md.archived` - Phase 1 complete
+
+### STATUS Files (Active)
+
+**Latest**: `STATUS-2025-11-07-023418.md` - Source for this backlog
+
+**Historical** (for context):
+- `STATUS-2025-11-07-010000.md` - Before DIP implementation
+- `STATUS-2025-11-06-164217.md` - Before scope cycling
+- `STATUS-2025-11-05-235152.md` - Earlier baseline
+
+---
+
+## Conclusion
+
+The backlog accurately reflects the current project state (87% complete, DIP Phase 1 done) and provides a clear roadmap for remaining work. The single P0 blocker (documentation) is well-defined and achievable this week, enabling immediate release.
+
+Subsequent work is well-prioritized across P1 (2 weeks), P2 (1 month), and P3 (3 months) timeframes with realistic effort estimates and clear dependencies.
+
+**Project Status**: EXCELLENT - Ready to ship after documentation update
+
+**Next Action**: Complete P0 documentation (2-3 hours)
+
+---
+
+**END OF SUMMARY**

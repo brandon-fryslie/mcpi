@@ -15,11 +15,17 @@ logger = logging.getLogger(__name__)
 class ClientRegistry:
     """Registry for MCP client plugins with auto-discovery."""
 
-    def __init__(self) -> None:
-        """Initialize the client registry."""
+    def __init__(self, auto_discover: bool = True) -> None:
+        """Initialize the client registry.
+
+        Args:
+            auto_discover: Whether to automatically discover and register plugins.
+                          Set to False for testing to avoid instantiation issues.
+        """
         self._plugins: Dict[str, Type[MCPClientPlugin]] = {}
         self._instances: Dict[str, MCPClientPlugin] = {}
-        self._discover_plugins()
+        if auto_discover:
+            self._discover_plugins()
 
     def _discover_plugins(self) -> None:
         """Automatically discover and register client plugins."""

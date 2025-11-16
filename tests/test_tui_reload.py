@@ -20,8 +20,10 @@ import pytest
 from click.testing import CliRunner
 
 from mcpi.clients import MCPManager, ServerConfig
+from mcpi.clients.manager import create_default_manager
+from mcpi.clients.registry import ClientRegistry
 from mcpi.clients.types import ServerInfo, ServerState
-from mcpi.registry.catalog import MCPServer, ServerCatalog
+from mcpi.registry.catalog import MCPServer, ServerCatalog, create_default_catalog
 
 # Import CLI after checking if command exists
 from mcpi import cli
@@ -58,30 +60,34 @@ class TestReloadServerListFunction:
 
         # Create real test harness with actual files
         test_config_path = tmp_path / "test_settings.json"
-        test_config_path.write_text(json.dumps({
-            "mcpEnabled": True,
-            "mcpServers": {
-                "test-server": {
-                    "command": "npx",
-                    "args": ["-y", "test"],
-                    "type": "stdio"
+        test_config_path.write_text(
+            json.dumps(
+                {
+                    "mcpEnabled": True,
+                    "mcpServers": {
+                        "test-server": {
+                            "command": "npx",
+                            "args": ["-y", "test"],
+                            "type": "stdio",
+                        }
+                    },
                 }
-            }
-        }))
+            )
+        )
 
         # Create REAL plugin with path overrides
         path_overrides = {"user-global": test_config_path}
         real_plugin = ClaudeCodePlugin(path_overrides=path_overrides)
 
         # Create REAL registry and manager
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_manager.registry = registry
+        # Pass registry to manager to avoid creating new registry with safety violations
+        real_manager = MCPManager(default_client="claude-code", registry=registry)
 
         # Create REAL catalog (with minimal test data)
-        real_catalog = ServerCatalog()
+        real_catalog = create_default_catalog()
         # Add test server to catalog
         real_catalog._servers = {
             "test-server": MCPServer(
@@ -91,24 +97,9 @@ class TestReloadServerListFunction:
             )
         }
 
-        # Patch the factory functions to return our real instances
-        def mock_create_manager():
-            return real_manager
-
-        def mock_create_catalog():
-            return real_catalog
-
-        # Import and patch at module level
-        import mcpi.tui
-        monkeypatch.setattr(mcpi.tui, "MCPManager", lambda: real_manager)
-        monkeypatch.setattr(mcpi.tui, "ServerCatalog", lambda: real_catalog)
-
-        # Mock the actual initialization in reload_server_list
-        # This is the ONLY mocking - everything else is real
-        with patch('mcpi.tui.MCPManager', return_value=real_manager):
-            with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
-                # Call the actual function
-                reload_server_list()
+        # Call the function with our real instances (no mocking needed!)
+        # This is the correct way - pass configured instances directly
+        reload_server_list(catalog=real_catalog, manager=real_manager)
 
         # Capture stdout
         captured = capsys.readouterr()
@@ -120,12 +111,18 @@ class TestReloadServerListFunction:
         assert "test-server" in captured.out, "Output must contain server ID"
 
         # Verify output contains the description
-        assert "Test server for reload" in captured.out, "Output must contain description"
+        assert (
+            "Test server for reload" in captured.out
+        ), "Output must contain description"
 
         # Verify output uses correct format (status indicator)
-        assert "[" in captured.out and "]" in captured.out, "Output must have status indicators"
+        assert (
+            "[" in captured.out and "]" in captured.out
+        ), "Output must have status indicators"
 
-    def test_reload_format_matches_build_server_list(self, tmp_path, capsys, monkeypatch):
+    def test_reload_format_matches_build_server_list(
+        self, tmp_path, capsys, monkeypatch
+    ):
         """Verify reload_server_list outputs same format as build_server_list.
 
         This ensures consistency between initial launch and reload.
@@ -137,43 +134,56 @@ class TestReloadServerListFunction:
 
         # Setup real test environment
         test_config = tmp_path / "config.json"
-        test_config.write_text(json.dumps({
-            "mcpEnabled": True,
-            "mcpServers": {
-                "server1": {"command": "npx", "args": ["server1"], "type": "stdio"},
-                "server2": {"command": "node", "args": ["server2"], "type": "stdio"},
-            }
-        }))
+        test_config.write_text(
+            json.dumps(
+                {
+                    "mcpEnabled": True,
+                    "mcpServers": {
+                        "server1": {
+                            "command": "npx",
+                            "args": ["server1"],
+                            "type": "stdio",
+                        },
+                        "server2": {
+                            "command": "node",
+                            "args": ["server2"],
+                            "type": "stdio",
+                        },
+                    },
+                }
+            )
+        )
 
         # Create REAL objects
         real_plugin = ClaudeCodePlugin(path_overrides={"user-global": test_config})
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_manager.registry = registry
+        real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = ServerCatalog()
+        real_catalog = create_default_catalog()
         real_catalog._servers = {
             "server1": MCPServer(description="Server One", command="npx"),
             "server2": MCPServer(description="Server Two", command="node"),
         }
 
         # Get expected output from build_server_list
-        expected_lines = build_server_list(real_catalog, real_manager)
+        # build_server_list is now a method on FzfAdapter, use the adapter directly
+        from mcpi.tui.adapters.fzf import FzfAdapter
+
+        adapter = FzfAdapter()
+        expected_lines = adapter._build_server_list(real_catalog, real_manager)
         expected_output = "\n".join(expected_lines) + "\n"
 
         # Get actual output from reload_server_list
-        with patch('mcpi.tui.MCPManager', return_value=real_manager):
-            with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
-                reload_server_list()
+        reload_server_list(catalog=real_catalog, manager=real_manager)
 
         actual_output = capsys.readouterr().out
 
         # Verify outputs match exactly
-        assert actual_output == expected_output, (
-            "reload_server_list must output same format as build_server_list"
-        )
+        assert (
+            actual_output == expected_output
+        ), "reload_server_list must output same format as build_server_list"
 
     def test_reload_with_empty_registry(self, capsys, monkeypatch):
         """Verify reload handles empty registry gracefully.
@@ -183,13 +193,18 @@ class TestReloadServerListFunction:
         from mcpi.tui import reload_server_list
 
         # Create REAL manager and catalog with no servers
-        real_manager = MCPManager(default_client="claude-code")
-        real_catalog = ServerCatalog()
-        real_catalog._servers = {}
+        # Use empty registry to avoid client detection in test mode
+        empty_registry = ClientRegistry(auto_discover=False)
+        real_manager = MCPManager(registry=empty_registry, default_client=None)
+        real_catalog = create_default_catalog()
+        # Set up empty registry to avoid loading default registry
+        from mcpi.registry.catalog import ServerRegistry
 
-        with patch('mcpi.tui.MCPManager', return_value=real_manager):
-            with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
-                reload_server_list()
+        real_catalog._registry = ServerRegistry(servers={})
+        real_catalog._loaded = True
+
+        # Call the function with our real instances
+        reload_server_list(catalog=real_catalog, manager=real_manager)
 
         output = capsys.readouterr().out
 
@@ -208,21 +223,37 @@ class TestReloadServerListFunction:
 
         # Create config with servers in different states
         enabled_config = tmp_path / "enabled.json"
-        enabled_config.write_text(json.dumps({
-            "mcpEnabled": True,
-            "mcpServers": {
-                "enabled-server": {"command": "npx", "args": ["enabled"], "type": "stdio"}
-            }
-        }))
+        enabled_config.write_text(
+            json.dumps(
+                {
+                    "mcpEnabled": True,
+                    "mcpServers": {
+                        "enabled-server": {
+                            "command": "npx",
+                            "args": ["enabled"],
+                            "type": "stdio",
+                        }
+                    },
+                }
+            )
+        )
 
         disabled_config = tmp_path / "disabled.json"
-        disabled_config.write_text(json.dumps({
-            "mcpEnabled": True,
-            "disabledMcpjsonServers": ["disabled-server"],
-            "mcpServers": {
-                "disabled-server": {"command": "npx", "args": ["disabled"], "type": "stdio"}
-            }
-        }))
+        disabled_config.write_text(
+            json.dumps(
+                {
+                    "mcpEnabled": True,
+                    "disabledMcpjsonServers": ["disabled-server"],
+                    "mcpServers": {
+                        "disabled-server": {
+                            "command": "npx",
+                            "args": ["disabled"],
+                            "type": "stdio",
+                        }
+                    },
+                }
+            )
+        )
 
         # Create REAL plugin with multiple scopes
         path_overrides = {
@@ -231,22 +262,20 @@ class TestReloadServerListFunction:
         }
         real_plugin = ClaudeCodePlugin(path_overrides=path_overrides)
 
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_manager.registry = registry
+        real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = ServerCatalog()
+        real_catalog = create_default_catalog()
         real_catalog._servers = {
             "enabled-server": MCPServer(description="Enabled", command="npx"),
             "disabled-server": MCPServer(description="Disabled", command="npx"),
             "not-installed": MCPServer(description="Not Installed", command="npx"),
         }
 
-        with patch('mcpi.tui.MCPManager', return_value=real_manager):
-            with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
-                reload_server_list()
+        # Call the function with our real instances
+        reload_server_list(catalog=real_catalog, manager=real_manager)
 
         output = capsys.readouterr().out
 
@@ -279,15 +308,15 @@ class TestTuiReloadCLICommand:
         Cannot be gamed - checks actual CLI structure.
         """
         # Check if command exists in CLI group
-        assert hasattr(cli, 'main'), "CLI must have main group"
+        assert hasattr(cli, "main"), "CLI must have main group"
 
         # Get all registered commands
         commands = cli.main.commands
 
         # Verify tui-reload command exists
-        assert 'tui-reload' in commands, (
-            "CLI must have 'tui-reload' command for fzf integration"
-        )
+        assert (
+            "tui-reload" in commands
+        ), "CLI must have 'tui-reload' command for fzf integration"
 
     def test_tui_reload_command_executes_successfully(self, tmp_path):
         """Verify tui-reload command executes without errors.
@@ -297,7 +326,7 @@ class TestTuiReloadCLICommand:
         runner = CliRunner()
 
         # Execute the command
-        result = runner.invoke(cli.main, ['tui-reload'])
+        result = runner.invoke(cli.main, ["tui-reload"])
 
         # Verify successful execution
         assert result.exit_code == 0, (
@@ -315,7 +344,7 @@ class TestTuiReloadCLICommand:
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             # Run command
-            result = runner.invoke(cli.main, ['tui-reload'])
+            result = runner.invoke(cli.main, ["tui-reload"])
 
             assert result.exit_code == 0, "Command must succeed"
 
@@ -332,12 +361,10 @@ class TestTuiReloadCLICommand:
         runner = CliRunner()
 
         # Test with explicit client selection
-        result = runner.invoke(cli.main, ['--client', 'claude-code', 'tui-reload'])
+        result = runner.invoke(cli.main, ["--client", "claude-code", "tui-reload"])
 
         # Should succeed (or fail gracefully if client not available)
-        assert result.exit_code in [0, 1], (
-            "Command should succeed or fail gracefully"
-        )
+        assert result.exit_code in [0, 1], "Command should succeed or fail gracefully"
 
     def test_tui_reload_command_via_subprocess(self):
         """Verify tui-reload works when called as subprocess (like fzf does).
@@ -366,9 +393,9 @@ class TestTuiReloadCLICommand:
             # If successful, should have some output (or empty if no servers)
             if result.returncode == 0:
                 # Output should be valid (not error messages)
-                assert not result.stdout.startswith("Error:"), (
-                    "Output should not be an error message"
-                )
+                assert not result.stdout.startswith(
+                    "Error:"
+                ), "Output should not be an error message"
 
         except FileNotFoundError:
             pytest.skip("mcpi command not installed in PATH")
@@ -402,15 +429,13 @@ class TestReloadConsoleScriptEntry:
             )
 
         # Verify we got a path
-        assert len(result.stdout.strip()) > 0, (
-            "which mcpi-tui-reload should return a path"
-        )
+        assert (
+            len(result.stdout.strip()) > 0
+        ), "which mcpi-tui-reload should return a path"
 
         # Verify the path exists
         script_path = Path(result.stdout.strip())
-        assert script_path.exists(), (
-            f"Console script path {script_path} does not exist"
-        )
+        assert script_path.exists(), f"Console script path {script_path} does not exist"
 
     def test_console_script_executes(self):
         """Verify mcpi-tui-reload console script is executable.
@@ -462,9 +487,9 @@ class TestFzfIntegrationWithReload:
         cmd_str = " ".join(fzf_cmd)
 
         # Verify reload commands are present in bindings
-        assert "reload(mcpi-tui-reload)" in cmd_str or "reload(mcpi tui-reload)" in cmd_str, (
-            "fzf bindings must include reload command"
-        )
+        assert (
+            "reload(mcpi-tui-reload)" in cmd_str or "reload(mcpi tui-reload)" in cmd_str
+        ), "fzf bindings must include reload command"
 
     def test_reload_called_in_add_binding(self):
         """Verify ctrl-a (add) binding calls reload.
@@ -566,20 +591,16 @@ class TestFzfIntegrationWithReload:
 
         # Setup: Create real config file
         config_file = tmp_path / "test_config.json"
-        config_file.write_text(json.dumps({
-            "mcpEnabled": True,
-            "mcpServers": {}
-        }))
+        config_file.write_text(json.dumps({"mcpEnabled": True, "mcpServers": {}}))
 
         # Create REAL plugin and manager
         real_plugin = ClaudeCodePlugin(path_overrides={"user-global": config_file})
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_manager.registry = registry
+        real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = ServerCatalog()
+        real_catalog = create_default_catalog()
         real_catalog._servers = {
             "test-server": MCPServer(
                 description="Test Server",
@@ -590,9 +611,9 @@ class TestFzfIntegrationWithReload:
 
         # Initial state: server not installed
         state_before = real_manager.get_server_state("test-server")
-        assert state_before == ServerState.NOT_INSTALLED, (
-            "Server should initially be not installed"
-        )
+        assert (
+            state_before == ServerState.NOT_INSTALLED
+        ), "Server should initially be not installed"
 
         # Perform add operation (REAL operation, not mocked)
         config = ServerConfig(
@@ -606,9 +627,9 @@ class TestFzfIntegrationWithReload:
         # Verify file was actually written
         assert config_file.exists(), "Config file should exist"
         saved_config = json.loads(config_file.read_text())
-        assert "test-server" in saved_config["mcpServers"], (
-            "Server should be in saved config"
-        )
+        assert (
+            "test-server" in saved_config["mcpServers"]
+        ), "Server should be in saved config"
 
         # Call reload with updated manager
         import io
@@ -618,8 +639,8 @@ class TestFzfIntegrationWithReload:
         sys.stdout = captured_output = io.StringIO()
 
         try:
-            with patch('mcpi.tui.MCPManager', return_value=real_manager):
-                with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
+            with patch("mcpi.tui.MCPManager", return_value=real_manager):
+                with patch("mcpi.tui.ServerCatalog", return_value=real_catalog):
                     reload_server_list()
         finally:
             sys.stdout = old_stdout
@@ -628,9 +649,9 @@ class TestFzfIntegrationWithReload:
 
         # Verify reload output shows server as installed (green checkmark)
         assert "test-server" in output, "Reload should show the server"
-        assert "\033[32m" in output or "✓" in output, (
-            "Reload should show server as enabled (green/checkmark)"
-        )
+        assert (
+            "\033[32m" in output or "✓" in output
+        ), "Reload should show server as enabled (green/checkmark)"
 
 
 class TestReloadEdgeCases:
@@ -648,7 +669,7 @@ class TestReloadEdgeCases:
         def mock_manager_init(*args, **kwargs):
             raise RuntimeError("No MCP client found")
 
-        with patch('mcpi.tui.MCPManager', side_effect=mock_manager_init):
+        with patch("mcpi.tui.MCPManager", side_effect=mock_manager_init):
             # Should not crash, should exit gracefully
             try:
                 reload_server_list()
@@ -656,7 +677,9 @@ class TestReloadEdgeCases:
                 # Acceptable - command exits with error
                 pass
             except Exception as e:
-                pytest.fail(f"reload_server_list should not raise {type(e).__name__}: {e}")
+                pytest.fail(
+                    f"reload_server_list should not raise {type(e).__name__}: {e}"
+                )
 
     def test_reload_with_corrupted_config(self, tmp_path, monkeypatch):
         """Verify reload handles corrupted config files gracefully.
@@ -673,24 +696,25 @@ class TestReloadEdgeCases:
 
         # Create plugin that will encounter the corrupted file
         real_plugin = ClaudeCodePlugin(path_overrides={"user-global": config_file})
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_manager.registry = registry
+        real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = ServerCatalog()
-        real_catalog._servers = {}
+        real_catalog = create_default_catalog()
+        # Set up empty registry to avoid loading default registry
+        from mcpi.registry.catalog import ServerRegistry
+
+        real_catalog._registry = ServerRegistry(servers={})
+        real_catalog._loaded = True
 
         # Should handle error gracefully
-        with patch('mcpi.tui.MCPManager', return_value=real_manager):
-            with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
-                try:
-                    reload_server_list()
-                except SystemExit:
-                    pass  # Acceptable
-                except json.JSONDecodeError:
-                    pass  # May propagate, but shouldn't crash fzf
+        try:
+            reload_server_list(catalog=real_catalog, manager=real_manager)
+        except SystemExit:
+            pass  # Acceptable
+        except json.JSONDecodeError:
+            pass  # May propagate, but shouldn't crash fzf
 
     def test_reload_with_permission_error(self, tmp_path, monkeypatch):
         """Verify reload handles permission errors gracefully.
@@ -716,9 +740,12 @@ class TestReloadPerformance:
         import time
         from mcpi.tui import reload_server_list
 
-        real_manager = MCPManager(default_client="claude-code")
-        real_catalog = ServerCatalog()
-        # Add a reasonable number of servers (simulate typical use)
+        # Use empty registry to avoid client detection in test mode
+        empty_registry = ClientRegistry(auto_discover=False)
+        real_manager = MCPManager(registry=empty_registry, default_client=None)
+        real_catalog = create_default_catalog()
+        # Add a reasonable number of servers
+        # Clear default servers and add test data (simulate typical use)
         real_catalog._servers = {
             f"server-{i}": MCPServer(
                 description=f"Test Server {i}",
@@ -726,15 +753,17 @@ class TestReloadPerformance:
             )
             for i in range(50)
         }
+        real_catalog._loaded = True  # Prevent auto-reload
 
         import io
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
 
         try:
-            with patch('mcpi.tui.MCPManager', return_value=real_manager):
-                with patch('mcpi.tui.ServerCatalog', return_value=real_catalog):
+            with patch("mcpi.tui.MCPManager", return_value=real_manager):
+                with patch("mcpi.tui.ServerCatalog", return_value=real_catalog):
                     start = time.time()
                     reload_server_list()
                     elapsed = time.time() - start
@@ -742,9 +771,9 @@ class TestReloadPerformance:
             sys.stdout = old_stdout
 
         # Should complete quickly (< 1 second)
-        assert elapsed < 1.0, (
-            f"Reload took {elapsed:.2f}s, should be < 1.0s for good UX"
-        )
+        assert (
+            elapsed < 1.0
+        ), f"Reload took {elapsed:.2f}s, should be < 1.0s for good UX"
 
 
 # Manual Testing Checklist (for humans, not automated)

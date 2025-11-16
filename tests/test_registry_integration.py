@@ -8,7 +8,7 @@ This module tests the actual registry data files (not mocked data) to ensure:
 5. Individual server entries are valid
 
 These tests eliminate the need for ad-hoc validation commands like:
-    python3 -m json.tool data/registry.json
+    python3 -m json.tool data/catalog.json
 """
 
 import json
@@ -21,12 +21,12 @@ from mcpi.registry.cue_validator import CUEValidator
 from mcpi.registry.validation import RegistryValidator
 
 # Path to actual registry file
-REGISTRY_PATH = Path(__file__).parent.parent / "data" / "registry.json"
-CUE_SCHEMA_PATH = Path(__file__).parent.parent / "data" / "registry.cue"
+REGISTRY_PATH = Path(__file__).parent.parent / "data" / "catalog.json"
+CUE_SCHEMA_PATH = Path(__file__).parent.parent / "data" / "catalog.cue"
 
 
 class TestActualRegistryValidation:
-    """Test suite for validating the actual registry.json file."""
+    """Test suite for validating the actual catalog.json file."""
 
     def test_registry_file_exists(self):
         """Verify the registry file exists."""
@@ -39,7 +39,7 @@ class TestActualRegistryValidation:
                 data = json.load(f)
             assert isinstance(data, dict), "Registry root must be a dictionary"
         except json.JSONDecodeError as e:
-            pytest.fail(f"Invalid JSON syntax in registry.json: {e}")
+            pytest.fail(f"Invalid JSON syntax in catalog.json: {e}")
 
     def test_cue_schema_validation(self):
         """Layer 2: Validate against CUE schema."""
@@ -206,7 +206,7 @@ class TestRegistryConsistency:
             pytest.fail(f"Failed to read CUE schema: {e}")
 
     def test_registry_json_formatting(self):
-        """Verify registry.json is properly formatted (indented)."""
+        """Verify catalog.json is properly formatted (indented)."""
         content = REGISTRY_PATH.read_text()
 
         # Load and re-dump with standard formatting
@@ -219,7 +219,7 @@ class TestRegistryConsistency:
 
         assert (
             content_normalized == expected_normalized
-        ), "registry.json formatting is inconsistent. Run: python -m json.tool --indent 2 data/registry.json > temp && mv temp data/registry.json"
+        ), "catalog.json formatting is inconsistent. Run: python -m json.tool --indent 2 data/catalog.json > temp && mv temp data/catalog.json"
 
 
 if __name__ == "__main__":

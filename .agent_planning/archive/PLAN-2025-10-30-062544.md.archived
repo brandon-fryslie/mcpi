@@ -1,0 +1,822 @@
+# MCPI Project Backlog: Emergency Recovery & 1.0 Release Plan
+
+**Generated**: 2025-10-30 06:25:44
+**Source STATUS**: STATUS-2025-10-30-062049.md (Emergency Assessment - CLI BROKEN)
+**Previous Plan**: BACKLOG.md (2025-10-29, OBSOLETE - claimed 90% ready, app doesn't run)
+**Spec Reference**: CLAUDE.md (Project Architecture), pyproject.toml (Package Config)
+
+---
+
+## Executive Summary
+
+### Critical Reality Check
+
+**Previous Claims vs. Actual State**:
+- **CLAIMED**: 90% production ready, 2 days to ship 1.0
+- **ACTUAL**: 0% functional - CLI doesn't load due to broken packaging
+- **GAP**: Application is completely unusable, cannot verify any functionality
+
+**Emergency Blockers**:
+1. **P0 EMERGENCY**: Packaging broken - editable install fails with path containing spaces
+2. **P0 CRITICAL**: Cannot verify any commands work - CLI won't load
+3. **P1 IMPORTANT**: 82 test failures dismissed but may indicate real bugs
+4. **P2 CLEANUP**: 1,748 lines dead code (18% of codebase)
+5. **P2 QUALITY**: Test infrastructure masks packaging failures
+
+### Recommended Focus Areas
+
+**Phase 1: Emergency Fix (4-8 hours)**
+1. Fix packaging to make CLI runnable
+2. Manual test ALL 17 commands to verify actual functionality
+3. Document honest current state
+
+**Phase 2: Critical Bugs (8-16 hours)**
+1. Investigate all 82 test failures
+2. Fix critical bugs found
+3. Fix known `client info` bug
+4. Validate core workflows work
+
+**Phase 3: Quality & Ship (8-14 hours)**
+1. Delete dead code
+2. Align documentation with reality
+3. Add packaging tests to prevent regression
+4. Version bump, CHANGELOG, ship 1.0
+
+**Revised Timeline**: 3-4 days minimum (not 2 days as claimed)
+**Confidence**: 40% (many unknowns until packaging fixed)
+
+---
+
+## Dependency Graph
+
+```
+P0-EMERGENCY → P0-VERIFY → P0-INVESTIGATE → P1-CLEANUP → P1-QUALITY → P0-SHIP
+                                ↓
+                           P1-BUG-FIX
+```
+
+**Critical Path**:
+1. Must fix packaging before ANY other work
+2. Must verify commands work before claiming functionality
+3. Must investigate test failures before claiming quality
+4. Should clean up dead code before shipping
+5. Can ship with updated, honest documentation
+
+---
+
+## P0: EMERGENCY BLOCKERS (4-8 hours)
+
+These items BLOCK ALL OTHER WORK. Nothing else can proceed until the CLI actually runs.
+
+### P0-EMERGENCY-1: Fix Broken Packaging
+
+**Status**: NOT STARTED
+**Effort**: 1-4 hours
+**Priority**: P0 - EMERGENCY BLOCKER
+**Dependencies**: None
+**Spec Reference**: pyproject.toml lines 42-64 • **Status Reference**: STATUS-2025-10-30-062049.md lines 46-89
+
+#### Description
+
+Editable install is broken due to path containing spaces. The `.pth` file points to:
+```
+/Users/bmf/Library/Mobile Documents/com~apple~CloudDocs/_mine/icode/mcpi/src
+```
+
+Python cannot resolve this path, causing `ModuleNotFoundError: No module named 'mcpi'` when running the CLI.
+
+**Evidence**:
+```bash
+$ mcpi --help
+ModuleNotFoundError: No module named 'mcpi'
+
+$ python -c "import mcpi"
+ModuleNotFoundError: No module named 'mcpi'
+```
+
+Even after reinstalling with `uv pip uninstall mcpi && uv pip install -e .`, the issue persists.
+
+#### Acceptance Criteria
+
+- [ ] `mcpi --help` loads successfully without ModuleNotFoundError
+- [ ] `python -c "import mcpi"` works from any directory
+- [ ] `python -m mcpi.cli --help` works from any directory
+- [ ] CLI script entry point (`mcpi` command) functional
+- [ ] Installation instructions documented and tested
+
+#### Technical Notes
+
+**Three viable solutions** (choose one):
+
+**Option 1: Move Repository (RECOMMENDED - Fastest)**
+- Move repo from `~/Library/Mobile Documents/...` to `~/dev/mcpi` or similar
+- No spaces in path
+- Reinstall: `uv pip install -e .`
+- Test: `mcpi --help`
+- **Effort**: 30 minutes
+- **Risk**: LOW
+- **Downside**: Requires moving existing work
+
+**Option 2: Use Non-Editable Install**
+- `uv pip install .` (without `-e`)
+- Rebuild after every code change
+- **Effort**: 10 minutes
+- **Risk**: LOW
+- **Downside**: Annoying development workflow
+
+**Option 3: Fix .pth File Generation**
+- Research setuptools editable install with spaces in path
+- May require pyproject.toml changes or wrapper script
+- **Effort**: 2-4 hours
+- **Risk**: MEDIUM
+- **Downside**: Unknown if solvable
+
+**Recommendation**: Option 1 (move repo) for immediate resolution, investigate Option 3 later if needed.
+
+#### Implementation Steps
+
+1. **Choose solution** (move repo recommended)
+2. **If moving repo**:
+   ```bash
+   cd ~
+   mkdir -p dev
+   mv "Library/Mobile Documents/com~apple~CloudDocs/_mine/icode/mcpi" dev/
+   cd dev/mcpi
+   uv pip uninstall mcpi
+   uv pip install -e .
+   mcpi --help  # Verify works
+   ```
+3. **Update symlinks/IDE paths** if applicable
+4. **Verify installation**:
+   ```bash
+   mcpi --help
+   python -c "import mcpi"
+   python -m mcpi.cli --help
+   ```
+5. **Update CLAUDE.md** with working installation instructions
+
+---
+
+### P0-EMERGENCY-2: Verify Actual Command Functionality
+
+**Status**: BLOCKED by P0-EMERGENCY-1
+**Effort**: 4-8 hours
+**Priority**: P0 - CRITICAL BLOCKER
+**Dependencies**: P0-EMERGENCY-1 (packaging fixed)
+**Spec Reference**: CLAUDE.md lines 226-232 • **Status Reference**: STATUS-2025-10-30-062049.md lines 189-213
+
+#### Description
+
+Once CLI loads, manually test ALL 17 commands to determine actual functionality. Previous planning claims "16/17 commands working" but this is UNVERIFIED because the CLI doesn't run.
+
+**Commands to Test** (from PROJECT_SPEC.md):
+1. `mcpi registry list`
+2. `mcpi registry search <query>`
+3. `mcpi registry info <server>`
+4. `mcpi list [--scope X] [--client X]`
+5. `mcpi add <server> [--scope X]`
+6. `mcpi remove <server> [--scope X]`
+7. `mcpi enable <server> [--scope X]`
+8. `mcpi disable <server> [--scope X]`
+9. `mcpi rescope <server> --from X --to Y`
+10. `mcpi status [<server>]`
+11. `mcpi client list`
+12. `mcpi client info <client>` (KNOWN BUG - expect error)
+13. `mcpi client set-default <client>`
+14. `mcpi categories`
+15. `mcpi completion bash`
+16. `mcpi completion zsh`
+17. `mcpi --help` and all subcommand help
+
+#### Acceptance Criteria
+
+- [ ] All 17 commands manually tested with sample data
+- [ ] Results documented: WORKING / BROKEN / PARTIAL for each
+- [ ] Error messages captured for broken commands
+- [ ] Workflows tested: install → enable → disable → remove
+- [ ] Cross-scope operations tested
+- [ ] README examples verified against actual behavior
+- [ ] Known bugs documented (client info, others discovered)
+
+#### Technical Notes
+
+**Testing Approach**:
+1. Create test scope with sample servers
+2. Test each command in isolation
+3. Test common workflows end-to-end
+4. Document EVERY command's actual behavior
+5. Compare to README claims
+6. Update documentation to match reality
+
+**Do NOT skip commands** - test every single one. Planning documents claimed functionality that cannot be verified while CLI is broken.
+
+---
+
+### P0-EMERGENCY-3: Investigate 82 Test Failures
+
+**Status**: BLOCKED by P0-EMERGENCY-1
+**Effort**: 8-16 hours
+**Priority**: P0 - SHOULD BE BLOCKER
+**Dependencies**: P0-EMERGENCY-1 (packaging fixed)
+**Spec Reference**: pyproject.toml lines 65-78 (test config) • **Status Reference**: STATUS-2025-10-30-062049.md lines 131-150, 301-321
+
+#### Description
+
+82 test failures were dismissed in previous planning as "88% test infrastructure issues, defer to 1.1". However, these failures include:
+
+**Critical Workflow Failures**:
+- `test_list_servers_across_scopes` - Cross-scope listing broken
+- `test_add_and_remove_server_workflow` - User workflow broken
+- `test_manager_get_servers_aggregates_across_scopes` - Manager broken
+- `test_cli_status_command_works` - Status command broken
+- `test_cli_list_shows_servers` - List command broken
+- `test_cli_help_command_works` - Help command broken
+
+**API Contract Failures**:
+- `test_get_server_config_returns_complete_data` - API contract broken
+- `test_get_server_config_works_across_all_scopes` - Scope isolation broken
+- `test_get_server_config_with_complex_config` - Complex configs fail
+
+**Impact**: Cannot ship with unknown quality. These may be real bugs in core functionality.
+
+#### Acceptance Criteria
+
+- [ ] All 82 failing tests categorized: REAL BUG / TEST ISSUE / INFRASTRUCTURE
+- [ ] Real bugs documented with severity (P0/P1/P2)
+- [ ] Critical bugs (P0) fixed before 1.0
+- [ ] Test issues fixed or disabled with explanation
+- [ ] Infrastructure issues deferred to 1.1 with justification
+- [ ] Test pass rate updated with honest assessment
+
+#### Technical Notes
+
+**Why This Matters**:
+- Tests inject pythonpath manually (line 67 pyproject.toml)
+- Tests pass in isolation but app may fail in reality
+- 82 failures dismissed without investigation is risky
+- Cannot claim "production ready" with 14% failure rate unexplained
+
+**Investigation Process**:
+1. Run pytest with verbose output: `pytest -v --tb=short`
+2. For each failure, determine:
+   - Is this testing real functionality?
+   - Does the command/workflow work manually?
+   - Is the test broken or is the code broken?
+3. Categorize and prioritize
+4. Fix critical bugs, defer rest with justification
+
+**Estimated Breakdown** (planning guess - verify via investigation):
+- Real bugs: 10-15 tests (1-2% of total) → Fix
+- Test infrastructure: 60-70 tests (10-12% of total) → Defer to 1.1
+- Test issues: 5-10 tests (1% of total) → Fix or disable
+
+---
+
+## P1: CRITICAL BUGS (1-2 hours)
+
+### P1-BUG-1: Fix `mcpi client info` TypeError
+
+**Status**: READY TO START after P0-EMERGENCY-1
+**Effort**: 1 hour
+**Priority**: P1 - CRITICAL (documented feature broken)
+**Dependencies**: P0-EMERGENCY-1 (packaging fixed)
+**Spec Reference**: README.md lines 95-96 • **Status Reference**: STATUS-2025-10-30-062049.md lines 28-32
+
+#### Description
+
+**Bug**: `mcpi client info <client>` raises TypeError
+**Error**: `'str' object has no attribute 'get'`
+**Root Cause**: Code assumes `scopes` is list of dicts, but error path returns dict with `{"error": "message"}`
+
+**Code Location**: `src/mcpi/cli.py` lines ~556-563 (estimated)
+
+#### Acceptance Criteria
+
+- [ ] `mcpi client info <valid-client>` works without error
+- [ ] `mcpi client info <invalid-client>` shows graceful error
+- [ ] No TypeError raised in any scenario
+- [ ] Test case added for error handling
+- [ ] Manual verification successful
+- [ ] No regression in test suite
+
+#### Technical Notes
+
+**Fix** (add error check before scope iteration):
+```python
+if "error" in client_data:
+    info_text += f"[bold]Error:[/bold] {client_data['error']}\n"
+    return info_text
+```
+
+**Test Case**:
+```python
+def test_client_info_handles_error_gracefully():
+    """Test client info handles error state without TypeError"""
+    result = runner.invoke(cli, ["client", "info", "invalid-client"])
+    assert result.exit_code == 0
+    assert "Error:" in result.output
+    assert "TypeError" not in result.output
+```
+
+---
+
+## P2: IMPORTANT CLEANUP (6-10 hours)
+
+### P2-CLEANUP-1: Delete Dead Code
+
+**Status**: READY after P1 bugs fixed
+**Effort**: 2 hours
+**Priority**: P2 - IMPORTANT (18% of codebase unused)
+**Dependencies**: None (can do anytime)
+**Spec Reference**: None (dead code, no spec) • **Status Reference**: STATUS-2025-10-30-062049.md lines 216-241
+
+#### Description
+
+1,748 lines of dead code in `src/mcpi/config/` with 0-18% coverage:
+
+**Files to Delete**:
+- `src/mcpi/config/client_manager.py` (43 lines, 0% coverage)
+- `src/mcpi/config/manager.py` (244 lines, 18% coverage)
+- `src/mcpi/config/profiles.py` (119 lines, 11% coverage)
+- `src/mcpi/config/server_state.py` (153 lines, 0% coverage)
+- `src/mcpi/config/templates.py` (105 lines, 10% coverage)
+- `src/mcpi/config/templates_refactored.py` (37 lines, 0% coverage)
+
+**Total**: 1,748 lines (18% of 7,964 LOC codebase)
+
+These files represent an obsolete profile-based architecture that was replaced with the scope-based plugin system.
+
+#### Acceptance Criteria
+
+- [ ] All files in `src/mcpi/config/` deleted
+- [ ] Any remaining imports to these modules removed
+- [ ] Test suite runs without import errors
+- [ ] Coverage percentage recalculated (should improve to ~50% from 40%)
+- [ ] Git commit documents why code was deleted
+
+#### Technical Notes
+
+**Verification Steps**:
+1. Search for imports: `grep -r "from mcpi.config" src/ tests/`
+2. Delete directory: `rm -rf src/mcpi/config/`
+3. Run tests: `pytest --tb=no -q`
+4. Verify no import errors
+5. Run coverage: `pytest --cov=src/mcpi`
+6. Commit with message explaining obsolete architecture
+
+**Why This Matters**:
+- Confuses new contributors
+- Inflates codebase artificially
+- Pulls down coverage metrics
+- Obsolete code may mislead future development
+
+---
+
+### P2-CLEANUP-2: Add Packaging Tests
+
+**Status**: READY after P0-EMERGENCY-1
+**Effort**: 4-8 hours
+**Priority**: P2 - IMPORTANT (prevent regression)
+**Dependencies**: P0-EMERGENCY-1 (packaging fixed)
+**Spec Reference**: CLAUDE.md lines 253-259 (testing strategy) • **Status Reference**: STATUS-2025-10-30-062049.md lines 783-811
+
+#### Description
+
+Tests currently inject pythonpath manually (pyproject.toml line 67), masking packaging failures. Add tests that verify:
+1. Package installs correctly
+2. CLI entry point works
+3. At least one command runs end-to-end
+
+**Current Gap**: Tests pass, app broken - this is UNACCEPTABLE for production.
+
+#### Acceptance Criteria
+
+- [ ] Test that verifies `uv pip install -e .` succeeds
+- [ ] Test that verifies `mcpi --help` runs without ModuleNotFoundError
+- [ ] Test that verifies at least one command works end-to-end (e.g., `mcpi registry list`)
+- [ ] Tests run in CI/CD pipeline
+- [ ] Tests fail if packaging breaks (prevent regression)
+- [ ] Documentation added to CLAUDE.md
+
+#### Technical Notes
+
+**Test Structure** (new file: `tests/test_packaging.py`):
+```python
+import subprocess
+import sys
+
+def test_package_imports():
+    """Test that mcpi package can be imported."""
+    result = subprocess.run(
+        [sys.executable, "-c", "import mcpi"],
+        capture_output=True,
+        text=True
+    )
+    assert result.returncode == 0, f"Import failed: {result.stderr}"
+
+def test_cli_entry_point():
+    """Test that mcpi CLI entry point works."""
+    result = subprocess.run(
+        ["mcpi", "--help"],
+        capture_output=True,
+        text=True
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "MCPI" in result.stdout or "mcp" in result.stdout.lower()
+
+def test_cli_command_works():
+    """Test that at least one command runs successfully."""
+    result = subprocess.run(
+        ["mcpi", "registry", "list"],
+        capture_output=True,
+        text=True
+    )
+    # Should either succeed or fail gracefully (not crash)
+    assert "Traceback" not in result.stderr
+    assert "ModuleNotFoundError" not in result.stderr
+```
+
+**Why This Matters**:
+- Prevents shipping broken packaging again
+- Catches integration failures tests miss
+- Verifies actual user experience
+- Critical gap in current test suite
+
+---
+
+### P2-DOC-1: Align Documentation with Reality
+
+**Status**: READY after P0-EMERGENCY-2
+**Effort**: 4-6 hours
+**Priority**: P2 - IMPORTANT (documentation misleading)
+**Dependencies**: P0-EMERGENCY-2 (commands verified)
+**Spec Reference**: README.md, PROJECT_SPEC.md, CLAUDE.md • **Status Reference**: STATUS-2025-10-30-062049.md lines 326-381, 508-515
+
+#### Description
+
+Multiple documentation files contain claims that don't match reality:
+
+**README.md Issues**:
+- All command examples untested (can't verify while CLI broken)
+- `mcpi client info` example shows broken command
+- Installation instructions may not work
+
+**PROJECT_SPEC.md Issues**:
+- Line 109: Claims Python 3.9+ but pyproject.toml requires 3.12+
+- Lines 172-200: Lists commands as implemented (unverified)
+- Lines 318-336: Describes profile-based design (OBSOLETE - scope-based implemented)
+- Line 244: Claims 85.3% test pass rate (close but tests ≠ reality)
+
+**CLAUDE.md Issues**:
+- Installation instructions fail (CLI doesn't load)
+- Need to document packaging fix
+- Need to add troubleshooting section
+
+#### Acceptance Criteria
+
+- [ ] README examples verified against actual command behavior
+- [ ] PROJECT_SPEC updated to reflect scope-based architecture
+- [ ] PROJECT_SPEC Python version matches pyproject.toml (3.12+)
+- [ ] CLAUDE.md installation instructions work
+- [ ] Known issues documented honestly
+- [ ] No false claims remain
+- [ ] Documentation accurately describes what exists
+
+#### Technical Notes
+
+**README.md** (after P0-EMERGENCY-2):
+- Test every example command
+- Update or remove broken examples
+- Add troubleshooting section
+- Document known issues
+
+**PROJECT_SPEC.md**:
+- Replace profile-based architecture with scope-based
+- Update Python version to 3.12+
+- Remove references to deleted modules
+- Update command list to match actual implementation
+
+**CLAUDE.md**:
+- Fix installation instructions
+- Add packaging troubleshooting
+- Document development workflow that works
+- Update architecture description
+
+---
+
+## P0: RELEASE PREPARATION (4-6 hours)
+
+### P0-SHIP-1: Version Bump & CHANGELOG
+
+**Status**: SCHEDULED after all P0/P1/P2 complete
+**Effort**: 2 hours
+**Priority**: P0 - RELEASE REQUIREMENT
+**Dependencies**: All P0, P1, P2 items complete
+
+#### Description
+
+Prepare 1.0 release with:
+1. Version bump to 1.0.0 in pyproject.toml
+2. Create CHANGELOG.md with honest release notes
+3. Document known issues transparently
+
+#### Acceptance Criteria
+
+- [ ] pyproject.toml version = "1.0.0"
+- [ ] CHANGELOG.md created following Keep a Changelog format
+- [ ] Known issues documented honestly
+- [ ] Breaking changes documented (if any)
+- [ ] Git commit ready for release tag
+
+#### Technical Notes
+
+**CHANGELOG Structure**:
+```markdown
+# Changelog
+
+## [1.0.0] - 2025-11-0X
+
+### Added
+- 13 core commands for MCP server management
+- Plugin architecture for multi-client support
+- Scope-based configuration management
+- Tab completion for bash/zsh/fish
+- CI/CD pipeline with multi-OS testing
+
+### Fixed
+- Packaging installation with paths containing spaces
+- `mcpi client info` TypeError
+- [List other bugs fixed]
+
+### Known Issues
+- [Be honest about remaining issues]
+- Test pass rate: 8X% (YY failures under investigation)
+- Coverage: ~50% (acceptable for 1.0, improvement planned for 1.1)
+
+### Removed
+- Obsolete profile-based configuration system (1,748 LOC)
+```
+
+---
+
+### P0-SHIP-2: Tag and Release
+
+**Status**: SCHEDULED after P0-SHIP-1
+**Effort**: 1 hour
+**Priority**: P0 - RELEASE REQUIREMENT
+**Dependencies**: P0-SHIP-1 complete
+
+#### Description
+
+Create git tag and GitHub release for 1.0.0.
+
+#### Acceptance Criteria
+
+- [ ] Git tag v1.0.0 created
+- [ ] Tag pushed to remote
+- [ ] GitHub release created with CHANGELOG
+- [ ] Release verified downloadable
+
+#### Technical Notes
+
+```bash
+# Ensure all changes committed
+git status
+
+# Create annotated tag
+git tag -a v1.0.0 -m "Release 1.0.0
+
+First production release with working packaging,
+13 core commands, and scope-based configuration.
+
+See CHANGELOG.md for full details."
+
+# Push tag
+git push origin v1.0.0
+
+# Create GitHub release
+gh release create v1.0.0 \
+  --title "MCPI 1.0.0 - First Production Release" \
+  --notes-file CHANGELOG.md \
+  --verify-tag
+```
+
+---
+
+## P3: NICE-TO-HAVE (Defer to 1.0.1+)
+
+### P3-REFACTOR-1: Refactor cli.py
+
+**Effort**: 3-5 days
+**Priority**: P3 - DEFER TO 1.1
+**Status**: Deferred
+
+cli.py is 852 lines, should be split into modules (max 500 LOC per file). Works fine, just large. Not worth delaying 1.0.
+
+---
+
+### P3-TEST-1: Add Integration Tests
+
+**Effort**: 3-5 days
+**Priority**: P3 - DEFER TO 1.1
+**Status**: Deferred
+
+Missing end-to-end integration tests. Functional tests exist, core workflows verified manually. Add comprehensive integration tests in 1.1.
+
+---
+
+### P3-COV-1: Achieve 80%+ Coverage
+
+**Effort**: 3-5 days
+**Priority**: P3 - DEFER TO 1.1
+**Status**: Measure in 1.0, improve in 1.1
+
+After removing dead code, coverage should improve to ~50%. Target 80% in 1.1.
+
+---
+
+## Revised Timeline to 1.0
+
+### Emergency Day (Day 0): Packaging Fix - 4-8 hours
+**Tasks**:
+- P0-EMERGENCY-1: Fix packaging (1-4 hours)
+- P0-EMERGENCY-2: Manual test all commands (4-8 hours)
+- **Output**: Honest assessment of what works
+
+**Critical**: Cannot proceed to Day 1 until CLI loads.
+
+### Day 1: Bug Fixes - 8-16 hours
+**Tasks**:
+- P0-EMERGENCY-3: Investigate 82 test failures (8-16 hours)
+- P1-BUG-1: Fix client info bug (1 hour)
+- Fix other critical bugs discovered
+- **Output**: Core functionality verified working
+
+### Day 2: Quality & Cleanup - 6-10 hours
+**Tasks**:
+- P2-CLEANUP-1: Delete dead code (2 hours)
+- P2-CLEANUP-2: Add packaging tests (4-8 hours)
+- P2-DOC-1: Align documentation (4-6 hours, can parallelize)
+- **Output**: Clean, honest codebase
+
+### Day 3: Release Prep - 4-6 hours
+**Tasks**:
+- P0-SHIP-1: Version bump & CHANGELOG (2 hours)
+- P0-SHIP-2: Tag and release (1 hour)
+- Final verification (1-2 hours)
+- **Output**: SHIP 1.0
+
+**Total Estimated Time**: 22-40 hours of work
+**Elapsed Time**: 3-4 days (assuming 8-10 hours/day)
+**Target Ship Date**: 2025-11-02 or 2025-11-03
+**Confidence**: 40% (many unknowns until packaging fixed)
+
+### Timeline Comparison
+
+| Plan | Estimate | Reality |
+|------|----------|---------|
+| Original (BACKLOG.md) | 2 days | IMPOSSIBLE - app doesn't run |
+| Revised (This Plan) | 3-4 days | REALISTIC - accounts for unknowns |
+| Slip | 1-2 days | Necessary for quality |
+
+---
+
+## Risk Assessment
+
+### HIGH RISK: Unknown Command Functionality
+**Likelihood**: 100% (currently unknown)
+**Impact**: HIGH (may discover more broken features)
+**Mitigation**: P0-EMERGENCY-2 (manual test ALL commands)
+**Timeline Impact**: +0-8 hours if bugs found
+
+### HIGH RISK: Test Failures Are Real Bugs
+**Likelihood**: 60% (likely some real bugs)
+**Impact**: HIGH (core workflows broken)
+**Mitigation**: P0-EMERGENCY-3 (investigate all failures)
+**Timeline Impact**: +4-16 hours to fix critical bugs
+
+### MEDIUM RISK: Documentation Drift
+**Likelihood**: 100% (confirmed)
+**Impact**: MEDIUM (confuses users)
+**Mitigation**: P2-DOC-1 (align docs with reality)
+**Timeline Impact**: +4-6 hours
+
+### LOW RISK: Dead Code Complications
+**Likelihood**: 20% (unlikely issues)
+**Impact**: LOW (mostly cleanup)
+**Mitigation**: P2-CLEANUP-1 (delete systematically)
+**Timeline Impact**: +1-2 hours if imports break
+
+---
+
+## Success Criteria for 1.0
+
+**MUST HAVE** (Cannot ship without):
+- [ ] Packaging works (CLI loads without error)
+- [ ] All 17 commands manually tested and documented
+- [ ] Critical bugs fixed (client info + any P0 bugs found)
+- [ ] Known issues documented honestly
+- [ ] Documentation accurate (README examples work)
+- [ ] CHANGELOG with transparent known issues
+
+**SHOULD HAVE** (Strong recommendation):
+- [ ] 82 test failures investigated and categorized
+- [ ] Dead code deleted (cleaner codebase)
+- [ ] Packaging tests added (prevent regression)
+- [ ] Coverage above 50% (after dead code removal)
+
+**NICE TO HAVE** (Defer to 1.0.1):
+- [ ] cli.py refactored (works fine, just large)
+- [ ] Integration tests added (manual tests sufficient for 1.0)
+- [ ] 80%+ coverage (50% acceptable for 1.0)
+
+---
+
+## Key Lessons Learned
+
+### What Went Wrong
+
+1. **Optimistic Planning Without Verification**
+   - Claimed "90% ready" without running app
+   - Dismissed 82 test failures without investigation
+   - Assumed tests passing = app working
+   - **Lesson**: Always verify claims with actual usage
+
+2. **Test Infrastructure Masked Critical Failure**
+   - Pytest injects pythonpath (line 67 pyproject.toml)
+   - Tests import modules directly, never test packaging
+   - CLI packaging never verified
+   - **Lesson**: Test the actual installed product, not just modules
+
+3. **Documentation Drift**
+   - PROJECT_SPEC describes obsolete architecture
+   - CLAUDE.md instructions don't work
+   - README examples untested
+   - **Lesson**: Documentation must match reality
+
+4. **No End-to-End Validation**
+   - No test that installs and runs CLI
+   - No manual smoke test of all commands
+   - No packaging verification
+   - **Lesson**: E2E tests catch integration failures
+
+### What To Do Differently
+
+1. **Always Test Packaging**
+   - Add test that verifies `pip install` works
+   - Add test that verifies CLI entry point loads
+   - Run packaging tests in CI/CD
+   - Manual test CLI before claiming "production ready"
+
+2. **Honest Assessment**
+   - Don't claim "X% ready" without evidence
+   - Don't dismiss test failures without investigation
+   - Don't extrapolate "tests pass" → "app works"
+   - Verify claims against actual usage
+
+3. **Documentation Validation**
+   - Run every example in README
+   - Verify installation instructions
+   - Align specs with actual code
+   - Update docs when implementation changes
+
+4. **Risk-Appropriate Planning**
+   - Account for unknowns in estimates
+   - Add buffer for investigation work
+   - Don't commit to aggressive timelines
+   - Better to under-promise and over-deliver
+
+---
+
+## Appendix: Planning File Provenance
+
+**Source Files**:
+- STATUS-2025-10-30-062049.md (Emergency assessment, ground truth)
+- CLAUDE.md (Project architecture and development workflow)
+- pyproject.toml (Package configuration)
+- PROJECT_SPEC.md (Original specification, outdated)
+
+**Obsolete Files** (contradicts STATUS report):
+- BACKLOG.md (2025-10-29, claims 90% ready, INCORRECT)
+- RELEASE-PLAN-1.0-FINAL.md (2025-10-29, claims 2 days to ship, INCORRECT)
+- STATUS-2025-10-29-015500.md (claimed production ready, INCORRECT)
+- PLANNING-SUMMARY-2025-10-29.md (optimistic summary, INCORRECT)
+- COMPLETION-AUDIT-2025-10-29.md (audit based on incorrect status, INCORRECT)
+
+**Action**: Archive obsolete files after creating this plan.
+
+---
+
+**Plan Complete**: 2025-10-30 06:25:44
+**Next Action**: P0-EMERGENCY-1 (Fix packaging - choose solution, implement, verify)
+**Timeline**: 3-4 days to honest 1.0 release
+**Confidence**: 40% (LOW - too many unknowns until packaging fixed)
+
+---
+
+## Quick Reference: Priority Definitions
+
+**P0 (EMERGENCY/BLOCKER)**: Application doesn't work, blocks all other work
+**P1 (CRITICAL)**: Documented features broken, blocks release
+**P2 (IMPORTANT)**: Quality issues, should fix for 1.0
+**P3 (NICE-TO-HAVE)**: Improvements, defer to 1.0.1+

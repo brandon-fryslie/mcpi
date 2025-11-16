@@ -1,5 +1,6 @@
 """Interactive TUI for managing MCP servers using fzf."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -154,13 +155,14 @@ def reload_server_list(
             # Tests will provide pre-populated catalog via mocking
             # Check if catalog has data (either mocked via _servers or loaded via _loaded)
             # Tests may set _servers directly without setting _loaded
-            has_data = getattr(catalog, '_loaded', False) or hasattr(catalog, '_servers')
+            has_data = getattr(catalog, "_loaded", False) or hasattr(
+                catalog, "_servers"
+            )
             if not has_data:
                 catalog.load_registry()
             # Mark as loaded to prevent auto-reload in list_servers()
-            if hasattr(catalog, '_loaded') and not catalog._loaded:
+            if hasattr(catalog, "_loaded") and not catalog._loaded:
                 catalog._loaded = True
-
 
         if manager is None:
             manager = MCPManager()
@@ -175,26 +177,126 @@ def reload_server_list(
         print("[ ] error - Failed to reload server list")
 
 
-def build_fzf_command() -> List[str]:
+# =============================================================================
+# Scope Cycling State Management
+# =============================================================================
+
+
+def get_current_scope() -> str:
+    """Get current scope from environment or return default.
+
+    Returns:
+        Current scope name (defaults to first available scope)
+    """
+    return os.environ.get("MCPI_FZF_SCOPE", "project-mcp")
+
+
+def get_available_scopes(manager: Optional[MCPManager] = None) -> List[str]:
+    """Get list of available scope names for cycling.
+
+    Args:
+        manager: MCPManager instance (created if not provided)
+
+    Returns:
+        List of scope names in cycling order
+    """
+    if manager is None:
+        manager = MCPManager()
+
+    scopes_info = manager.get_scopes_for_client(manager.default_client)
+    return [scope["name"] for scope in scopes_info]
+
+
+def set_next_scope(current_scope: str, available_scopes: List[str]) -> str:
+    """Cycle to next scope in the list.
+
+    Args:
+        current_scope: Current scope name
+        available_scopes: List of all available scopes
+
+    Returns:
+        Next scope name in the cycle
+    """
+    try:
+        idx = available_scopes.index(current_scope)
+        next_scope = available_scopes[(idx + 1) % len(available_scopes)]
+    except (ValueError, IndexError):
+        # If current scope not found or list empty, use first scope
+        next_scope = available_scopes[0] if available_scopes else "project-mcp"
+
+    # Store in environment for next reload
+    os.environ["MCPI_FZF_SCOPE"] = next_scope
+    return next_scope
+
+
+def cycle_scope_and_reload(
+    catalog: Optional[ServerCatalog] = None, manager: Optional[MCPManager] = None
+) -> None:
+    """Cycle to next scope and reload server list.
+
+    Used by fzf ctrl-s binding to cycle through scopes.
+    Outputs formatted server list to stdout with updated scope.
+
+    Args:
+        catalog: ServerCatalog instance (created if not provided)
+        manager: MCPManager instance (created if not provided)
+    """
+    try:
+        # Create manager if not provided
+        if manager is None:
+            manager = MCPManager()
+
+        # Get current scope and available scopes
+        current = get_current_scope()
+        available = get_available_scopes(manager)
+
+        # Cycle to next scope
+        next_scope = set_next_scope(current, available)
+
+        # Output scope change to stderr for user feedback
+        print(f"Switched to scope: {next_scope}", file=sys.stderr)
+
+        # Reload server list
+        reload_server_list(catalog, manager)
+
+    except Exception as e:
+        print(f"Error cycling scope: {e}", file=sys.stderr)
+        # Fall back to regular reload
+        reload_server_list(catalog, manager)
+
+
+def build_fzf_command(current_scope: Optional[str] = None) -> List[str]:
     """Build the fzf command with all options and bindings.
+
+    Args:
+        current_scope: Current target scope to display in header (optional)
 
     Returns:
         List of command arguments for subprocess
     """
+    # Get current scope if not provided
+    if current_scope is None:
+        current_scope = get_current_scope()
+
     # Extract server ID from fzf selection
     # Format is "[X] server-id - description"
     # We use awk to extract the server-id (field 2)
     extract_id = "awk '{print $2}'"
 
-    # Multi-line header for better readability on narrow terminals
-    # Line 1: Title (19 chars)
-    # Line 2: Operation shortcuts (60 chars)
-    # Line 3: Info/Exit shortcuts (37 chars)
-    # All lines <= 80 chars to fit 80-column terminals
+    # Multi-line header with scope indicator
+    # Line 1: Title with current scope (dynamic width)
+    # Line 2: Scope cycling and operation shortcuts
+    # Line 3: Info/Exit shortcuts
+    # Compact header that fits in 60 columns (safe for narrow terminals)
+    # Line 1: Title + scope (max 60 chars with longest scope name)
+    # Line 2: Scope change + server ops (47 chars)
+    # Line 3: State ops (37 chars)
+    # Line 4: Info/exit (25 chars)
     header = (
-        "MCPI Server Manager\n"
-        "ctrl-a:Add  ctrl-r:Remove  ctrl-e:Enable  ctrl-d:Disable\n"
-        "ctrl-i:Info  enter:Info  esc:Exit"
+        f"MCPI | Scope: {current_scope}\n"
+        "^S:Chg-Scope ^A:Add ^R:Remove\n"
+        "^E:Enable ^D:Disable\n"
+        "^I/Enter:Info  Esc:Exit"
     )
 
     return [
@@ -205,16 +307,23 @@ def build_fzf_command() -> List[str]:
         "--layout=reverse",
         "--border",
         "--preview",
-        f"echo {{}} | {extract_id} | xargs -I {{}} mcpi info {{}}",
+        # Validate server ID before running info to avoid errors during typing
+        f"id=$(echo {{}} | {extract_id}); [ -n \"$id\" ] && mcpi info \"$id\" 2>/dev/null || echo 'Select a server to view details'",
         "--preview-window=right:50%:wrap",
+        # Scope cycling binding (ctrl-s)
+        # Use Python module execution to avoid PATH issues
         "--bind",
-        f"ctrl-a:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi add {{}})+reload(mcpi-tui-reload)",
+        f"ctrl-s:reload(python -c 'from mcpi.cli import tui_cycle_scope_entry; tui_cycle_scope_entry()')+clear-query",
+        # Operation bindings with --scope parameter
+        "--bind",
+        f"ctrl-a:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi add {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
         "--bind",
         f"ctrl-r:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi remove {{}})+reload(mcpi-tui-reload)",
         "--bind",
-        f"ctrl-e:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi enable {{}})+reload(mcpi-tui-reload)",
+        f"ctrl-e:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi enable {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
         "--bind",
-        f"ctrl-d:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi disable {{}})+reload(mcpi-tui-reload)",
+        f"ctrl-d:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi disable {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
+        # Info bindings (no scope needed for read-only operations)
         "--bind",
         f"ctrl-i:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi info {{}} | less)",
         "--bind",
@@ -241,6 +350,14 @@ def launch_fzf_interface(manager: MCPManager, catalog: ServerCatalog) -> None:
             "  Or visit: https://github.com/junegunn/fzf#installation"
         )
 
+    # Initialize scope to first available scope
+    available_scopes = get_available_scopes(manager)
+    if available_scopes:
+        initial_scope = available_scopes[0]
+        os.environ["MCPI_FZF_SCOPE"] = initial_scope
+    else:
+        initial_scope = "project-mcp"
+
     # Build server list
     server_lines = build_server_list(catalog, manager)
 
@@ -248,8 +365,8 @@ def launch_fzf_interface(manager: MCPManager, catalog: ServerCatalog) -> None:
         console.print("[yellow]No servers found in registry[/yellow]")
         return
 
-    # Build fzf command
-    fzf_cmd = build_fzf_command()
+    # Build fzf command with current scope
+    fzf_cmd = build_fzf_command(initial_scope)
 
     # Prepare input for fzf
     input_data = "\n".join(server_lines)

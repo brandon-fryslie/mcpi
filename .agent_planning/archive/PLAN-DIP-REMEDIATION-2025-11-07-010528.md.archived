@@ -1,0 +1,1117 @@
+# DIP Remediation Implementation Plan
+
+**Generated**: 2025-11-07 01:05:28
+**Source STATUS**: STATUS-2025-11-06-164217.md (2025-11-06 16:42:17)
+**Source Audit**: DIP_AUDIT-2025-11-07-010149.md (2025-11-07 01:01:49)
+**Specification**: CLAUDE.md (Project Architecture section)
+**Planning Type**: Phased Implementation - Critical to Low Priority
+
+---
+
+## Executive Summary
+
+This plan addresses all Dependency Inversion Principle (DIP) violations identified in the DIP audit. The audit found **2 Critical**, **5 High Priority**, **4 Medium Priority**, and **2 Low Priority** issues that make true unit testing impossible and violate SOLID principles.
+
+**Total Work Items**: 23 items across 4 phases
+**Estimated Total Effort**: 8-12 days (1.5-2 weeks)
+**Current State**: 85-90% feature complete (per STATUS), but architectural debt must be addressed
+**Goal**: Enable true unit testing, improve testability, follow DIP consistently
+
+**Key Metrics**:
+- Test Pass Rate: Currently 86% (539/635 tests passing)
+- After remediation: Target 95%+ with faster, more isolated tests
+- File I/O in tests: Currently required, Target: Optional (only integration tests)
+
+---
+
+## Phase 1: Critical Fixes (BLOCKING)
+
+These issues prevent true unit testing and violate core SOLID principles. Must be fixed first.
+
+**Total Effort**: 3-4 days
+**Dependencies**: None (foundational work)
+**Test Impact**: Will require updating ~50-100 test cases
+
+---
+
+### P0-1: Refactor ServerCatalog to Require registry_path
+
+**Status**: Not Started
+**Effort**: Large (1-2 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § Registry System • DIP_AUDIT § 1.1 Critical
+
+#### Description
+
+ServerCatalog currently hardcodes the path to `data/registry.json` using `__file__` magic when `registry_path` is None. This makes unit testing impossible without touching the real file system. The optional parameter pattern is an anti-pattern - the dependency is actually required.
+
+**Files to Modify**:
+- `src/mcpi/registry/catalog.py` (lines 130-150): Constructor changes
+- `src/mcpi/registry/catalog.py` (add new): Factory functions
+- `src/mcpi/cli.py` (line 208-215): Update get_catalog() to use factory
+- All test files that instantiate ServerCatalog (~15-20 files)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def __init__(self, registry_path: Optional[Path] = None, validate_with_cue: bool = True):
+    if registry_path is None:
+        # Hardcoded calculation
+        package_dir = Path(__file__).parent.parent.parent.parent
+        registry_path = package_dir / "data" / "registry.json"
+```
+
+#### Acceptance Criteria
+
+- [ ] ServerCatalog.__init__ requires registry_path as non-optional parameter
+- [ ] Constructor signature: `__init__(self, registry_path: Path, validator: Optional[CUEValidator] = None)`
+- [ ] Factory function `create_default_catalog()` exists and returns ServerCatalog with default path
+- [ ] Factory function `create_test_catalog(test_data_path: Path)` exists for testing
+- [ ] CLI get_catalog() updated to use `create_default_catalog()`
+- [ ] All existing tests updated to use factory or pass explicit path
+- [ ] New unit test: Test ServerCatalog with in-memory path (no file I/O)
+- [ ] New unit test: Test factory functions return correct instances
+- [ ] All existing tests still pass (539+ tests)
+- [ ] No direct `ServerCatalog()` calls without arguments remain in codebase
+
+#### Technical Notes
+
+**Breaking Change**: YES - All code that calls `ServerCatalog()` must update to either:
+1. Use `create_default_catalog()` for production
+2. Pass explicit `registry_path` for testing
+
+**Implementation Strategy**:
+1. Add factory functions first (backwards compatible)
+2. Make registry_path required (breaking change)
+3. Update all call sites in single commit
+4. Run full test suite to catch any missed locations
+
+**Test Strategy**:
+- Write tests FIRST for new factory functions
+- Write test showing ServerCatalog works with explicit Path
+- Update existing tests one file at a time
+- Use grep to find all `ServerCatalog()` instantiations
+
+**Search Pattern**:
+```bash
+# Find all instantiations
+grep -r "ServerCatalog()" src/ tests/
+# Find optional param usage
+grep -r "registry_path.*None" src/
+```
+
+---
+
+### P0-2: Refactor MCPManager to Require ClientRegistry
+
+**Status**: Not Started
+**Effort**: Large (1-2 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § Core Architecture • DIP_AUDIT § 1.2 Critical
+
+#### Description
+
+MCPManager creates ClientRegistry internally when not provided, using the optional parameter anti-pattern. The comment literally says "useful for tests" which is a code smell - production code shouldn't have optional params just to enable testing. This violates DIP and prevents isolated unit testing.
+
+**Files to Modify**:
+- `src/mcpi/clients/manager.py` (lines 15-26): Constructor changes
+- `src/mcpi/clients/manager.py` (add new): Factory functions
+- `src/mcpi/cli.py` (lines 53-76): Update get_mcp_manager() to use factory
+- All test files that instantiate MCPManager (~20-30 files)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def __init__(
+    self,
+    default_client: Optional[str] = None,
+    registry: Optional[ClientRegistry] = None  # <-- Anti-pattern
+) -> None:
+    self.registry = registry if registry is not None else ClientRegistry()
+```
+
+#### Acceptance Criteria
+
+- [ ] MCPManager.__init__ requires registry as non-optional parameter
+- [ ] Constructor signature: `__init__(self, registry: ClientRegistry, default_client: Optional[str] = None)`
+- [ ] Parameter order: registry first (required), default_client second (optional)
+- [ ] Factory function `create_default_manager()` exists and returns MCPManager
+- [ ] Factory function `create_test_manager(registry: ClientRegistry)` exists
+- [ ] CLI get_mcp_manager() updated to use factory with optional factory parameter
+- [ ] All existing tests updated to inject ClientRegistry or use factory
+- [ ] New unit test: Test MCPManager with mock ClientRegistry (no plugin discovery)
+- [ ] New unit test: Test factory functions
+- [ ] All existing tests still pass
+- [ ] No `MCPManager()` calls without registry argument remain
+
+#### Technical Notes
+
+**Breaking Change**: YES - All code that calls `MCPManager()` must update
+
+**Implementation Strategy**:
+1. Add factories first (backwards compatible)
+2. Make registry required (breaking change)
+3. Update CLI to accept factory parameter (for testing)
+4. Update all test call sites
+5. Verify with full test run
+
+**CLI Injection Pattern**:
+```python
+def get_mcp_manager(ctx: click.Context, factory=None) -> MCPManager:
+    """Lazy initialization with injectable factory."""
+    if "mcp_manager" not in ctx.obj:
+        if factory is None:
+            factory = create_default_manager
+        ctx.obj["mcp_manager"] = factory()
+    return ctx.obj["mcp_manager"]
+```
+
+**Test Strategy**:
+- Create MockClientRegistry class for testing
+- Update all tests to use explicit injection
+- Remove any environment variable hacks for testing
+
+**Search Pattern**:
+```bash
+grep -r "MCPManager()" src/ tests/
+grep -r "registry.*Optional" src/mcpi/clients/manager.py
+```
+
+---
+
+## Phase 2: High Priority Fixes
+
+These issues significantly impact testability and extensibility. Should be fixed soon after Phase 1.
+
+**Total Effort**: 3-4 days
+**Dependencies**: Phase 1 complete (factories established)
+**Test Impact**: Will improve test speed and isolation
+
+---
+
+### P1-1: Add Plugin Injection to ClientRegistry
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § Plugin Architecture • DIP_AUDIT § 1.3 High
+
+#### Description
+
+ClientRegistry hardcodes plugin discovery in constructor using importlib and filesystem scanning. This prevents testing with mock plugins and violates SRP (constructor both initializes AND discovers). Need to support pre-injected plugins while keeping auto-discovery as default.
+
+**Files to Modify**:
+- `src/mcpi/clients/registry.py` (lines 15-22): Constructor changes
+- `src/mcpi/clients/registry.py` (lines 24-68): Extract discovery logic
+- `src/mcpi/clients/registry.py` (add new): Add _register_plugin_class() method
+- Test files using ClientRegistry (~10-15 files)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def __init__(self) -> None:
+    self._plugins = {}
+    self._instances = {}
+    self._discover_plugins()  # <-- Hardcoded behavior
+```
+
+#### Acceptance Criteria
+
+- [ ] ClientRegistry.__init__ accepts Optional[List[Type[MCPClientPlugin]]]
+- [ ] Signature: `__init__(self, plugin_classes: Optional[List[Type[MCPClientPlugin]]] = None)`
+- [ ] If plugin_classes provided, use them instead of auto-discovery
+- [ ] If plugin_classes is None, call _discover_plugins() (default behavior)
+- [ ] New method _register_plugin_class(plugin_class) for internal use
+- [ ] Existing tests still pass without changes (auto-discovery preserved)
+- [ ] New unit test: Inject list of mock plugin classes
+- [ ] New unit test: Verify no filesystem I/O when plugins pre-loaded
+- [ ] New unit test: Verify auto-discovery still works when plugin_classes=None
+- [ ] Documentation updated to explain injection pattern
+
+#### Technical Notes
+
+**Breaking Change**: NO - Backwards compatible (defaults to auto-discovery)
+
+**Design Decision**: Use Optional parameter here (not anti-pattern) because:
+1. Auto-discovery is genuinely the default use case
+2. Injection is truly optional (for testing only)
+3. Both behaviors are valid, neither is "required"
+
+**Implementation Strategy**:
+1. Add _register_plugin_class() helper method
+2. Add plugin_classes parameter with default None
+3. Add conditional logic (inject vs discover)
+4. Write tests showing both paths work
+5. Update docs
+
+**Test Strategy**:
+- Create MockPlugin class for testing
+- Test registry with [MockPlugin] - verify no discovery
+- Test registry with None - verify discovery happens
+- Verify mock plugins are used in operations
+
+**Not Breaking Because**:
+- All existing code calls ClientRegistry() with no args → still works
+- New parameter is optional with sensible default
+- No behavior change for existing callers
+
+---
+
+### P1-2: Add Dependency Injection Points to CLI
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: P0-1 (ServerCatalog factory), P0-2 (MCPManager factory)
+**Spec Reference**: CLAUDE.md § CLI Interface • DIP_AUDIT § 1.4 High
+
+#### Description
+
+CLI functions hardcode instantiation of MCPManager and ServerCatalog with no way to inject test doubles. This makes CLI testing require real components with real file system I/O. Need to add factory parameters to enable injection while keeping production defaults.
+
+**Files to Modify**:
+- `src/mcpi/cli.py` (lines 53-76): Update get_mcp_manager() and get_catalog()
+- CLI test files (~5-10 files): Update to inject test factories
+- Add new CLI test showing pure unit testing (no file I/O)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def get_mcp_manager(ctx: click.Context) -> MCPManager:
+    if "mcp_manager" not in ctx.obj:
+        ctx.obj["mcp_manager"] = MCPManager()  # <-- Hardcoded
+
+def get_catalog(ctx: click.Context) -> ServerCatalog:
+    if "catalog" not in ctx.obj:
+        ctx.obj["catalog"] = ServerCatalog()  # <-- Hardcoded
+```
+
+#### Acceptance Criteria
+
+- [ ] get_mcp_manager() accepts optional factory parameter
+- [ ] Signature: `get_mcp_manager(ctx, factory=None) -> MCPManager`
+- [ ] get_catalog() accepts optional factory parameter
+- [ ] Signature: `get_catalog(ctx, factory=None) -> ServerCatalog`
+- [ ] Both functions use create_default_* factories when factory=None
+- [ ] Both functions use injected factory when provided
+- [ ] CLI commands can pass factories via ctx.obj (for testing)
+- [ ] New unit test: Inject mock factories, verify no file I/O
+- [ ] New unit test: Verify default factories work in production
+- [ ] All existing CLI tests still pass
+- [ ] Documentation shows how to test CLI commands with injection
+
+#### Technical Notes
+
+**Breaking Change**: NO - Backwards compatible
+
+**Injection Strategy**: Use Click context object
+```python
+# Production use (no change)
+result = runner.invoke(cli, ["list"])
+
+# Test use (with mocks)
+def mock_manager_factory():
+    return MockMCPManager()
+
+result = runner.invoke(
+    cli,
+    ["list"],
+    obj={"manager_factory": mock_manager_factory}
+)
+```
+
+**Implementation Strategy**:
+1. Add factory parameter with default None
+2. Check ctx.obj for factory keys first
+3. Fall back to parameter, then default
+4. Update tests to show injection pattern
+5. Document the injection approach
+
+**Test Strategy**:
+- Create MockMCPManager and MockServerCatalog
+- Write tests that inject via ctx.obj
+- Verify no real file access happens
+- Verify CLI output is correct with mocks
+
+---
+
+### P1-3: Inject Readers/Writers into ClaudeCodePlugin
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § MCP Client Plugins • DIP_AUDIT § 1.5 High
+
+#### Description
+
+ClaudeCodePlugin._initialize_scopes() creates JSONFileReader and JSONFileWriter directly instead of accepting them as dependencies. Protocols exist (ConfigReader, ConfigWriter) but aren't leveraged for construction. This prevents testing scope operations without file I/O.
+
+**Files to Modify**:
+- `src/mcpi/clients/claude_code.py` (lines 63-72): Update _initialize_scopes()
+- `src/mcpi/clients/claude_code.py` (constructor): Add reader/writer parameters
+- `src/mcpi/clients/base.py` (if needed): Update base class signature
+- Test files for ClaudeCodePlugin (~5-8 files)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def _initialize_scopes(self):
+    json_reader = JSONFileReader()  # <-- Hardcoded
+    json_writer = JSONFileWriter()  # <-- Hardcoded
+    validator = YAMLSchemaValidator()  # <-- Hardcoded
+```
+
+#### Acceptance Criteria
+
+- [ ] ClaudeCodePlugin.__init__ accepts optional reader/writer/validator
+- [ ] Signature: `__init__(self, path_overrides=None, reader=None, writer=None, validator=None)`
+- [ ] Defaults to JSONFileReader/JSONFileWriter/YAMLSchemaValidator if None
+- [ ] _initialize_scopes() uses self._reader, self._writer, self._validator
+- [ ] All scopes created with injected dependencies
+- [ ] New unit test: Inject mock reader/writer, verify no file I/O
+- [ ] New unit test: Verify scope operations use injected dependencies
+- [ ] New unit test: Verify defaults work when not injected
+- [ ] Existing tests still pass
+- [ ] Other plugins (cursor, vscode) updated if they have same pattern
+
+#### Technical Notes
+
+**Breaking Change**: NO - Optional parameters with defaults
+
+**Design Pattern**: Same as FileBasedScope approach
+- Accept protocols (ConfigReader, ConfigWriter)
+- Default to concrete implementations
+- Store as instance variables
+- Pass to scope handlers
+
+**Implementation Strategy**:
+1. Add constructor parameters with defaults
+2. Store as instance variables
+3. Update _initialize_scopes() to use instance variables
+4. Pass to FileBasedScope constructors
+5. Write tests with mock implementations
+
+**Test Strategy**:
+- Create MockConfigReader and MockConfigWriter
+- Inject into ClaudeCodePlugin
+- Call scope operations (enable, disable, add)
+- Verify mocks were called instead of real file I/O
+- Verify operations return expected results
+
+---
+
+### P1-4: Create RegistryDataSource Protocol and Implementations
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: P0-1 (ServerCatalog refactored)
+**Spec Reference**: CLAUDE.md § Registry System • DIP_AUDIT § 3.1 High
+
+#### Description
+
+ServerCatalog is hardcoded to file-based JSON/YAML loading. Need to abstract the data source behind a protocol so we can:
+1. Test with in-memory registry (no file I/O)
+2. Support future backends (database, remote API)
+3. Follow Open/Closed Principle
+
+**Files to Modify**:
+- `src/mcpi/registry/catalog.py`: Update to use RegistryDataSource protocol
+- `src/mcpi/registry/protocols.py` (new file): Define RegistryDataSource protocol
+- `src/mcpi/registry/sources.py` (new file): Implement FileRegistryDataSource, InMemoryRegistryDataSource
+- Update tests to use InMemoryRegistryDataSource (~15-20 files)
+
+**Evidence from Audit**: Missing abstraction - no protocol exists for data source
+
+#### Acceptance Criteria
+
+- [ ] New protocol RegistryDataSource with methods: load(), save()
+- [ ] Protocol signature: `load() -> Dict[str, MCPServer]` and `save(servers) -> bool`
+- [ ] FileRegistryDataSource implementation (wraps current file logic)
+- [ ] InMemoryRegistryDataSource implementation (dict-based, no I/O)
+- [ ] ServerCatalog constructor accepts RegistryDataSource
+- [ ] ServerCatalog.load_registry() delegates to data_source.load()
+- [ ] Factory functions updated to create FileRegistryDataSource
+- [ ] New unit test: ServerCatalog with InMemoryRegistryDataSource
+- [ ] New unit test: FileRegistryDataSource loads real file
+- [ ] New unit test: InMemoryRegistryDataSource never touches filesystem
+- [ ] Existing tests updated to use appropriate data source
+- [ ] Documentation explains data source abstraction
+
+#### Technical Notes
+
+**Breaking Change**: Partial - ServerCatalog constructor changes (but factories hide this)
+
+**Protocol Definition**:
+```python
+class RegistryDataSource(Protocol):
+    """Protocol for registry data sources."""
+
+    def load(self) -> Dict[str, MCPServer]:
+        """Load all servers from data source."""
+        ...
+
+    def save(self, servers: Dict[str, MCPServer]) -> bool:
+        """Save servers to data source."""
+        ...
+```
+
+**Implementation Strategy**:
+1. Create protocol definition
+2. Extract current file logic to FileRegistryDataSource
+3. Create InMemoryRegistryDataSource
+4. Update ServerCatalog to delegate to data_source
+5. Update factories to create FileRegistryDataSource
+6. Update tests to use InMemoryRegistryDataSource
+
+**Test Strategy**:
+- Test FileRegistryDataSource with temp files
+- Test InMemoryRegistryDataSource with sample data
+- Test ServerCatalog with both implementations
+- Verify InMemoryRegistryDataSource tests run FAST (no I/O)
+
+---
+
+### P1-5: Create PluginDiscovery Protocol
+
+**Status**: Not Started
+**Effort**: Small (1-2 days)
+**Dependencies**: P1-1 (ClientRegistry supports injection)
+**Spec Reference**: CLAUDE.md § Plugin Architecture • DIP_AUDIT § 3.2 Medium
+
+#### Description
+
+ClientRegistry hardcodes plugin discovery using importlib and pkgutil. Need to abstract this behind a protocol for testability and extensibility. This is lower priority than other issues because P1-1 already enables injection.
+
+**Files to Modify**:
+- `src/mcpi/clients/registry.py`: Extract discovery to separate class
+- `src/mcpi/clients/protocols.py`: Add PluginDiscovery protocol
+- `src/mcpi/clients/discovery.py` (new file): Implement FilesystemPluginDiscovery
+- Optional: Add StaticPluginDiscovery for testing
+
+**Evidence from Audit**: Lines 24-68 in registry.py hardcode discovery logic
+
+#### Acceptance Criteria
+
+- [ ] New protocol PluginDiscovery with method: discover() -> List[Type[MCPClientPlugin]]
+- [ ] FilesystemPluginDiscovery implementation (wraps current logic)
+- [ ] ClientRegistry optionally accepts PluginDiscovery instance
+- [ ] If PluginDiscovery provided, use it; else use FilesystemPluginDiscovery
+- [ ] New unit test: ClientRegistry with custom PluginDiscovery
+- [ ] New unit test: FilesystemPluginDiscovery finds real plugins
+- [ ] Existing tests still work (auto-discovery preserved)
+- [ ] Documentation explains discovery abstraction
+
+#### Technical Notes
+
+**Breaking Change**: NO - Fully backwards compatible
+
+**Priority Note**: This is P1 for completeness but can be deferred if time-constrained, since P1-1 already enables test injection.
+
+**Implementation Strategy**:
+1. Define protocol
+2. Extract current logic to FilesystemPluginDiscovery
+3. Add optional discovery parameter to ClientRegistry
+4. Use discovery.discover() if provided
+5. Write tests
+
+---
+
+## Phase 3: Medium Priority Fixes
+
+These issues improve code quality and consistency but aren't blocking. Can be done after Phases 1-2.
+
+**Total Effort**: 2-3 days
+**Dependencies**: Phases 1-2 complete
+**Test Impact**: Minimal (mostly cleanup)
+
+---
+
+### P2-1: Make FileBasedScope Reader/Writer Required
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: P1-3 (ClaudeCodePlugin updated)
+**Spec Reference**: CLAUDE.md § Scope-Based Configuration • DIP_AUDIT § 1.6 Medium
+
+#### Description
+
+FileBasedScope has optional reader/writer parameters but these are actually required for operation. Making them optional just moves the hardcoding from caller to callee. Should require injection and use factory for defaults.
+
+**Files to Modify**:
+- `src/mcpi/clients/file_based.py` (lines 153-182): Update constructor
+- `src/mcpi/clients/file_based.py` (add new): Add factory function
+- All code that creates FileBasedScope (~5-10 locations)
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def __init__(
+    self,
+    config: ScopeConfig,
+    reader: Optional[ConfigReader] = None,  # <-- Should be required
+    writer: Optional[ConfigWriter] = None,  # <-- Should be required
+):
+    self.reader = reader or JSONFileReader()  # <-- Default
+```
+
+#### Acceptance Criteria
+
+- [ ] FileBasedScope.__init__ requires reader and writer (not optional)
+- [ ] Signature: `__init__(self, config, reader: ConfigReader, writer: ConfigWriter, validator=None, ...)`
+- [ ] Factory function create_file_based_scope() exists with defaults
+- [ ] ClaudeCodePlugin uses updated constructor (passes reader/writer)
+- [ ] All other callers updated to pass reader/writer or use factory
+- [ ] New unit test: FileBasedScope requires reader/writer (TypeError if missing)
+- [ ] New unit test: Factory creates scope with defaults
+- [ ] Existing tests updated and passing
+
+#### Technical Notes
+
+**Breaking Change**: YES - All callers must update
+
+**Why Required Not Optional**:
+- FileBasedScope cannot function without reader/writer
+- Optional suggests they're not essential, which is false
+- Explicit is better than implicit (Zen of Python)
+
+**Implementation Strategy**:
+1. Create factory first (backwards compatible)
+2. Make params required (breaking change)
+3. Update all callers in one commit
+4. Run tests to verify
+
+---
+
+### P2-2: Refactor TUI Factory to Support Adapter Injection
+
+**Status**: Not Started
+**Effort**: Small (1-2 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § TUI (not explicitly documented) • DIP_AUDIT § 1.7 Medium
+
+#### Description
+
+TUI factory hardcodes FzfAdapter instantiation. Should accept optional adapter factory to enable testing with mock adapters.
+
+**Files to Modify**:
+- `src/mcpi/tui/factory.py` (lines 18-58): Add adapter_factory parameter
+- TUI tests (~2-3 files): Add tests with mock adapter
+
+**Evidence from Audit**:
+```python
+# WRONG (current)
+def get_tui_adapter(backend: Optional[str] = None) -> TUIAdapter:
+    if backend == "fzf":
+        return FzfAdapter()  # <-- Hardcoded
+```
+
+#### Acceptance Criteria
+
+- [ ] get_tui_adapter() accepts optional adapter_factory parameter
+- [ ] Signature: `get_tui_adapter(backend=None, adapter_factory=None) -> TUIAdapter`
+- [ ] If adapter_factory provided, use it (ignore backend)
+- [ ] If adapter_factory is None, use backend-based logic (current behavior)
+- [ ] New unit test: Inject adapter_factory, verify it's used
+- [ ] New unit test: Verify default behavior unchanged
+- [ ] Existing TUI tests still pass
+
+#### Technical Notes
+
+**Breaking Change**: NO - Backwards compatible
+
+**Implementation Strategy**:
+1. Add adapter_factory parameter with default None
+2. Check adapter_factory first, then fall back to backend logic
+3. Write tests showing both paths
+
+---
+
+### P2-3: Add PathResolver Abstraction (Optional)
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: None
+**Spec Reference**: CLAUDE.md § Testing Strategy • DIP_AUDIT § 3.3 Low
+
+#### Description
+
+Path resolution (Path.home(), Path.cwd()) is scattered throughout the codebase. A PathResolver protocol would improve testability and reduce code duplication. This is optional cleanup, not critical.
+
+**Files to Modify**:
+- `src/mcpi/clients/protocols.py`: Add PathResolver protocol
+- `src/mcpi/clients/path_utils.py` (new): Implement DefaultPathResolver, TestPathResolver
+- Various files that use Path.home() or Path.cwd() (~10-15 locations)
+
+**Evidence from Audit**: Path resolution duplicated across components
+
+#### Acceptance Criteria
+
+- [ ] PathResolver protocol with methods: get_home(), get_cwd(), get_user_config_dir(), get_project_config_dir()
+- [ ] DefaultPathResolver implementation (uses Path.home(), Path.cwd())
+- [ ] TestPathResolver implementation (uses configurable paths)
+- [ ] Optional: Inject PathResolver into plugins and managers
+- [ ] New unit test: TestPathResolver returns custom paths
+- [ ] Existing tests can optionally use TestPathResolver
+
+#### Technical Notes
+
+**Priority**: P2 (nice to have, not essential)
+
+**Breaking Change**: YES if we require injection, NO if we keep defaults
+
+**Defer if Needed**: This can be skipped if time-constrained
+
+---
+
+### P2-4: Standardize Factory Pattern Usage
+
+**Status**: Not Started
+**Effort**: Small (1-2 days)
+**Dependencies**: All previous factory implementations
+**Spec Reference**: CLAUDE.md § Key Design Patterns • DIP_AUDIT § 7 Conclusion
+
+#### Description
+
+After implementing factories for ServerCatalog, MCPManager, FileBasedScope, etc., ensure consistent naming and usage patterns across codebase.
+
+**Files to Review**:
+- All factory functions created in Phase 1-3
+- Documentation of factory pattern usage
+
+**Audit complete**: Audit is a doc task, not implementation
+
+#### Acceptance Criteria
+
+- [ ] All factories follow naming convention: create_default_*, create_test_*
+- [ ] All factories documented with docstrings
+- [ ] Factories listed in relevant __init__.py files for easy import
+- [ ] Documentation updated to show factory usage patterns
+- [ ] Code examples in CLAUDE.md updated
+
+#### Technical Notes
+
+**Type**: Cleanup and documentation
+
+**Implementation Strategy**:
+1. Review all factories created
+2. Ensure consistent naming
+3. Update documentation
+4. Add code examples
+
+---
+
+## Phase 4: Testing Infrastructure Improvements
+
+After fixing the code, update tests to leverage new dependency injection capabilities.
+
+**Total Effort**: 2-3 days
+**Dependencies**: Phases 1-3 complete
+**Test Impact**: Major improvement in test speed and isolation
+
+---
+
+### P3-1: Create Mock Implementations for All Protocols
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: P1-4 (RegistryDataSource), P1-5 (PluginDiscovery), P2-3 (PathResolver)
+**Spec Reference**: CLAUDE.md § Testing Strategy
+
+#### Description
+
+Create reusable mock implementations of all protocols to enable pure unit testing without file I/O, network I/O, or subprocess execution.
+
+**Files to Create**:
+- `tests/mocks/__init__.py`: Central mock registry
+- `tests/mocks/config_io.py`: MockConfigReader, MockConfigWriter
+- `tests/mocks/registry.py`: MockRegistryDataSource, InMemoryRegistryDataSource
+- `tests/mocks/plugins.py`: MockClientPlugin, MockPluginDiscovery
+- `tests/mocks/managers.py`: MockMCPManager, MockServerCatalog
+- `tests/mocks/validators.py`: MockSchemaValidator
+- `tests/mocks/paths.py`: MockPathResolver
+
+#### Acceptance Criteria
+
+- [ ] All protocols have mock implementations
+- [ ] Mocks track calls (for verification)
+- [ ] Mocks support configurable behavior (return values, exceptions)
+- [ ] Mocks documented with usage examples
+- [ ] New unit test: Each mock behaves correctly
+- [ ] Mocks registered in conftest.py as fixtures
+- [ ] Documentation shows how to use mocks in tests
+
+#### Technical Notes
+
+**Pattern**: Follow pytest-mock patterns
+- Track method calls
+- Support return value configuration
+- Support exception raising
+- Provide sensible defaults
+
+**Implementation Strategy**:
+1. Create mock for each protocol
+2. Add call tracking
+3. Add configuration methods
+4. Write tests for mocks themselves
+5. Document usage
+
+---
+
+### P3-2: Refactor Existing Tests to Use Dependency Injection
+
+**Status**: Not Started
+**Effort**: Large (1-2 weeks)
+**Dependencies**: P3-1 (mocks available), All Phase 1-2 work complete
+**Spec Reference**: CLAUDE.md § Testing Strategy
+
+#### Description
+
+Update existing tests to use new dependency injection patterns instead of relying on real file system, real plugin discovery, etc. This is the largest effort but will dramatically improve test speed and isolation.
+
+**Files to Update**: 50-100 test files
+
+**Categories**:
+1. ServerCatalog tests → Use InMemoryRegistryDataSource
+2. MCPManager tests → Inject mock ClientRegistry
+3. ClientRegistry tests → Inject mock plugin list
+4. CLI tests → Inject mock factories
+5. Plugin tests → Inject mock readers/writers
+6. Scope tests → Use mock file I/O
+
+#### Acceptance Criteria
+
+- [ ] All ServerCatalog tests use data source injection (no file I/O unless integration test)
+- [ ] All MCPManager tests inject ClientRegistry (no plugin discovery)
+- [ ] All ClientRegistry tests inject plugins (no filesystem scanning)
+- [ ] All CLI tests inject factories (no real components)
+- [ ] All plugin tests inject readers/writers (no file I/O)
+- [ ] Test suite runs faster (target: 2x speedup)
+- [ ] Test pass rate improves (target: 95%+)
+- [ ] Integration tests clearly marked (in separate file or marker)
+- [ ] Unit tests can run offline (no network, no file I/O)
+
+#### Technical Notes
+
+**Effort**: This is the largest single work item
+
+**Strategy**: Update one test file at a time
+1. Identify file I/O or discovery in test
+2. Replace with mock injection
+3. Verify test still validates same behavior
+4. Move to next file
+
+**Track Progress**: Use checklist of test files
+
+**Test Files Priority**:
+1. Start with ServerCatalog tests (P0-1 impact)
+2. Then MCPManager tests (P0-2 impact)
+3. Then CLI tests (P1-2 impact)
+4. Then plugin tests (P1-3 impact)
+5. Finally scope tests (P2-1 impact)
+
+---
+
+### P3-3: Add Pure Unit Tests for Business Logic
+
+**Status**: Not Started
+**Effort**: Medium (3-5 days)
+**Dependencies**: P3-1 (mocks available), P3-2 (existing tests refactored)
+**Spec Reference**: CLAUDE.md § Testing Strategy
+
+#### Description
+
+Add new unit tests that focus on business logic in isolation, using mocks for all I/O. These should be fast, focused tests that verify single responsibilities.
+
+**Test Categories**:
+1. ServerCatalog business logic (search, filter, validate)
+2. MCPManager client detection and selection
+3. Scope priority resolution
+4. Configuration merging logic
+5. Server state management
+6. Error handling and edge cases
+
+**New Test Files**:
+- `tests/unit/test_catalog_logic.py`
+- `tests/unit/test_manager_logic.py`
+- `tests/unit/test_scope_resolution.py`
+- `tests/unit/test_config_merging.py`
+- `tests/unit/test_server_state.py`
+
+#### Acceptance Criteria
+
+- [ ] At least 50 new pure unit tests added
+- [ ] All new tests use mocks (zero I/O)
+- [ ] All new tests run in <1 second total
+- [ ] Business logic covered: catalog search, scope resolution, config merging
+- [ ] Edge cases covered: empty configs, invalid data, missing files
+- [ ] Error handling covered: exceptions, validation failures
+- [ ] Tests organized in `tests/unit/` directory
+- [ ] Tests marked with `@pytest.mark.unit`
+- [ ] Documentation explains unit vs integration test structure
+
+#### Technical Notes
+
+**Focus**: Business logic, not I/O
+
+**Pattern**: Arrange-Act-Assert
+1. Arrange: Set up mocks with specific data
+2. Act: Call business logic method
+3. Assert: Verify correct behavior
+
+**Speed Target**: All unit tests <5 seconds total
+
+---
+
+### P3-4: Clean Up Integration Tests
+
+**Status**: Not Started
+**Effort**: Small (1-2 days)
+**Dependencies**: P3-2 (unit tests refactored)
+**Spec Reference**: CLAUDE.md § Testing Strategy
+
+#### Description
+
+After separating unit tests, clean up integration tests to focus on end-to-end workflows. Mark them clearly so they can be run separately (e.g., for CI vs local development).
+
+**Files to Update**:
+- Move integration tests to `tests/integration/` directory
+- Mark with `@pytest.mark.integration`
+- Update CI to run unit tests first, integration tests second
+
+#### Acceptance Criteria
+
+- [ ] Integration tests in `tests/integration/` directory
+- [ ] All integration tests marked with `@pytest.mark.integration`
+- [ ] Integration tests cover end-to-end workflows (install, enable, disable, etc.)
+- [ ] Integration tests can be skipped with `pytest -m "not integration"`
+- [ ] CI updated to run unit tests first (fast feedback)
+- [ ] CI runs integration tests after unit tests pass
+- [ ] Documentation explains test organization and how to run subsets
+
+#### Technical Notes
+
+**Integration Test Focus**:
+- Real file system operations
+- Real plugin discovery
+- Real subprocess execution (npx, npm, pip)
+- Full workflow validation
+
+**CI Strategy**:
+```yaml
+# Fast unit tests first
+- run: pytest -m "not integration" --maxfail=5
+
+# Slower integration tests after
+- run: pytest -m integration
+```
+
+---
+
+## Dependency Graph
+
+```
+Phase 1: Critical Fixes (Parallel - No Dependencies)
+├── P0-1: ServerCatalog refactor ────────┐
+└── P0-2: MCPManager refactor ──────────┐│
+                                        ││
+Phase 2: High Priority                  ││
+├── P1-1: ClientRegistry injection ─────┼┘
+├── P1-2: CLI injection ←──────────────┼─(P0-1, P0-2)
+├── P1-3: ClaudeCodePlugin injection ───┤
+├── P1-4: RegistryDataSource ←─────────┘
+└── P1-5: PluginDiscovery ←────(P1-1)
+
+Phase 3: Medium Priority
+├── P2-1: FileBasedScope ←──────(P1-3)
+├── P2-2: TUI factory ──────────────────(independent)
+├── P2-3: PathResolver ─────────────────(independent, optional)
+└── P2-4: Factory standardization ←─────(all previous)
+
+Phase 4: Testing Infrastructure (Sequential)
+├── P3-1: Create mocks ←────(P1-4, P1-5, P2-3)
+├── P3-2: Refactor tests ←──(P3-1, Phase 1-2 complete)
+├── P3-3: Add unit tests ←──(P3-1, P3-2)
+└── P3-4: Clean up integration ←────(P3-2)
+```
+
+---
+
+## Breaking Changes Summary
+
+**Breaking Changes** (require code updates):
+- P0-1: ServerCatalog constructor (use factories)
+- P0-2: MCPManager constructor (use factories)
+- P2-1: FileBasedScope constructor (require reader/writer)
+
+**Non-Breaking** (backwards compatible):
+- P1-1: ClientRegistry (optional parameter, defaults to discovery)
+- P1-2: CLI injection (optional factory parameter)
+- P1-3: ClaudeCodePlugin (optional parameters with defaults)
+- P1-4: RegistryDataSource (hidden behind factories)
+- P1-5: PluginDiscovery (optional, defaults to filesystem)
+- P2-2: TUI factory (optional parameter)
+- P2-3: PathResolver (optional feature)
+
+**Migration Strategy**:
+1. Factories provide backwards compatibility
+2. Update call sites incrementally
+3. Use grep to find all instantiations
+4. Run full test suite after each change
+
+---
+
+## Success Metrics
+
+**Before Remediation**:
+- Test pass rate: 86% (539/635)
+- Unit tests require file I/O: YES (most tests)
+- True unit testing possible: NO (critical components)
+- Test execution time: ~30-60 seconds
+- DIP violations: 13 total (2 critical, 5 high, 4 medium, 2 low)
+
+**After Remediation** (Targets):
+- Test pass rate: 95%+ (600+/635)
+- Unit tests require file I/O: NO (mocks available)
+- True unit testing possible: YES (all components)
+- Test execution time: ~15-30 seconds (2x faster)
+- DIP violations: 0 (all resolved)
+
+**Additional Metrics**:
+- Factory pattern usage: Consistent across codebase
+- Protocol coverage: All I/O abstracted
+- Mock availability: Full coverage
+- Documentation quality: Comprehensive
+
+---
+
+## Risk Assessment
+
+**High Risk Items**:
+- P0-1, P0-2: Breaking changes require updating many call sites
+  - Mitigation: Use factories, grep to find all locations, commit atomically
+- P3-2: Large refactor of existing tests
+  - Mitigation: One file at a time, run tests after each change
+
+**Medium Risk Items**:
+- P1-4: RegistryDataSource is new abstraction
+  - Mitigation: Implement FileRegistryDataSource as exact wrapper of current logic first
+- P2-1: FileBasedScope breaking change
+  - Mitigation: Update ClaudeCodePlugin first, then FileBasedScope
+
+**Low Risk Items**:
+- P1-1, P1-3, P2-2: All backwards compatible
+- P2-3: Optional feature, can defer
+- P3-1, P3-3, P3-4: Test-only changes
+
+**Overall Risk**: MEDIUM
+- Multiple breaking changes
+- Large test refactor
+- But: Phased approach reduces risk
+- But: Extensive test coverage catches issues
+
+---
+
+## Recommended Execution Order
+
+**Week 1: Critical Fixes**
+1. Day 1-2: P0-1 (ServerCatalog) - Includes factory creation and all test updates
+2. Day 3-4: P0-2 (MCPManager) - Includes factory creation and all test updates
+3. Day 5: Run full test suite, fix any issues
+
+**Week 2: High Priority Part 1**
+1. Day 1-2: P1-1 (ClientRegistry injection)
+2. Day 2-3: P1-2 (CLI injection) - Depends on P0-1, P0-2
+3. Day 3-4: P1-3 (ClaudeCodePlugin injection)
+4. Day 5: P1-4 (RegistryDataSource) - Depends on P0-1
+
+**Week 3: High Priority Part 2 + Medium Priority** (if time permits)
+1. Day 1: P1-5 (PluginDiscovery)
+2. Day 2-3: P2-1 (FileBasedScope)
+3. Day 4: P2-2 (TUI factory), P2-4 (Factory standardization)
+4. Day 5: Buffer / catch-up / testing
+
+**Week 4+: Testing Infrastructure** (if desired)
+1. P3-1: Create mocks (3-5 days)
+2. P3-2: Refactor tests (5-10 days) - Can be done incrementally
+3. P3-3: Add unit tests (3-5 days)
+4. P3-4: Clean integration tests (1-2 days)
+
+**Minimum Viable Remediation**: Phases 1-2 (Weeks 1-2)
+**Full Remediation**: Phases 1-4 (4+ weeks)
+
+---
+
+## Notes for test-driven-implementer Agent
+
+**Test-First Approach**:
+1. For each work item, write tests FIRST that show desired behavior
+2. Run tests (they should fail)
+3. Implement changes to make tests pass
+4. Verify all existing tests still pass
+5. Move to next work item
+
+**Verification Pattern**:
+```bash
+# Before implementing
+pytest tests/test_catalog.py -v  # See current behavior
+
+# Write new test showing desired behavior
+# tests/test_catalog_with_injection.py
+
+# Run new test (should fail)
+pytest tests/test_catalog_with_injection.py -v
+
+# Implement changes
+# src/mcpi/registry/catalog.py
+
+# Run new test (should pass)
+pytest tests/test_catalog_with_injection.py -v
+
+# Run all tests (should all pass)
+pytest -v
+
+# Run specific category if needed
+pytest -m unit -v  # Only unit tests
+```
+
+**Critical Pattern**: Always verify existing tests still pass after each change.
+
+**Use grep to find call sites**:
+```bash
+# Example for ServerCatalog
+grep -r "ServerCatalog()" src/ tests/ | wc -l  # How many to update?
+grep -r "ServerCatalog()" src/ tests/  # Show all locations
+```
+
+**Commit Strategy**:
+- Small commits for each step
+- Run tests before each commit
+- Commit message format: "[P0-1] Add factory functions for ServerCatalog"
+
+---
+
+## Related Documents
+
+**Source Documents**:
+- `.agent_planning/DIP_AUDIT-2025-11-07-010149.md` - Detailed audit findings
+- `.agent_planning/STATUS-2025-11-06-164217.md` - Current project status
+- `CLAUDE.md` - Architecture specification
+
+**Generated Artifacts** (will be created during execution):
+- Test updates in `tests/` directory
+- Mock implementations in `tests/mocks/`
+- Factory functions in relevant modules
+- Protocol definitions in `protocols.py` files
+
+**Documentation Updates Needed**:
+- Update CLAUDE.md with factory pattern usage
+- Update CLAUDE.md with testing strategy (unit vs integration)
+- Add examples of dependency injection in docstrings
+
+---
+
+**END OF PLAN**
+
+**Generated**: 2025-11-07 01:05:28
+**Total Work Items**: 23 (4 phases)
+**Estimated Effort**: 8-12 days (Phases 1-2), 4+ weeks (all phases)
+**Priority**: Start with Phase 1 (Critical Fixes), then Phase 2 (High Priority)

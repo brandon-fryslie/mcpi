@@ -165,8 +165,9 @@ Launch an interactive fuzzy finder interface for managing MCP servers.
 **Features:**
 - Browse all servers from the registry with fuzzy search
 - Installed servers shown at top (green=enabled, yellow=disabled)
-- Real-time status updates after operations
+- Interactive operations without exiting (add, remove, enable, disable)
 - Preview pane shows server details
+- List refreshes after operations to show updated status
 
 **Keyboard Shortcuts:**
 - `ctrl-a`: Add server to configuration
@@ -575,6 +576,99 @@ To add a new MCP server to the registry:
 - Write tests for new features
 - Update documentation for new features
 - Use semantic versioning
+
+## Python API
+
+MCPI can be used as a Python library for programmatic MCP server management.
+
+### Basic Usage
+
+```python
+from mcpi.registry.catalog import create_default_catalog
+from mcpi.clients.manager import create_default_manager
+
+# Create catalog to browse available servers
+catalog = create_default_catalog()
+catalog.load_registry()
+
+# Search for servers
+results = catalog.search_servers("filesystem")
+for server_id, server in results:
+    print(f"{server_id}: {server.description}")
+
+# Create manager for server operations
+manager = create_default_manager()
+
+# List installed servers
+servers = manager.list_servers()
+for server_id, info in servers.items():
+    print(f"{server_id}: {info.state}")
+
+# Add a server
+result = manager.add_server(
+    "filesystem",
+    config={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem"]},
+    scope="user-global"
+)
+print(result.message)
+```
+
+### Factory Functions (Recommended)
+
+For production use, use factory functions that handle default initialization:
+
+```python
+from mcpi.registry.catalog import create_default_catalog, create_test_catalog
+from mcpi.clients.manager import create_default_manager, create_test_manager
+
+# Production: Use defaults
+catalog = create_default_catalog()  # Uses data/registry.json
+manager = create_default_manager()  # Auto-detects clients
+
+# Testing: Inject dependencies
+from pathlib import Path
+test_catalog = create_test_catalog(Path("/tmp/test-registry.json"))
+test_manager = create_test_manager(mock_registry)
+```
+
+### Breaking Changes (v2.0)
+
+**Important**: MCPI v2.0 introduced dependency injection for better testability:
+
+```python
+# ❌ OLD API (no longer works):
+from mcpi.registry.catalog import ServerCatalog
+from mcpi.clients.manager import MCPManager
+catalog = ServerCatalog()  # TypeError: missing required argument 'registry_path'
+manager = MCPManager()      # TypeError: missing required argument 'registry'
+
+# ✅ NEW API (use factory functions):
+from mcpi.registry.catalog import create_default_catalog
+from mcpi.clients.manager import create_default_manager
+catalog = create_default_catalog()  # Provides default path
+manager = create_default_manager()  # Creates default registry
+
+# ✅ NEW API (explicit injection for advanced use):
+from mcpi.registry.catalog import ServerCatalog
+from mcpi.clients.manager import MCPManager
+from mcpi.clients.registry import ClientRegistry
+from pathlib import Path
+
+catalog = ServerCatalog(registry_path=Path("custom/registry.json"))
+manager = MCPManager(registry=ClientRegistry())
+```
+
+**Migration Guide**:
+- Replace `ServerCatalog()` with `create_default_catalog()`
+- Replace `MCPManager()` with `create_default_manager()`
+- For testing, use `create_test_catalog(path)` and `create_test_manager(registry)`
+- For advanced use, pass required parameters explicitly
+
+**Why this change?** Dependency Inversion Principle (DIP) enables:
+- True unit testing without file system access
+- Component isolation and modularity
+- Easier mocking in tests
+- Better adherence to SOLID principles
 
 ## Troubleshooting
 

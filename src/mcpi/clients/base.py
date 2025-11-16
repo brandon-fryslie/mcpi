@@ -74,14 +74,14 @@ class ScopeHandler(ABC):
         ...
 
     @abstractmethod
-    def get_server_config(self, server_id: str) -> ServerConfig:
+    def get_server_config(self, server_id: str) -> Dict[str, Any]:
         """Get the full configuration for a specific server.
 
         Args:
             server_id: The ID of the server to retrieve
 
         Returns:
-            ServerConfig object with full server configuration
+            Dictionary with full server configuration
 
         Raises:
             ValueError: If server doesn't exist in this scope

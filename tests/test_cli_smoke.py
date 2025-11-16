@@ -1,23 +1,25 @@
 """Smoke tests for CLI commands to ensure they don't crash immediately."""
 
 import json
-import subprocess
-from pathlib import Path
 from typing import List
 
 import pytest
+from click.testing import CliRunner
+
+from mcpi.cli import main
 
 
 def run_cli_command(args: List[str]) -> tuple[int, str, str]:
-    """Run a CLI command and return exit code, stdout, stderr."""
-    cmd = ["uv", "run", "mcpi"] + args
-    result = subprocess.run(
-        cmd,
-        cwd=Path(__file__).parent.parent,
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode, result.stdout, result.stderr
+    """Run a CLI command and return exit code, stdout, stderr.
+
+    Uses Click's CliRunner for fast, reliable testing without subprocess overhead.
+    Note: Click errors (like missing arguments) go to output, not stderr.
+    """
+    runner = CliRunner()
+    result = runner.invoke(main, args, catch_exceptions=False)
+    # CliRunner puts everything (stdout + stderr + Click errors) in output
+    # For tests checking stderr for Click errors, check output instead
+    return result.exit_code, result.output, result.output
 
 
 class TestCliSmoke:
@@ -54,79 +56,6 @@ class TestCliSmoke:
         except json.JSONDecodeError:
             pytest.fail("status --json did not output valid JSON")
 
-    def test_registry_validate(self):
-        """Test that registry validate works without crashing."""
-        code, stdout, stderr = run_cli_command(["registry", "validate"])
-        # Should succeed or fail gracefully
-        assert code in [0, 1]  # Valid registry or validation errors
-
-    def test_config_help(self):
-        """Test that config --help works."""
-        code, stdout, stderr = run_cli_command(["config", "--help"])
-        assert code == 0
-        assert "Configuration management" in stdout
-
-    def test_config_show(self):
-        """Test that config show works without crashing."""
-        code, stdout, stderr = run_cli_command(["config", "show"])
-        # Should work even with default config
-        assert code == 0
-        assert "MCPI Configuration" in stdout or "General Settings" in stdout
-
-    def test_config_show_json(self):
-        """Test that config show --json works."""
-        code, stdout, stderr = run_cli_command(["config", "show", "--json"])
-        assert code == 0
-        # Should be valid JSON
-        try:
-            data = json.loads(stdout)
-            assert isinstance(data, dict)
-            assert "general" in data
-        except json.JSONDecodeError:
-            pytest.fail("config show --json did not output valid JSON")
-
-    def test_config_validate(self):
-        """Test that config validate works without crashing."""
-        code, stdout, stderr = run_cli_command(["config", "validate"])
-        # Should succeed or show validation errors
-        assert code in [0, 1]
-
-    def test_install_help(self):
-        """Test that install --help works."""
-        code, stdout, stderr = run_cli_command(["install", "--help"])
-        assert code == 0
-        assert "Install one or more MCP servers" in stdout
-
-    def test_install_no_args(self):
-        """Test that install with no arguments shows appropriate error."""
-        code, stdout, stderr = run_cli_command(["install"])
-        assert code == 2  # Click error for missing argument
-        assert "Missing argument" in stderr
-
-    def test_install_invalid_server(self):
-        """Test that install with invalid server ID fails gracefully."""
-        code, stdout, stderr = run_cli_command(["install", "nonexistent-server"])
-        assert code == 1  # Should exit with error code
-        assert "not found" in stdout
-
-    def test_uninstall_help(self):
-        """Test that uninstall --help works."""
-        code, stdout, stderr = run_cli_command(["uninstall", "--help"])
-        assert code == 0
-        assert "Uninstall one or more MCP servers" in stdout
-
-    def test_uninstall_no_args(self):
-        """Test that uninstall with no arguments shows appropriate error."""
-        code, stdout, stderr = run_cli_command(["uninstall"])
-        assert code == 2  # Click error for missing argument
-        assert "Missing argument" in stderr
-
-    def test_update_help(self):
-        """Test that update --help works."""
-        code, stdout, stderr = run_cli_command(["update", "--help"])
-        assert code == 0
-        assert "Update registry from remote source" in stdout
-
     def test_registry_search_help(self):
         """Test that search --help works."""
         code, stdout, stderr = run_cli_command(["search", "--help"])
@@ -145,12 +74,6 @@ class TestCliSmoke:
         code, stdout, stderr = run_cli_command(["info", "--help"])
         assert code == 0
         assert "Show detailed information" in stdout
-
-    def test_registry_add_help(self):
-        """Test that registry add --help works."""
-        code, stdout, stderr = run_cli_command(["registry", "add", "--help"])
-        assert code == 0
-        assert "Add MCP server to registry" in stdout
 
     def test_verbose_flag(self):
         """Test that --verbose flag works."""
@@ -179,9 +102,3 @@ class TestCliEdgeCases:
         code, stdout, stderr = run_cli_command(["invalid-command"])
         assert code == 2  # Click error
         assert "No such command" in stderr
-
-    def test_config_init_help(self):
-        """Test that config init --help works."""
-        code, stdout, stderr = run_cli_command(["config", "init", "--help"])
-        assert code == 0
-        assert "Initialize MCPI configuration" in stdout

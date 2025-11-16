@@ -15,7 +15,7 @@ class CUEValidator:
         if schema_path is None:
             # Default to package data directory
             package_dir = Path(__file__).parent.parent.parent.parent
-            schema_path = package_dir / "data" / "registry.cue"
+            schema_path = package_dir / "data" / "catalog.cue"
 
         self.schema_path = schema_path
 

@@ -12,13 +12,16 @@ logger = logging.getLogger(__name__)
 class MCPManager:
     """Main manager for MCP clients and servers with type safety."""
 
-    def __init__(self, default_client: Optional[str] = None) -> None:
+    def __init__(
+        self, registry: ClientRegistry, default_client: Optional[str] = None
+    ) -> None:
         """Initialize the MCP manager.
 
         Args:
+            registry: ClientRegistry instance (required for DI/testability)
             default_client: Default client name to use
         """
-        self.registry = ClientRegistry()
+        self.registry = registry
         self._default_client = default_client
 
         # Auto-detect default client if not specified
@@ -361,9 +364,7 @@ class MCPManager:
             # Return as list of (client, scope) tuples
             return [(client_name, scope_name) for scope_name in scope_names]
         except Exception as e:
-            logger.error(
-                f"Error finding server scopes in client '{client_name}': {e}"
-            )
+            logger.error(f"Error finding server scopes in client '{client_name}': {e}")
             return []
 
     def get_scopes_for_client(
@@ -470,3 +471,41 @@ class MCPManager:
         """Clean up resources and connections."""
         logger.info("Cleaning up MCP manager")
         # Future: Add cleanup logic for active connections, temporary files, etc.
+
+
+# Factory Functions for DIP Compliance
+
+
+def create_default_manager(default_client: Optional[str] = None) -> MCPManager:
+    """Create MCPManager with default ClientRegistry.
+
+    This factory function provides the default behavior that was previously
+    in MCPManager.__init__. Use this for production code that needs
+    automatic client discovery.
+
+    Args:
+        default_client: Default client name to use (auto-detected if None)
+
+    Returns:
+        MCPManager instance with discovered clients
+    """
+    registry = ClientRegistry()
+    return MCPManager(registry=registry, default_client=default_client)
+
+
+def create_test_manager(
+    registry: ClientRegistry, default_client: Optional[str] = None
+) -> MCPManager:
+    """Create MCPManager with custom ClientRegistry for testing.
+
+    This factory function makes it easy to create test managers with
+    pre-configured mock registries.
+
+    Args:
+        registry: Pre-configured ClientRegistry (e.g., with mocks)
+        default_client: Default client name to use
+
+    Returns:
+        MCPManager instance configured with test registry
+    """
+    return MCPManager(registry=registry, default_client=default_client)

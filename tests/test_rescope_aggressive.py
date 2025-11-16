@@ -176,7 +176,10 @@ class TestRescopeAggressiveMultipleScopes:
 
         # Setup: Add same server to THREE different scopes
         config = ServerConfig(
-            command="npx", args=["-y", "test-package"], env={"TEST": "true"}, type="stdio"
+            command="npx",
+            args=["-y", "test-package"],
+            env={"TEST": "true"},
+            type="stdio",
         )
 
         manager.add_server("multi-scope-server", config, "user-global", "claude-code")
@@ -226,9 +229,7 @@ class TestRescopeAggressiveMultipleScopes:
         runner = CliRunner()
 
         # Add server to 4 different scopes
-        config = ServerConfig(
-            command="node", args=["server.js"], type="stdio"
-        )
+        config = ServerConfig(command="node", args=["server.js"], type="stdio")
 
         source_scopes = ["user-global", "user-internal", "user-mcp", "project-mcp"]
         for scope in source_scopes:
@@ -318,9 +319,15 @@ class TestRescopeAggressiveSameScopeIdempotent:
         # Setup: Server in target AND other scopes
         config = ServerConfig(command="node", args=["app.js"], type="stdio")
 
-        manager.add_server("partial-server", config, "user-global", "claude-code")  # target
-        manager.add_server("partial-server", config, "user-internal", "claude-code")  # other
-        manager.add_server("partial-server", config, "project-mcp", "claude-code")  # other
+        manager.add_server(
+            "partial-server", config, "user-global", "claude-code"
+        )  # target
+        manager.add_server(
+            "partial-server", config, "user-internal", "claude-code"
+        )  # other
+        manager.add_server(
+            "partial-server", config, "project-mcp", "claude-code"
+        )  # other
 
         # Verify in all 3 scopes
         harness.assert_server_exists("user-global", "partial-server")
@@ -509,9 +516,7 @@ class TestRescopeAggressiveDryRun:
         with pytest.raises(AssertionError):
             harness.assert_server_exists("user-global", "dry-test")
 
-    def test_rescope_dry_run_no_changes_multiple_scopes(
-        self, mcp_manager_with_harness
-    ):
+    def test_rescope_dry_run_no_changes_multiple_scopes(self, mcp_manager_with_harness):
         """Test dry-run with server in multiple scopes.
 
         This test cannot be gamed because:
@@ -643,9 +648,7 @@ class TestRescopeAggressiveWorkflows:
         final_config = harness.get_server_config("user-global", "postgres")
         assert final_config["env"]["DATABASE_URL"] == "${DATABASE_URL}"
 
-    def test_workflow_project_testing_to_user_promotion(
-        self, mcp_manager_with_harness
-    ):
+    def test_workflow_project_testing_to_user_promotion(self, mcp_manager_with_harness):
         """Real workflow: Tested server at project level, promote to user level.
 
         This test cannot be gamed because:
@@ -696,9 +699,7 @@ class TestRescopeAggressiveEdgeCases:
         runner = CliRunner()
 
         # Server with special chars (common in npm packages)
-        config = ServerConfig(
-            command="npx", args=["@scope/package-name"], type="stdio"
-        )
+        config = ServerConfig(command="npx", args=["@scope/package-name"], type="stdio")
         manager.add_server("@scope/package-name", config, "user-global", "claude-code")
 
         # Rescope (no --from parameter)
@@ -735,9 +736,7 @@ class TestRescopeAggressiveEdgeCases:
 
         for i, (source_scope, dest_scope) in enumerate(test_cases):
             server_id = f"transition-{i}"
-            config = ServerConfig(
-                command="node", args=[f"server{i}.js"], type="stdio"
-            )
+            config = ServerConfig(command="node", args=[f"server{i}.js"], type="stdio")
 
             # Add to source
             manager.add_server(server_id, config, source_scope, "claude-code")

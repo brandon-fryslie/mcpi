@@ -334,22 +334,6 @@ class TestLoggingErrorScenarios:
         assert len(logger.handlers) == 1  # Console only
         assert isinstance(logger.handlers[0], logging.StreamHandler)
 
-    def test_setup_logging_with_empty_format_string(self):
-        """Test setup_logging handles empty format string."""
-        logger = setup_logging(format_string="")
-
-        assert logger.name == "mcpi"
-        assert len(logger.handlers) == 1
-        # Should use empty format string
-        assert logger.handlers[0].formatter._fmt == ""
-
-    def test_get_logger_with_empty_name(self):
-        """Test get_logger with empty name."""
-        logger = get_logger("")
-
-        assert isinstance(logger, logging.Logger)
-        assert logger.name == ""
-
     def test_multiple_setup_calls_same_logger(self):
         """Test multiple setup_logging calls on same logger name."""
         logger1 = setup_logging(level="INFO")

@@ -1,0 +1,182 @@
+{
+  "analysis_date": "2025-11-07",
+  "current_status": {
+    "total_tests": 682,
+    "passing": 593,
+    "failing": 74,
+    "skipped": 15,
+    "pass_rate_percent": 87
+  },
+  "target_status": {
+    "total_tests": 656,
+    "passing": 656,
+    "failing": 0,
+    "skipped": 15,
+    "pass_rate_percent": 100,
+    "note": "Total reduced by 26 obsolete tests"
+  },
+  "failure_categories": {
+    "obsolete_commands": {
+      "count": 26,
+      "action": "DELETE",
+      "effort_minutes": 30,
+      "priority": 1,
+      "description": "Tests for removed/renamed commands (config, install, uninstall, registry validate/add, update)"
+    },
+    "api_contract_changes": {
+      "count": 10,
+      "action": "FIX",
+      "effort_minutes": 30,
+      "priority": 2,
+      "description": "Tests expect dict, API returns ServerConfig object"
+    },
+    "missing_command_options": {
+      "count": 7,
+      "action": "FIX",
+      "effort_minutes": 45,
+      "priority": 4,
+      "description": "Tests use --scope flag on enable/disable commands that don't support it"
+    },
+    "test_implementation_bugs": {
+      "count": 6,
+      "action": "FIX",
+      "effort_minutes": 45,
+      "priority": 5,
+      "description": "Edge case assertions with off-by-one errors or wrong expectations"
+    },
+    "mock_harness_issues": {
+      "count": 25,
+      "action": "FIX",
+      "effort_minutes": 90,
+      "priority": 3,
+      "description": "Tests patching wrong imports, missing path_overrides, or using stale mocks"
+    }
+  },
+  "implementation_phases": [
+    {
+      "phase": 1,
+      "name": "Quick Wins - Delete Obsolete",
+      "tests_affected": 26,
+      "effort_minutes": 30,
+      "impact": "26 fewer failures (35% reduction)",
+      "tasks": [
+        "Delete or comment out tests for config commands",
+        "Delete or comment out tests for install/uninstall commands",
+        "Delete or comment out tests for registry validate/add commands",
+        "Delete or comment out tests for update command",
+        "Run test suite to verify reduction in failures"
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "API Contract Fixes",
+      "tests_affected": 10,
+      "effort_minutes": 30,
+      "impact": "10 fewer failures (21% reduction)",
+      "tasks": [
+        "Update test_functional_rescope_prerequisites.py to accept ServerConfig",
+        "Update test_functional_critical_workflows.py to accept ServerConfig",
+        "Update test_functional_user_workflows.py to accept ServerConfig",
+        "Update test_installer_workflows_integration.py to accept ServerConfig",
+        "Update test_cli_missing_coverage.py to accept ServerConfig",
+        "Add helper function to normalize ServerConfig to dict for assertions"
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Mock/Harness Fixes",
+      "tests_affected": 25,
+      "effort_minutes": 90,
+      "impact": "25 fewer failures (66% reduction)",
+      "tasks": [
+        "Fix test_cli_new.py - remove obsolete ClaudeCodeInstaller mock",
+        "Fix test_cli_new.py - update ServerCatalog mock location",
+        "Fix test_cli_missing_coverage.py - change 'registry info' to 'info'",
+        "Fix test_functional_rescope_prerequisites.py - switch subprocess to CliRunner",
+        "Fix test_functional_critical_workflows.py - investigate and fix API usage",
+        "Fix test_functional_cli_workflows.py - update output assertions",
+        "Fix test_cli_scope_features.py - fix interactive selection mocks",
+        "Fix test_tui_reload.py - fix stdout capture and mock setup",
+        "Fix test_rescope_aggressive.py - add path_overrides to plugin",
+        "Fix test_installer.py - add 'command' field to test data"
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Command Option Fixes",
+      "tests_affected": 7,
+      "effort_minutes": 45,
+      "impact": "7 fewer failures (54% reduction)",
+      "tasks": [
+        "Update test_tui_scope_cycling.py - remove --scope from enable/disable tests",
+        "Verify enable/disable commands don't need --scope parameter",
+        "Update tests to use --client if disambiguation needed",
+        "Verify scope is determined automatically by server location"
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Edge Case Fixes",
+      "tests_affected": 6,
+      "effort_minutes": 45,
+      "impact": "6 fewer failures - 100% PASS RATE!",
+      "tasks": [
+        "Fix test_utils_validation_missing_lines.py - investigate 254 vs 255 behavior",
+        "Fix test_utils_logging_comprehensive.py - verify default format behavior",
+        "Fix test_cli_integration.py - investigate status command exit codes",
+        "Document correct behavior in test comments"
+      ]
+    }
+  ],
+  "total_estimated_effort_minutes": 240,
+  "total_estimated_effort_hours": 4,
+  "confidence_level": "high",
+  "risks": [
+    {
+      "risk": "Hidden test dependencies or execution order issues",
+      "mitigation": "Run tests with --random-order to verify independence"
+    },
+    {
+      "risk": "Test failures revealing real implementation bugs",
+      "mitigation": "Manually verify command behavior before updating tests"
+    },
+    {
+      "risk": "Breaking changes discovered in API contracts",
+      "mitigation": "Review API changes carefully, add backward compatibility if needed"
+    }
+  ],
+  "test_quality_metrics": {
+    "high_value_test_files": [
+      "test_cli_rescope.py",
+      "test_enable_disable_bugs.py",
+      "test_functional_cli_workflows.py",
+      "test_info_plain_flag.py",
+      "test_cli_completion.py",
+      "test_harness_example.py",
+      "test_clients_*.py"
+    ],
+    "tests_following_best_practices": {
+      "un_gameable": "Most functional tests test real CLI commands with real file operations",
+      "traceable": "test_functional_rescope_prerequisites.py has traceability matrix",
+      "complete": "test_enable_disable_bugs.py tests edge cases thoroughly",
+      "flexible": "Harness-based tests allow refactoring without breaking tests"
+    },
+    "areas_for_improvement": [
+      "Consolidate test_cli_new.py with other CLI tests",
+      "Merge test_cli_missing_coverage.py into appropriate test files",
+      "Merge test_cli_targeted_coverage.py into appropriate test files",
+      "Reduce mock usage in favor of real object testing"
+    ]
+  },
+  "next_actions": [
+    "Review this analysis with stakeholder",
+    "Create work items for each phase",
+    "Execute Phase 1 (delete obsolete tests)",
+    "Execute Phase 2 (API contract fixes)",
+    "Execute Phase 3 (mock/harness fixes)",
+    "Execute Phase 4 (command option fixes)",
+    "Execute Phase 5 (edge case fixes)",
+    "Run full test suite and verify 100% pass rate",
+    "Consider test file consolidation for maintainability"
+  ]
+}

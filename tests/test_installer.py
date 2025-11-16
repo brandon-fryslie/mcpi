@@ -117,6 +117,7 @@ class TestBaseInstaller:
             "id": "test_server",
             "name": "Test Server",
             "description": "Test",
+            "command": "npx",  # Required field
             "category": ["test"],
             "author": "Test",
             "versions": {"latest": "1.0.0", "supported": ["1.0.0"]},

@@ -292,3 +292,114 @@ Each client plugin defines multiple configuration scopes (e.g., project-level, u
 - **Rich**: Enhanced console output and tables
 - **jsonschema**: JSON schema validation for configuration
 - **PyYAML**: YAML schema support
+
+## Dependency Inversion Principle (DIP) Implementation
+
+### Overview
+
+MCPI follows the Dependency Inversion Principle to enable true unit testing, improve modularity, and maintain SOLID architecture. This was implemented in Phase 1 (v2.0) for core components.
+
+### What Changed (Breaking Changes)
+
+**Before (v1.x)**:
+```python
+# Components created dependencies internally (hidden dependencies)
+catalog = ServerCatalog()  # Hardcoded path to data/registry.json
+manager = MCPManager()      # Created ClientRegistry internally
+```
+
+**After (v2.0)**:
+```python
+# Dependencies must be injected explicitly
+catalog = ServerCatalog(registry_path=Path("data/registry.json"))
+manager = MCPManager(registry=ClientRegistry())
+
+# OR use factory functions (recommended)
+catalog = create_default_catalog()  # Handles default path
+manager = create_default_manager()  # Creates default registry
+```
+
+### When to Use Each Pattern
+
+**Use Factory Functions** (Production Code):
+```python
+from mcpi.registry.catalog import create_default_catalog
+from mcpi.clients.manager import create_default_manager
+
+# Simple, handles all defaults
+catalog = create_default_catalog()
+manager = create_default_manager()
+```
+
+**Use Explicit Injection** (Testing/Advanced Use):
+```python
+from mcpi.registry.catalog import ServerCatalog, create_test_catalog
+from mcpi.clients.manager import MCPManager, create_test_manager
+from mcpi.clients.registry import ClientRegistry
+from pathlib import Path
+
+# Testing with custom dependencies
+test_catalog = ServerCatalog(registry_path=Path("/tmp/test.json"))
+test_manager = MCPManager(registry=mock_registry)
+
+# Or use test factories
+test_catalog = create_test_catalog(Path("/tmp/test.json"))
+test_manager = create_test_manager(mock_registry)
+```
+
+### Testing Patterns
+
+**Unit Testing** (No File I/O):
+```python
+# Create catalog with explicit path to temp file
+test_path = tmp_path / "test-registry.json"
+test_path.write_text(json.dumps({...}))
+catalog = ServerCatalog(registry_path=test_path)
+
+# Or use test factory
+catalog = create_test_catalog(test_path)
+```
+
+**Integration Testing** (Use MCPTestHarness):
+```python
+from tests.test_harness import MCPTestHarness
+
+harness = MCPTestHarness(tmp_path)
+harness.setup_scope_files()
+
+# Create plugin with path overrides
+plugin = ClaudeCodePlugin(path_overrides=harness.path_overrides)
+registry = ClientRegistry()
+registry.inject_client_instance("claude-code", plugin)
+
+# Create manager with injected registry
+manager = MCPManager(registry=registry, default_client="claude-code")
+```
+
+### Benefits of DIP
+
+1. **True Unit Testing**: No file system access required
+2. **Component Isolation**: Each component has explicit dependencies
+3. **Easier Mocking**: Dependencies injected, not created internally
+4. **SOLID Compliance**: High-level modules depend on abstractions
+5. **Parallel Testing**: No shared state between test instances
+
+### Migration Checklist
+
+If updating code that uses MCPI as a library:
+
+- [ ] Replace `ServerCatalog()` with `create_default_catalog()`
+- [ ] Replace `MCPManager()` with `create_default_manager()`
+- [ ] Update tests to use `create_test_catalog(path)` and `create_test_manager(registry)`
+- [ ] Remove any workarounds for testing (mocks, patches)
+- [ ] Use explicit injection for advanced use cases
+- [ ] Run tests to verify no regressions
+
+### Implementation Status
+
+- ✅ Phase 1 (P0): ServerCatalog and MCPManager (Complete)
+- ⏳ Phase 2 (P1): ClaudeCodePlugin, FileBasedScope, etc. (5 items, 2-3 weeks)
+- ⏳ Phase 3 (P2): Medium priority components (4 items, 1-2 weeks)
+- ⏳ Phase 4 (P3): Low priority components (2 items, 1 week)
+
+See `.agent_planning/DIP_AUDIT-2025-11-07-010149.md` for complete audit details.

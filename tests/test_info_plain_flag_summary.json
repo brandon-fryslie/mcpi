@@ -1,0 +1,95 @@
+{
+  "feature": "mcpi info --plain flag",
+  "test_file": "tests/test_info_plain_flag.py",
+  "tests_added": [
+    "test_info_without_plain_shows_rich_formatting",
+    "test_info_default_mode_shows_complete_information",
+    "test_info_default_mode_server_not_found_error",
+    "test_info_with_plain_flag_has_no_box_characters",
+    "test_info_plain_mode_shows_complete_information",
+    "test_info_plain_mode_uses_simple_text_formatting",
+    "test_info_plain_mode_server_not_found_error",
+    "test_both_modes_contain_same_essential_information",
+    "test_default_has_boxes_plain_does_not",
+    "test_plain_output_suitable_for_narrow_terminals",
+    "test_plain_output_has_no_ansi_escape_issues",
+    "test_plain_flag_position_after_server_id",
+    "test_plain_flag_position_before_server_id",
+    "test_info_no_server_id_shows_system_status",
+    "test_info_no_server_id_with_plain_flag",
+    "test_info_help_shows_plain_flag"
+  ],
+  "total_tests": 17,
+  "test_classes": 6,
+  "workflows_covered": [
+    "Terminal usage with default Rich formatting",
+    "Plain text output for fzf preview panes",
+    "Error handling in both modes",
+    "Edge cases (flag positioning, system status)",
+    "Mode comparison (feature parity)",
+    "fzf preview pane integration",
+    "Documentation completeness"
+  ],
+  "initial_status": {
+    "passing": 4,
+    "failing": 13,
+    "reason": "Feature not implemented - --plain flag does not exist yet"
+  },
+  "expected_after_implementation": {
+    "passing": 17,
+    "failing": 0
+  },
+  "gaming_resistance": "high",
+  "gaming_resistance_mechanisms": [
+    "Tests actual CLI output via CliRunner (no mocks)",
+    "Verifies presence/absence of specific characters (boolean checks)",
+    "Tests multiple scenarios (happy path, errors, edge cases)",
+    "Validates content completeness (all required fields)",
+    "Compares modes for equivalent information",
+    "Tests integration context (narrow terminals, ANSI handling)",
+    "Cannot pass with stub implementations or hardcoded output"
+  ],
+  "backlog_reference": {
+    "document": "BACKLOG-2025-11-06-010234.md",
+    "priority": "P1",
+    "item": "Improve Preview Pane Layout Quality",
+    "lines": "132-180",
+    "issue": "Box characters render inconsistently across terminals"
+  },
+  "integration_points": [
+    "src/mcpi/cli.py :: info() command (lines 1464-1541)",
+    "src/mcpi/tui/adapters/fzf.py :: preview command (line 354)"
+  ],
+  "implementation_guidance": {
+    "estimated_effort": "1 hour",
+    "steps": [
+      "Add --plain flag to info command decorator",
+      "Implement conditional formatting (Panel vs plain text)",
+      "Run tests to verify correctness",
+      "Update fzf preview command to use --plain",
+      "Manual verification in real fzf TUI"
+    ],
+    "risk_level": "LOW",
+    "backward_compatibility": "PRESERVED (tests verify default mode)"
+  },
+  "test_execution": {
+    "run_all": "pytest tests/test_info_plain_flag.py -v",
+    "run_class": "pytest tests/test_info_plain_flag.py::TestInfoPlainMode -v",
+    "run_with_coverage": "pytest tests/test_info_plain_flag.py --cov=src/mcpi/cli --cov-report=term",
+    "execution_time": "~2 seconds"
+  },
+  "success_criteria": [
+    "All 17 tests pass",
+    "Default mode still has box characters",
+    "Plain mode has no box characters",
+    "Both modes show same information",
+    "Error handling works in both modes",
+    "Help text documents --plain flag",
+    "fzf preview pane shows plain output"
+  ],
+  "deliverables": [
+    "tests/test_info_plain_flag.py (17 comprehensive tests)",
+    "tests/TEST-SUMMARY-info-plain-flag.md (documentation)",
+    "tests/test_info_plain_flag_summary.json (this file)"
+  ]
+}

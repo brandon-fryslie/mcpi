@@ -1,0 +1,367 @@
+# DIP Remediation Planning Summary
+
+**Generated**: 2025-11-07 01:05:28
+**Plan Document**: PLAN-DIP-REMEDIATION-2025-11-07-010528.md
+**Source Audit**: DIP_AUDIT-2025-11-07-010149.md
+**Current Status**: STATUS-2025-11-06-164217.md
+
+---
+
+## Executive Summary
+
+A comprehensive implementation plan has been created to address all 13 Dependency Inversion Principle (DIP) violations identified in the DIP audit. The violations currently make true unit testing impossible and prevent clean dependency injection across the codebase.
+
+**Scope**: 23 work items organized into 4 phases
+**Estimated Effort**: 8-12 days minimum (Phases 1-2), 4+ weeks for complete remediation
+**Priority**: Phases 1-2 are essential, Phases 3-4 are quality improvements
+
+---
+
+## Problem Statement
+
+The audit identified critical architectural issues:
+
+1. **ServerCatalog** hardcodes path to `data/registry.json` - cannot test without real files
+2. **MCPManager** creates ClientRegistry internally - cannot test in isolation
+3. **ClientRegistry** auto-discovers plugins from filesystem - cannot inject mocks
+4. **CLI functions** hardcode component instantiation - cannot test without real I/O
+5. **ClaudeCodePlugin** creates readers/writers directly - cannot mock file operations
+
+These violations mean:
+- Most "unit tests" are actually integration tests requiring file I/O
+- True business logic testing is impossible
+- Test suite is slow and fragile
+- SOLID principles are violated
+
+---
+
+## Solution Overview
+
+**Phase 1: Critical Fixes** (3-4 days, BLOCKING)
+- Make ServerCatalog require registry_path, add factories
+- Make MCPManager require ClientRegistry, add factories
+- These are breaking changes but essential for testability
+
+**Phase 2: High Priority** (3-4 days)
+- Add plugin injection to ClientRegistry
+- Add factory injection to CLI functions
+- Inject readers/writers into ClaudeCodePlugin
+- Create RegistryDataSource and PluginDiscovery protocols
+- These enable true unit testing across the codebase
+
+**Phase 3: Medium Priority** (2-3 days, optional)
+- Clean up FileBasedScope optional parameters
+- Refactor TUI factory for injection
+- Add PathResolver abstraction (optional)
+- Standardize factory pattern usage
+
+**Phase 4: Testing Infrastructure** (1-2 weeks, quality improvement)
+- Create comprehensive mock implementations
+- Refactor existing tests to use dependency injection
+- Add pure unit tests for business logic
+- Separate unit tests from integration tests
+
+---
+
+## Key Work Items (First 2 Phases)
+
+### Phase 1: Critical (Must Fix)
+
+**P0-1: ServerCatalog Refactor** (1-2 days)
+- Make registry_path required parameter
+- Create `create_default_catalog()` factory
+- Update all call sites (~50-100 locations)
+- BREAKING CHANGE: Yes
+
+**P0-2: MCPManager Refactor** (1-2 days)
+- Make ClientRegistry required parameter
+- Create `create_default_manager()` factory
+- Update all call sites (~50-100 locations)
+- BREAKING CHANGE: Yes
+
+### Phase 2: High Priority (Should Fix Soon)
+
+**P1-1: ClientRegistry Injection** (3-5 days)
+- Accept optional pre-loaded plugin classes
+- Keep auto-discovery as default
+- Backwards compatible
+
+**P1-2: CLI Dependency Injection** (3-5 days)
+- Add factory parameters to get_mcp_manager() and get_catalog()
+- Allow test injection via Click context
+- Backwards compatible
+
+**P1-3: ClaudeCodePlugin Injection** (3-5 days)
+- Accept optional reader/writer/validator
+- Default to current implementations
+- Backwards compatible
+
+**P1-4: RegistryDataSource Protocol** (3-5 days)
+- Abstract registry loading behind protocol
+- Implement FileRegistryDataSource and InMemoryRegistryDataSource
+- Enables testing without file I/O
+
+**P1-5: PluginDiscovery Protocol** (1-2 days)
+- Abstract plugin discovery behind protocol
+- Implement FilesystemPluginDiscovery
+- Enables testing without filesystem scanning
+
+---
+
+## Impact Analysis
+
+### Current State
+- Test pass rate: 86% (539/635 tests)
+- Most tests require file I/O
+- Test execution: ~30-60 seconds
+- True unit testing: Impossible for critical components
+- DIP violations: 13 (2 critical, 5 high, 4 medium, 2 low)
+
+### After Phase 1-2 (Minimum Viable Remediation)
+- Test pass rate: Expected 90%+ (updated tests)
+- Dependency injection: Available for all critical components
+- Test execution: Same or slightly slower (more tests)
+- True unit testing: Possible with manual mock creation
+- DIP violations: 0 critical, 0 high (all resolved)
+
+### After All Phases (Complete Remediation)
+- Test pass rate: 95%+ (comprehensive coverage)
+- Mocks available: Full protocol coverage
+- Test execution: ~15-30 seconds (2x faster with unit/integration split)
+- True unit testing: Easy with pre-built mocks
+- Test organization: Clear separation of unit vs integration tests
+
+---
+
+## Breaking Changes
+
+**Two Breaking Changes in Phase 1**:
+
+1. **ServerCatalog** constructor now requires `registry_path: Path`
+   - Migration: Use `create_default_catalog()` factory in production code
+   - Migration: Pass explicit path in tests
+   - Call sites: ~50-100 locations
+
+2. **MCPManager** constructor now requires `registry: ClientRegistry`
+   - Migration: Use `create_default_manager()` factory in production code
+   - Migration: Inject mock ClientRegistry in tests
+   - Call sites: ~50-100 locations
+
+**All other changes are backwards compatible** through use of optional parameters with defaults.
+
+---
+
+## Recommended Execution Strategy
+
+### Minimum Viable Path (2 weeks)
+1. **Week 1**: Complete Phase 1 (Critical fixes)
+   - Day 1-2: ServerCatalog refactor
+   - Day 3-4: MCPManager refactor
+   - Day 5: Full test suite verification
+2. **Week 2**: Complete Phase 2 (High priority)
+   - All 5 work items (P1-1 through P1-5)
+
+**Result**: True unit testing enabled, all critical DIP violations resolved
+
+### Complete Remediation (4+ weeks)
+1. Weeks 1-2: Phases 1-2 (as above)
+2. Week 3: Phase 3 (Medium priority cleanup)
+3. Week 4+: Phase 4 (Testing infrastructure)
+
+**Result**: Comprehensive test suite with full mock coverage and clear unit/integration separation
+
+### Aggressive Path (1 week, risky)
+- Combine Phases 1-2
+- Parallel implementation of non-dependent items
+- Requires careful coordination
+- High risk of breaking tests
+
+---
+
+## Dependencies and Constraints
+
+**Hard Dependencies**:
+- P1-2 (CLI injection) depends on P0-1 and P0-2 (factories must exist)
+- P1-4 (RegistryDataSource) depends on P0-1 (ServerCatalog refactored)
+- P1-5 (PluginDiscovery) depends on P1-1 (ClientRegistry supports injection)
+- P2-1 (FileBasedScope) depends on P1-3 (ClaudeCodePlugin updated)
+- All Phase 4 depends on Phase 3 complete
+
+**Parallel Opportunities**:
+- P0-1 and P0-2 can be done in parallel (no dependencies)
+- P1-1, P1-3 can be done in parallel (no dependencies)
+- P2-2, P2-3 can be done in parallel (independent)
+
+**Constraints**:
+- Must maintain test pass rate (no regressions)
+- Must update all call sites atomically for breaking changes
+- Must document migration path for external users (if any)
+
+---
+
+## Risk Mitigation
+
+**High Risk: Breaking Changes**
+- Mitigation: Use factories to provide migration path
+- Mitigation: Grep to find all call sites before making changes
+- Mitigation: Atomic commits that update all call sites at once
+- Mitigation: Run full test suite after each change
+
+**High Risk: Large Test Refactor (Phase 4)**
+- Mitigation: Update one test file at a time
+- Mitigation: Run tests after each file update
+- Mitigation: Can be done incrementally over time
+
+**Medium Risk: New Abstractions**
+- Mitigation: Implement as exact wrappers of current logic first
+- Mitigation: Verify behavior unchanged before adding new features
+- Mitigation: Comprehensive tests for new protocols
+
+**Low Risk: Optional Features**
+- P2-3 (PathResolver) can be deferred or skipped
+- Phase 4 can be done incrementally or deferred
+
+---
+
+## Success Criteria
+
+### Phase 1 Complete (Critical)
+- [ ] ServerCatalog requires registry_path (no optional parameter)
+- [ ] MCPManager requires ClientRegistry (no optional parameter)
+- [ ] Factories exist: create_default_catalog(), create_default_manager()
+- [ ] All call sites updated to use factories or explicit injection
+- [ ] All existing tests pass (539+ tests)
+- [ ] Can create ServerCatalog with test path (no file I/O required)
+- [ ] Can create MCPManager with mock registry (no plugin discovery)
+
+### Phase 2 Complete (High Priority)
+- [ ] ClientRegistry accepts optional plugin list (injection enabled)
+- [ ] CLI functions accept optional factories (injection enabled)
+- [ ] ClaudeCodePlugin accepts optional reader/writer (injection enabled)
+- [ ] RegistryDataSource protocol exists with implementations
+- [ ] PluginDiscovery protocol exists with implementations
+- [ ] Can test all critical components without file I/O
+- [ ] Test pass rate maintained or improved (90%+)
+
+### Phase 3 Complete (Medium Priority)
+- [ ] FileBasedScope requires reader/writer (no optional)
+- [ ] TUI factory supports adapter injection
+- [ ] Factory pattern usage is consistent
+- [ ] Documentation updated with injection patterns
+
+### Phase 4 Complete (Testing Infrastructure)
+- [ ] Mock implementations exist for all protocols
+- [ ] Existing tests refactored to use dependency injection
+- [ ] New pure unit tests added (50+)
+- [ ] Unit and integration tests clearly separated
+- [ ] Test execution time improved (2x faster)
+- [ ] Test pass rate 95%+
+
+---
+
+## Documentation Requirements
+
+**During Implementation**:
+- Update docstrings for all modified constructors
+- Add examples showing factory usage
+- Document migration path for breaking changes
+- Update CLAUDE.md with factory pattern examples
+
+**After Completion**:
+- Update CLAUDE.md § Testing Strategy with unit/integration split
+- Add code examples showing dependency injection patterns
+- Document all protocols and their implementations
+- Create testing guide showing mock usage
+
+---
+
+## Tools and Commands
+
+**Finding Call Sites**:
+```bash
+# ServerCatalog instantiations
+grep -r "ServerCatalog()" src/ tests/
+
+# MCPManager instantiations
+grep -r "MCPManager()" src/ tests/
+
+# Optional parameter usage
+grep -r "registry_path.*None" src/
+grep -r "registry.*Optional" src/
+```
+
+**Test Execution**:
+```bash
+# Run all tests
+pytest -v
+
+# Run specific phase tests
+pytest tests/test_catalog.py -v
+pytest tests/test_manager.py -v
+
+# Run with coverage
+pytest --cov=src/mcpi --cov-report=term
+
+# Run only fast tests (after Phase 4)
+pytest -m "not integration" -v
+```
+
+**Verification**:
+```bash
+# Check for remaining DIP violations
+grep -r "__file__.*parent" src/  # Hardcoded paths
+grep -r "= None$" src/ | grep "def __init__"  # Optional params
+
+# Verify factories exist
+grep -r "def create_default" src/
+grep -r "def create_test" src/
+```
+
+---
+
+## Next Steps
+
+1. **Review Plan**: Ensure all stakeholders understand scope and effort
+2. **Prioritize Phases**: Decide on MVP (Phases 1-2) vs full remediation
+3. **Assign Work**: Allocate work items to implementers
+4. **Set Milestones**: Define completion criteria for each phase
+5. **Begin Implementation**: Start with P0-1 (ServerCatalog refactor)
+
+**Immediate Action**: Begin Phase 1 implementation using test-driven approach
+
+**Key Contact**: test-driven-implementer agent (will consume this plan)
+
+---
+
+## Appendix: Work Item Checklist
+
+### Phase 1 (Critical)
+- [ ] P0-1: ServerCatalog refactor (1-2 days)
+- [ ] P0-2: MCPManager refactor (1-2 days)
+
+### Phase 2 (High Priority)
+- [ ] P1-1: ClientRegistry injection (3-5 days)
+- [ ] P1-2: CLI injection (3-5 days)
+- [ ] P1-3: ClaudeCodePlugin injection (3-5 days)
+- [ ] P1-4: RegistryDataSource protocol (3-5 days)
+- [ ] P1-5: PluginDiscovery protocol (1-2 days)
+
+### Phase 3 (Medium Priority)
+- [ ] P2-1: FileBasedScope refactor (3-5 days)
+- [ ] P2-2: TUI factory injection (1-2 days)
+- [ ] P2-3: PathResolver abstraction (3-5 days, optional)
+- [ ] P2-4: Factory standardization (1-2 days)
+
+### Phase 4 (Testing Infrastructure)
+- [ ] P3-1: Create mocks (3-5 days)
+- [ ] P3-2: Refactor existing tests (1-2 weeks)
+- [ ] P3-3: Add unit tests (3-5 days)
+- [ ] P3-4: Clean integration tests (1-2 days)
+
+---
+
+**Total**: 23 work items, 8-12 days minimum (Phases 1-2), 4+ weeks complete
+
+**Generated**: 2025-11-07 01:05:28
+**Plan File**: PLAN-DIP-REMEDIATION-2025-11-07-010528.md
+**Ready For**: test-driven-implementer agent
