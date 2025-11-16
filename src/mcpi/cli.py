@@ -1448,9 +1448,14 @@ def rescope(
     is_flag=True,
     help="Plain text output (no box characters)",
 )
+@click.option("--json", "output_json", is_flag=True, help="Output in JSON format")
 @click.pass_context
 def info(
-    ctx: click.Context, server_id: Optional[str], client: Optional[str], plain: bool
+    ctx: click.Context,
+    server_id: Optional[str],
+    client: Optional[str],
+    plain: bool,
+    output_json: bool,
 ) -> None:
     """Show detailed information about a server or system status."""
     try:
@@ -1466,6 +1471,13 @@ def info(
                 else:
                     console.print(f"[red]{error_msg}[/red]")
                 ctx.exit(1)
+
+            # Output JSON if requested
+            if output_json:
+                import json
+
+                print(json.dumps(registry_info.model_dump(), indent=2, default=str))
+                return
 
             # Build registry section
             if plain:
@@ -1602,8 +1614,11 @@ def info(
 @main.command()
 @click.argument("query", required=False)
 @click.option("--limit", default=20, help="Maximum number of results to show")
+@click.option("--json", "output_json", is_flag=True, help="Output in JSON format")
 @click.pass_context
-def search(ctx: click.Context, query: Optional[str], limit: int) -> None:
+def search(
+    ctx: click.Context, query: Optional[str], limit: int, output_json: bool
+) -> None:
     """Search for MCP servers in the registry."""
     try:
         catalog = get_catalog(ctx)
@@ -1618,9 +1633,42 @@ def search(ctx: click.Context, query: Optional[str], limit: int) -> None:
         servers = servers[:limit]
 
         if not servers:
-            console.print("[yellow]No servers found matching criteria[/yellow]")
+            if output_json:
+                import json
+
+                print(json.dumps([]))
+            else:
+                console.print("[yellow]No servers found matching criteria[/yellow]")
             return
 
+        # Output JSON if requested
+        if output_json:
+            import json
+
+            # Build JSON output - handle both tuple and plain server results
+            json_results = []
+            for item in servers:
+                # Check if it's a tuple (server, score, matches) or just (server_id, server)
+                if isinstance(item, tuple):
+                    if len(item) == 3:
+                        # Tuple result with score and matches
+                        server, score, matches = item
+                        result = server.model_dump()
+                        result["score"] = score
+                        result["matches"] = matches
+                        json_results.append(result)
+                    elif len(item) == 2:
+                        # Plain (server_id, server) tuple
+                        server_id, server = item
+                        json_results.append(server.model_dump())
+                else:
+                    # Single server object
+                    json_results.append(item.model_dump())
+
+            print(json.dumps(json_results, indent=2, default=str))
+            return
+
+        # Table output
         table = Table(title=f"Registry Search Results ({len(servers)} found)")
         table.add_column("ID", style="cyan", no_wrap=True)
         table.add_column("Command", style="magenta")

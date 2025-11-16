@@ -15,6 +15,7 @@ class TestCLIHighImpactCoverage:
     def setup_method(self):
         """Set up test fixtures."""
         self.runner = CliRunner()
+        self.mock_catalog = Mock()
         self.mock_server = Mock()
         self.mock_server.id = "test-server"
         self.mock_server.name = "Test Server"
@@ -24,16 +25,17 @@ class TestCLIHighImpactCoverage:
             "name": "Test Server",
             "description": "A test server",
         }
+        self.mock_manager = Mock()
 
     def test_registry_show_json_output(self):
         """Test info with --json flag.
 
         Targets lines 134-135: JSON output functionality.
         """
-        with patch("mcpi.cli.ServerCatalog") as mock_catalog_cls:
-            mock_catalog = Mock()
-            mock_catalog_cls.return_value = mock_catalog
-            mock_catalog.get_server.return_value = self.mock_server
+        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
+            mock_catalog_fn.return_value = self.mock_catalog
+            self.mock_catalog.load_catalog.return_value = None
+            self.mock_catalog.get_server.return_value = self.mock_server
 
             result = self.runner.invoke(main, ["info", "test-server", "--json"])
 
@@ -50,10 +52,10 @@ class TestCLIHighImpactCoverage:
 
         Targets error handling paths.
         """
-        with patch("mcpi.cli.ServerCatalog") as mock_catalog_cls:
-            mock_catalog = Mock()
-            mock_catalog_cls.return_value = mock_catalog
-            mock_catalog.get_server.return_value = None
+        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
+            mock_catalog_fn.return_value = self.mock_catalog
+            self.mock_catalog.load_catalog.return_value = None
+            self.mock_catalog.get_server.return_value = None
 
             result = self.runner.invoke(main, ["info", "nonexistent-server"])
 
@@ -65,13 +67,14 @@ class TestCLIHighImpactCoverage:
 
         Targets JSON output paths in status command.
         """
-        with patch("mcpi.cli.ConfigManager") as mock_config_cls:
-            mock_manager = Mock()
-            mock_config_cls.return_value = mock_manager
-            mock_manager.get_config.return_value = {
-                "mcpServers": {
-                    "test-server": {"command": "npx", "args": ["test-package"]}
-                }
+        with patch("mcpi.cli.create_default_manager") as mock_manager_fn:
+            mock_manager_fn.return_value = self.mock_manager
+            self.mock_manager.get_status_summary.return_value = {
+                "default_client": "claude-code",
+                "available_clients": ["claude-code"],
+                "total_servers": 1,
+                "server_states": {"ENABLED": 1},
+                "registry_stats": {"total_clients": 1, "loaded_instances": 1},
             }
 
             result = self.runner.invoke(main, ["status", "--json"])
@@ -85,10 +88,15 @@ class TestCLIHighImpactCoverage:
 
         Targets empty server state handling.
         """
-        with patch("mcpi.cli.ConfigManager") as mock_config_cls:
-            mock_manager = Mock()
-            mock_config_cls.return_value = mock_manager
-            mock_manager.get_config.return_value = {"mcpServers": {}}
+        with patch("mcpi.cli.create_default_manager") as mock_manager_fn:
+            mock_manager_fn.return_value = self.mock_manager
+            self.mock_manager.get_status_summary.return_value = {
+                "default_client": "claude-code",
+                "available_clients": ["claude-code"],
+                "total_servers": 0,
+                "server_states": {},
+                "registry_stats": {"total_clients": 1, "loaded_instances": 1},
+            }
 
             result = self.runner.invoke(main, ["status"])
 
