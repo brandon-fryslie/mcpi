@@ -5,10 +5,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import MCPClientPlugin, ScopeHandler
-from .disabled_tracker import DisabledServersTracker
 from .enable_disable_handlers import (
     ArrayBasedEnableDisableHandler,
-    FileTrackedEnableDisableHandler,
     InlineEnableDisableHandler,
 )
 from .file_based import (
@@ -17,6 +15,7 @@ from .file_based import (
     JSONFileWriter,
     YAMLSchemaValidator,
 )
+from .file_move_enable_disable_handler import FileMoveEnableDisableHandler
 from .types import OperationResult, ScopeConfig, ServerConfig, ServerInfo, ServerState
 
 
@@ -137,14 +136,18 @@ class ClaudeCodePlugin(MCPClientPlugin):
         )
 
         # User-global Claude settings (~/.claude/settings.json)
-        # This scope does NOT support enable/disable arrays in settings.json format
-        # Instead, use a separate disabled tracking file
+        # CUSTOM DISABLE MECHANISM (REQUIREMENT from CLAUDE.md lines 406-411):
+        # - Active file: ~/.claude/settings.json (ENABLED servers)
+        # - Disabled file: ~/.claude/disabled-mcp.json (DISABLED servers)
+        # - disable operation: MOVE server config from active to disabled file
+        # - enable operation: MOVE server config from disabled to active file
+        # - list operation: Show servers from BOTH files with correct states
         user_global_path = self._get_scope_path(
             "user-global", Path.home() / ".claude" / "settings.json"
         )
-        disabled_tracker_path = self._get_scope_path(
+        user_global_disabled_path = self._get_scope_path(
             "user-global-disabled",
-            Path.home() / ".claude" / ".mcpi-disabled-servers.json",
+            Path.home() / ".claude" / "disabled-mcp.json",
         )
         scopes["user-global"] = FileBasedScope(
             config=ScopeConfig(
@@ -158,19 +161,28 @@ class ClaudeCodePlugin(MCPClientPlugin):
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "claude-settings-schema.yaml",
-            enable_disable_handler=FileTrackedEnableDisableHandler(
-                DisabledServersTracker(disabled_tracker_path)
+            enable_disable_handler=FileMoveEnableDisableHandler(
+                active_file_path=user_global_path,
+                disabled_file_path=user_global_disabled_path,
+                reader=json_reader,
+                writer=json_writer,
             ),
         )
 
         # User internal configuration (~/.claude.json)
-        # This scope NOW supports enable/disable via separate tracking file
+        # CUSTOM DISABLE MECHANISM (same as user-global):
+        # - Active file: ~/.claude.json (ENABLED servers only)
+        # - Disabled file: ~/.claude/.disabled-servers.json (DISABLED servers)
+        # - disable operation: MOVE server config from active to disabled file
+        # - enable operation: MOVE server config from disabled to active file
+        # - list operation: Show servers from BOTH files with correct states
+        # This ensures Claude Code only loads servers from active file
         user_internal_path = self._get_scope_path(
             "user-internal", Path.home() / ".claude.json"
         )
-        user_internal_disabled_tracker_path = self._get_scope_path(
+        user_internal_disabled_file_path = self._get_scope_path(
             "user-internal-disabled",
-            Path.home() / ".claude" / ".mcpi-disabled-servers-internal.json",
+            Path.home() / ".claude" / ".disabled-servers.json",
         )
         scopes["user-internal"] = FileBasedScope(
             config=ScopeConfig(
@@ -184,8 +196,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "internal-config-schema.yaml",
-            enable_disable_handler=FileTrackedEnableDisableHandler(
-                DisabledServersTracker(user_internal_disabled_tracker_path)
+            enable_disable_handler=FileMoveEnableDisableHandler(
+                active_file_path=user_internal_path,
+                disabled_file_path=user_internal_disabled_file_path,
+                reader=json_reader,
+                writer=json_writer,
             ),
         )
 
@@ -219,7 +234,8 @@ class ClaudeCodePlugin(MCPClientPlugin):
         have different mechanisms:
         - project-mcp: Use inline 'disabled' field in server config
         - project-local, user-local: Use enabledMcpjsonServers/disabledMcpjsonServers arrays
-        - user-global, user-internal: Use separate disabled tracking files
+        - user-global: Use file-move mechanism (disabled-mcp.json file)
+        - user-internal: Use file-move mechanism (.disabled-servers.json file)
         - Other scopes: Don't support enable/disable (always ENABLED)
 
         Additionally checks for inline "disabled" field in config for backward compatibility.

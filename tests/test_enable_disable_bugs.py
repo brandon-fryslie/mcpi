@@ -705,25 +705,27 @@ class TestOriginalBugClientInfo:
         )
 
 
-class TestUserInternalEnableDisable:
-    """Test enable/disable for user-internal scope using file tracking.
 
-    user-internal scope (~/.claude.json) uses FileTrackedEnableDisableHandler with
-    tracking file at ~/.claude/.mcpi-disabled-servers-internal.json (separate from
-    config file).
+class TestUserInternalEnableDisable:
+    """Test enable/disable for user-internal scope using file-move mechanism.
+
+    user-internal scope (~/.claude.json) now uses FileMoveEnableDisableHandler:
+    - Active file: ~/.claude.json (contains ENABLED servers only)
+    - Disabled file: ~/.claude/.disabled-servers.json (contains DISABLED servers)
+    - disable operation: MOVES server config from active to disabled file
+    - enable operation: MOVES server config from disabled to active file
 
     These tests verify that:
-    1. Disabling a server creates the tracking file
-    2. Enabling a server removes it from the tracking file
+    1. Disabling a server REMOVES it from active file and ADDS it to disabled file
+    2. Enabling a server REMOVES it from disabled file and ADDS it to active file
     3. List command shows correct DISABLED/ENABLED state
-    4. Config file (~/.claude.json) remains unchanged during operations
-    5. Operations are idempotent (disable twice, enable twice)
+    4. Operations are idempotent (second disable/enable returns False as expected)
 
     Why these tests are un-gameable:
     - Use real file I/O through test harness (no mocks)
     - Verify actual file contents before and after operations
     - Assert on observable user-facing behavior (ServerState)
-    - Check side effects (tracking file creation, config file unchanged)
+    - Check side effects (server actually moved between files)
     - Test idempotency (real-world usage patterns)
     """
 
@@ -735,14 +737,14 @@ class TestUserInternalEnableDisable:
     def test_user_internal_disable_server_creates_tracking_file(
         self, plugin, mcp_harness
     ):
-        """Test that disabling user-internal server creates tracking file.
+        """Test that disabling user-internal server removes from active and adds to disabled file.
 
         Why this test is un-gameable:
         - Creates actual config file in temp directory
-        - Verifies tracking file is created on disable
-        - Checks actual JSON content of tracking file
+        - Verifies disabled file is created on disable
+        - Checks actual JSON content of both files
         - Uses real plugin.disable_server() method
-        - Verifies config file remains unchanged
+        - Verifies server REMOVED from active file (file-move mechanism)
         """
         # Setup: Install server in user-internal
         mcp_harness.prepopulate_file(
@@ -763,48 +765,42 @@ class TestUserInternalEnableDisable:
         assert config_data is not None
         assert "test-server" in config_data["mcpServers"]
 
-        # Store original config for comparison
-        import json
-
-        original_config = json.dumps(config_data, sort_keys=True)
-
         # Execute: Disable the server
         result = plugin.disable_server("test-server")
 
         # Verify: Operation succeeded
         assert result.success, f"Failed to disable server: {result.message}"
 
-        # Verify: Tracking file was created
-        # NOTE: This will fail initially because user-internal-disabled is not in test harness
+        # Verify: Disabled file was created
+        import json
+
         tracking_path = mcp_harness.path_overrides.get("user-internal-disabled")
         assert (
             tracking_path is not None
         ), "Test harness missing user-internal-disabled path override"
-        assert tracking_path.exists(), "Tracking file was not created"
+        assert tracking_path.exists(), "Disabled file was not created"
 
-        # Verify: Server is in tracking file
+        # Verify: Server is in disabled file (file-move mechanism)
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" in disabled, "Server not in tracking file"
+        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file"
 
-        # Verify: Original config file unchanged
+        # Verify: Server REMOVED from active file (critical for file-move mechanism)
         config_data_after = mcp_harness.read_scope_file("user-internal")
-        config_after = json.dumps(config_data_after, sort_keys=True)
-        assert config_after == original_config, "Config file was modified"
         assert (
-            "test-server" in config_data_after["mcpServers"]
-        ), "Server removed from config (should only be in tracking file)"
+            "test-server" not in config_data_after.get("mcpServers", {})
+        ), "Server still in active file (file-move didn't happen)"
 
     def test_user_internal_enable_server_removes_from_tracking_file(
         self, plugin, mcp_harness
     ):
-        """Test that enabling user-internal server removes from tracking file.
+        """Test that enabling user-internal server removes from disabled and adds to active file.
 
         Why this test is un-gameable:
         - Sets up disabled state using real disable operation
-        - Verifies enable removes server from tracking file
-        - Checks actual tracking file contents
-        - Verifies config file remains unchanged throughout
+        - Verifies enable moves server back to active file
+        - Checks actual file contents
+        - Verifies server ADDED to active file (file-move mechanism)
         """
         # Setup: Install server in user-internal
         mcp_harness.prepopulate_file(
@@ -824,21 +820,16 @@ class TestUserInternalEnableDisable:
         result = plugin.disable_server("test-server")
         assert result.success, "Failed to disable server in setup"
 
-        # Verify: Server is disabled (tracking file exists with server)
+        # Verify: Server is disabled (disabled file exists with server)
         import json
 
         tracking_path = mcp_harness.path_overrides.get("user-internal-disabled")
         assert tracking_path is not None, "Test harness missing path override"
-        assert tracking_path.exists(), "Tracking file not created by disable"
+        assert tracking_path.exists(), "Disabled file not created by disable"
 
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" in disabled, "Server not in tracking file after disable"
-
-        # Store config before enable
-        config_before = json.dumps(
-            mcp_harness.read_scope_file("user-internal"), sort_keys=True
-        )
+        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file after disable"
 
         # Execute: Enable the server
         result = plugin.enable_server("test-server")
@@ -846,16 +837,16 @@ class TestUserInternalEnableDisable:
         # Verify: Operation succeeded
         assert result.success, f"Failed to enable server: {result.message}"
 
-        # Verify: Server removed from tracking file
+        # Verify: Server removed from disabled file
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" not in disabled, "Server still in tracking file"
+        assert "test-server" not in disabled.get("mcpServers", {}), "Server still in disabled file"
 
-        # Verify: Config file unchanged
-        config_after = json.dumps(
-            mcp_harness.read_scope_file("user-internal"), sort_keys=True
-        )
-        assert config_after == config_before, "Config file was modified"
+        # Verify: Server ADDED back to active file (critical for file-move mechanism)
+        config_after = mcp_harness.read_scope_file("user-internal")
+        assert (
+            "test-server" in config_after.get("mcpServers", {})
+        ), "Server not restored to active file"
 
     def test_user_internal_disabled_server_shows_correct_state(
         self, plugin, mcp_harness
@@ -917,8 +908,8 @@ class TestUserInternalEnableDisable:
 
         Why this test is un-gameable:
         - Tests real-world usage (user runs disable command twice)
-        - Verifies tracking file doesn't have duplicates
-        - Checks both operations succeed
+        - Verifies disabled file doesn't have duplicates
+        - Checks first succeeds, second fails (expected behavior for file-move)
         """
         # Setup: Install server
         mcp_harness.prepopulate_file(
@@ -938,11 +929,11 @@ class TestUserInternalEnableDisable:
         result1 = plugin.disable_server("test-server")
         result2 = plugin.disable_server("test-server")
 
-        # Verify: Both operations succeed
+        # Verify: First succeeds, second fails (server already disabled)
         assert result1.success, f"First disable failed: {result1.message}"
-        assert result2.success, f"Second disable failed: {result2.message}"
+        assert not result2.success, f"Second disable should fail (server already disabled)"
 
-        # Verify: Server appears only once in tracking file
+        # Verify: Server appears only once in disabled file
         import json
 
         tracking_path = mcp_harness.path_overrides.get("user-internal-disabled")
@@ -952,16 +943,17 @@ class TestUserInternalEnableDisable:
         with tracking_path.open("r") as f:
             disabled = json.load(f)
 
-        count = disabled.count("test-server")
-        assert count == 1, f"Server appears {count} times in tracking file (expected 1)"
+        # Count occurrences in mcpServers dict
+        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file"
+        assert len(disabled.get("mcpServers", {})) == 1, "Multiple servers in disabled file (expected 1)"
 
     def test_user_internal_idempotent_enable(self, plugin, mcp_harness):
         """Test that enabling a user-internal server twice is idempotent.
 
         Why this test is un-gameable:
         - Tests real-world usage (user runs enable command twice)
-        - Verifies server removed from tracking file
-        - Checks both operations succeed
+        - Verifies server removed from disabled file
+        - Checks first succeeds, second fails (expected behavior for file-move)
         """
         # Setup: Install and disable server
         mcp_harness.prepopulate_file(
@@ -985,11 +977,11 @@ class TestUserInternalEnableDisable:
         result1 = plugin.enable_server("test-server")
         result2 = plugin.enable_server("test-server")
 
-        # Verify: Both operations succeed
+        # Verify: First succeeds, second fails (server already enabled)
         assert result1.success, f"First enable failed: {result1.message}"
-        assert result2.success, f"Second enable failed: {result2.message}"
+        assert not result2.success, f"Second enable should fail (server already enabled)"
 
-        # Verify: Server not in tracking file
+        # Verify: Server not in disabled file
         import json
 
         tracking_path = mcp_harness.path_overrides.get("user-internal-disabled")
@@ -998,7 +990,7 @@ class TestUserInternalEnableDisable:
         with tracking_path.open("r") as f:
             disabled = json.load(f)
 
-        assert "test-server" not in disabled, "Server still in tracking file"
+        assert "test-server" not in disabled.get("mcpServers", {}), "Server still in disabled file"
 
     def test_user_internal_scope_isolation(self, plugin, mcp_harness):
         """Test that user-internal enable/disable doesn't affect other scopes.
@@ -1063,7 +1055,6 @@ class TestUserInternalEnableDisable:
         assert (
             user_local_data.get("disabledMcpjsonServers", []) == []
         ), "user-local disabled array was modified (wrong!)"
-
 
 # Summary of Test Coverage
 """

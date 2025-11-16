@@ -65,23 +65,23 @@ class MCPTestHarness:
             file_path = self.tmp_dir / f"{client_name}_{scope_name}_{original}"
             self.path_overrides[scope_name] = file_path
 
-        # Add the disabled tracking file for user-global scope
-        # This is used to track disabled servers in user-global scope
-        disabled_tracking_file = (
-            self.tmp_dir
-            / f"{client_name}_user-global-disabled_.mcpi-disabled-servers.json"
+        # Add the disabled file for user-global scope (FILE-MOVE MECHANISM)
+        # REQUIREMENT (from CLAUDE.md lines 406-411):
+        # - Active file: ~/.claude/settings.json
+        # - Disabled file: ~/.claude/disabled-mcp.json
+        # - disable/enable operations MOVE configs between files
+        user_global_disabled_file = (
+            self.tmp_dir / f"{client_name}_user-global-disabled_disabled-mcp.json"
         )
-        self.path_overrides["user-global-disabled"] = disabled_tracking_file
+        self.path_overrides["user-global-disabled"] = user_global_disabled_file
 
-        # Add the disabled tracking file for user-internal scope
-        # This is used to track disabled servers in user-internal scope
-        user_internal_disabled_tracking_file = (
+        # Add the disabled file for user-internal scope
+        # This stores disabled server configurations (file-move mechanism)
+        user_internal_disabled_file = (
             self.tmp_dir
-            / f"{client_name}_user-internal-disabled_.mcpi-disabled-servers.json"
+            / f"{client_name}_user-internal-disabled_.disabled-servers.json"
         )
-        self.path_overrides["user-internal-disabled"] = (
-            user_internal_disabled_tracking_file
-        )
+        self.path_overrides["user-internal-disabled"] = user_internal_disabled_file
 
         return self.path_overrides
 

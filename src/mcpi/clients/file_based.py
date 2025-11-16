@@ -192,6 +192,10 @@ class FileBasedScope(ScopeHandler):
     def get_servers(self) -> Dict[str, Dict[str, Any]]:
         """Get all servers from this scope.
 
+        For scopes using FileMoveEnableDisableHandler, this returns servers from
+        BOTH the active file AND the disabled file. This ensures that `mcpi list`
+        shows all servers (enabled + disabled) with correct states.
+
         Returns:
             Dictionary mapping server IDs to their configurations
         """
@@ -199,8 +203,22 @@ class FileBasedScope(ScopeHandler):
             return {}
 
         try:
+            # Get servers from active file
             data = self.reader.read(self.path)
-            return data.get("mcpServers", {})
+            servers = data.get("mcpServers", {})
+
+            # If using FileMoveEnableDisableHandler, also include disabled servers
+            # Check if handler has get_disabled_servers method (duck typing)
+            if (
+                self.enable_disable_handler
+                and hasattr(self.enable_disable_handler, "get_disabled_servers")
+            ):
+                disabled_servers = self.enable_disable_handler.get_disabled_servers()
+                # Merge disabled servers into the result
+                # Note: We preserve the configuration from disabled file
+                servers.update(disabled_servers)
+
+            return servers
         except Exception:
             return {}
 
