@@ -311,20 +311,18 @@ class TestServerLifecycleWorkflows:
         - Cannot fake without proper file format handling
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        manager = MCPManager(default_client="claude-code")
-
         # Inject our test plugin
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", plugin)
-        manager.registry = registry
+        manager = MCPManager(registry=registry, default_client="claude-code")
 
-        # USER ACTION 1: Check initial state
         initial_servers = manager.list_servers("claude-code")
 
         # Find a server to test with (use project-tool from prepopulated data)
         test_server = None
         for server_id, server_info in initial_servers.items():
-            if server_id == "project-tool":
+            # Server IDs are qualified (e.g., 'claude-code:project-mcp:project-tool')
+            if "project-tool" in server_id:
                 test_server = server_info
                 break
 
@@ -343,7 +341,11 @@ class TestServerLifecycleWorkflows:
 
         # USER OBSERVABLE OUTCOME 1: Server shows as disabled
         disabled_servers = manager.list_servers("claude-code")
-        disabled_server = disabled_servers.get("project-tool")
+        # Server IDs are qualified, find the one containing "project-tool"
+        disabled_server = next(
+            (info for sid, info in disabled_servers.items() if "project-tool" in sid),
+            None,
+        )
         assert disabled_server is not None, "Server disappeared after disable"
         assert (
             disabled_server.state == ServerState.DISABLED
@@ -369,7 +371,11 @@ class TestServerLifecycleWorkflows:
 
         # USER OBSERVABLE OUTCOME 2: Server shows as enabled again
         enabled_servers = manager.list_servers("claude-code")
-        enabled_server = enabled_servers.get("project-tool")
+        # Server IDs are qualified, find the one containing "project-tool"
+        enabled_server = next(
+            (info for sid, info in enabled_servers.items() if "project-tool" in sid),
+            None,
+        )
         assert enabled_server is not None, "Server disappeared after enable"
         assert (
             enabled_server.state == ServerState.ENABLED
@@ -414,11 +420,10 @@ class TestMultiScopeWorkflows:
         - Tests scope precedence with overlapping server names
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", plugin)
 
-        manager = MCPManager(default_client="claude-code")
-        manager.registry = registry
+        manager = MCPManager(registry=registry, default_client="claude-code")
 
         # USER ACTION: List all servers (what 'mcpi list' would show)
         all_servers = manager.list_servers("claude-code")
@@ -515,11 +520,10 @@ class TestMultiScopeWorkflows:
         )
 
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", plugin)
 
-        manager = MCPManager(default_client="claude-code")
-        manager.registry = registry
+        manager = MCPManager(registry=registry, default_client="claude-code")
 
         # USER OBSERVABLE OUTCOME 1: Project scope wins
         all_servers = manager.list_servers("claude-code")

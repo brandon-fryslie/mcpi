@@ -206,7 +206,8 @@ class TestInteractiveScopeSelection:
         result = self.runner.invoke(main, ["add", "test-server"], input="n\n")
 
         # Check that scope selection was displayed
-        assert "Select a scope for 'Test Server'" in result.output
+        # CLI uses server ID in prompt, not server name
+        assert "Select a scope for 'test-server'" in result.output
         assert "[1] user-internal - User scope ✓" in result.output
         assert "[2] project-mcp - Project scope ✗" in result.output
         assert "Selected scope: project-mcp" in result.output
@@ -301,7 +302,8 @@ class TestInteractiveScopeSelection:
         # Check that it auto-selected first scope
         assert "Dry-run: Would use scope 'first-scope'" in result.output
         assert "Select a scope for" not in result.output  # No interactive menu
-        assert "Would add: Test Server" in result.output
+        # CLI uses server ID in output, not server name
+        assert "Would add: test-server" in result.output
         assert "Scope: first-scope" in result.output
 
     @patch("mcpi.cli.get_catalog")

@@ -80,7 +80,8 @@ class TestMCPHarnessBasics:
         """Test counting servers in scopes."""
         assert prepopulated_harness.count_servers_in_scope("user-global") == 2
         assert prepopulated_harness.count_servers_in_scope("project-mcp") == 1
-        assert prepopulated_harness.count_servers_in_scope("user-internal") == 1
+        # The prepopulated_harness has 2 servers in user-internal scope
+        assert prepopulated_harness.count_servers_in_scope("user-internal") == 2
         assert (
             prepopulated_harness.count_servers_in_scope("user-local") == 1
         )  # Has disabled-server

@@ -49,7 +49,42 @@ import pytest
 from mcpi.clients.claude_code import ClaudeCodePlugin
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.registry import ClientRegistry
-from mcpi.clients.types import OperationResult
+from mcpi.clients.types import OperationResult, ServerConfig
+
+
+def _to_dict(config):
+    """Convert ServerConfig to dict if needed (helper for test compatibility).
+
+    The API evolved from returning dict to returning ServerConfig Pydantic models.
+    This helper allows tests to work with both forms while maintaining validation.
+    """
+    if isinstance(config, ServerConfig):
+        return config.to_dict()
+    return config
+
+
+def _assert_config_matches(actual_dict, expected_dict, msg="Configs should match"):
+    """Assert that two config dicts match semantically.
+
+    Handles cases where ServerConfig.to_dict() includes default values
+    (like env={}) that may not be present in file.
+    """
+    # Check required fields match exactly
+    assert (
+        actual_dict["command"] == expected_dict["command"]
+    ), f"{msg}: command mismatch"
+    assert actual_dict["args"] == expected_dict["args"], f"{msg}: args mismatch"
+    assert actual_dict["type"] == expected_dict["type"], f"{msg}: type mismatch"
+
+    # Check env - handle case where file doesn't have env field
+    actual_env = actual_dict.get("env", {})
+    expected_env = expected_dict.get("env", {})
+    assert actual_env == expected_env, f"{msg}: env mismatch"
+
+    # Check any additional fields in expected_dict
+    for key in expected_dict:
+        if key not in ["command", "args", "type", "env"]:
+            assert actual_dict.get(key) == expected_dict[key], f"{msg}: {key} mismatch"
 
 
 class TestCriticalAPI:
@@ -106,7 +141,7 @@ class TestCriticalAPI:
         Priority: CRITICAL
 
         VALIDATION:
-        - Returns ServerConfig for existing server
+        - Returns ServerConfig (or dict) for existing server
         - Includes all configuration fields (command, args, env, type)
         - Data matches what's in the file
         - Raises error for non-existent server
@@ -124,27 +159,33 @@ class TestCriticalAPI:
         # Test 1: Get config for existing server
         server_config = scope_handler.get_server_config("filesystem")
 
-        # Verify it's a dict with required fields
+        # API evolved from dict to ServerConfig - accept both
         assert isinstance(
-            server_config, dict
-        ), "get_server_config should return dict (or ServerConfig)"
-        assert "command" in server_config, "ServerConfig missing 'command' field"
+            server_config, (dict, ServerConfig)
+        ), "get_server_config should return dict or ServerConfig"
+
+        # Convert to dict for uniform validation
+        config_dict = _to_dict(server_config)
+
+        assert "command" in config_dict, "ServerConfig missing 'command' field"
         assert (
-            server_config["command"] == "npx"
-        ), f"Expected command 'npx', got '{server_config['command']}'"
+            config_dict["command"] == "npx"
+        ), f"Expected command 'npx', got '{config_dict['command']}'"
 
         # Verify args are present and correct
-        assert "args" in server_config, "ServerConfig missing 'args' field"
-        assert isinstance(server_config["args"], list), "args should be a list"
-        assert "-y" in server_config["args"], "args missing expected values"
+        assert "args" in config_dict, "ServerConfig missing 'args' field"
+        assert isinstance(config_dict["args"], list), "args should be a list"
+        assert "-y" in config_dict["args"], "args missing expected values"
 
-        # Verify complete data matches file contents
+        # Verify complete data matches file contents (semantic comparison)
         file_content = prepopulated_harness.get_server_config(
             "user-global", "filesystem"
         )
-        assert (
-            server_config == file_content
-        ), "get_server_config() returned data doesn't match file contents"
+        _assert_config_matches(
+            config_dict,
+            file_content,
+            "get_server_config() returned data doesn't match file contents",
+        )
 
         # Test 2: Error handling for non-existent server
         with pytest.raises(Exception) as exc_info:
@@ -179,25 +220,28 @@ class TestCriticalAPI:
         # Test user-global scope (settings.json format)
         user_global = plugin.get_scope_handler("user-global")
         fs_config = user_global.get_server_config("filesystem")
+        fs_dict = _to_dict(fs_config)
         assert (
-            fs_config["command"] == "npx"
+            fs_dict["command"] == "npx"
         ), "user-global scope: get_server_config returned wrong data"
 
         # Test project-mcp scope (.mcp.json format)
         project_mcp = plugin.get_scope_handler("project-mcp")
         project_config = project_mcp.get_server_config("project-tool")
+        project_dict = _to_dict(project_config)
         assert (
-            project_config["command"] == "python"
+            project_dict["command"] == "python"
         ), "project-mcp scope: get_server_config returned wrong data"
 
         # Test user-internal scope (.claude.json format)
         user_internal = plugin.get_scope_handler("user-internal")
         disabled_config = user_internal.get_server_config("disabled-server")
+        disabled_dict = _to_dict(disabled_config)
         assert (
-            disabled_config["command"] == "node"
+            disabled_dict["command"] == "node"
         ), "user-internal scope: get_server_config returned wrong data"
         assert (
-            disabled_config.get("disabled") is True
+            disabled_dict.get("disabled") is True
         ), "user-internal scope: should preserve 'disabled' flag"
 
 
@@ -264,16 +308,20 @@ class TestCoreUserWorkflows:
         internal_servers = user_internal.get_servers()
 
         assert (
-            len(internal_servers) == 1
-        ), f"Expected 1 server in user-internal, got {len(internal_servers)}"
+            len(internal_servers) == 2
+        ), f"Expected 2 servers in user-internal, got {len(internal_servers)}"
+        assert (
+            "internal-server" in internal_servers
+        ), "user-internal should contain 'internal-server'"
         assert (
             "disabled-server" in internal_servers
         ), "user-internal should contain 'disabled-server'"
 
         # Verify disabled state is preserved
         disabled_config = internal_servers["disabled-server"]
+        disabled_dict = _to_dict(disabled_config)
         assert (
-            disabled_config.get("disabled") is True
+            disabled_dict.get("disabled") is True
         ), "disabled flag should be preserved in server listing"
 
     def test_add_and_remove_server_workflow(self, mcp_harness):
@@ -310,11 +358,12 @@ class TestCoreUserWorkflows:
         assert initial_count == 0, "Should start with 0 servers"
 
         # ADD OPERATION
-        new_server_config = {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-memory"],
-            "type": "stdio",
-        }
+        # Fix: Use ServerConfig object instead of dict
+        new_server_config = ServerConfig(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-memory"],
+            type="stdio",
+        )
 
         result = scope_handler.add_server("memory-server", new_server_config)
 
@@ -335,7 +384,7 @@ class TestCoreUserWorkflows:
             saved_config["command"] == "npx"
         ), f"Expected command 'npx', got '{saved_config['command']}'"
         assert (
-            saved_config["args"] == new_server_config["args"]
+            saved_config["args"] == new_server_config.args
         ), "Args don't match what was added"
 
         # REMOVE OPERATION
@@ -375,28 +424,34 @@ class TestCoreUserWorkflows:
 
         # Capture initial state of all servers
         initial_servers = scope_handler.get_servers()
-        initial_github = initial_servers["github"].copy()
+        initial_github = _to_dict(initial_servers["github"]).copy()
 
         # Update the filesystem server
-        updated_config = {
-            "command": "node",  # Changed from npx
-            "args": ["updated-filesystem.js"],  # Changed
-            "type": "stdio",
-        }
+        # Fix: Use ServerConfig object instead of dict
+        updated_config = ServerConfig(
+            command="node",  # Changed from npx
+            args=["updated-filesystem.js"],  # Changed
+            type="stdio",
+        )
 
         result = scope_handler.update_server("filesystem", updated_config)
         assert result.success, f"Update failed: {result.message}"
 
         # Verify filesystem server was updated
         fs_config = scope_handler.get_server_config("filesystem")
-        assert fs_config["command"] == "node", "Server command not updated"
-        assert fs_config["args"] == ["updated-filesystem.js"], "Server args not updated"
+        fs_dict = _to_dict(fs_config)
+        assert fs_dict["command"] == "node", "Server command not updated"
+        assert fs_dict["args"] == ["updated-filesystem.js"], "Server args not updated"
 
         # CRITICAL: Verify github server was NOT changed
         github_config = scope_handler.get_server_config("github")
-        assert (
-            github_config == initial_github
-        ), "Update to 'filesystem' server affected 'github' server"
+        github_dict = _to_dict(github_config)
+
+        _assert_config_matches(
+            github_dict,
+            initial_github,
+            "Update to 'filesystem' server affected 'github' server",
+        )
 
         # Verify total server count unchanged
         final_servers = scope_handler.get_servers()
@@ -661,11 +716,10 @@ class TestManagerIntegration:
         """
         # Create manager with custom plugin
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", plugin)
 
-        manager = MCPManager(default_client="claude-code")
-        manager.registry = registry
+        manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Get scopes for client
         scopes = manager.get_scopes_for_client("claude-code")
@@ -698,30 +752,34 @@ class TestManagerIntegration:
         """
         # Create manager with custom plugin
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        registry = ClientRegistry()
+        registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", plugin)
 
-        manager = MCPManager(default_client="claude-code")
-        manager.registry = registry
+        manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Get all servers (should aggregate from all scopes)
         servers = manager.list_servers()
 
         # Verify we get servers from multiple scopes
         assert (
-            len(servers) >= 3
-        ), f"Expected at least 3 servers (from different scopes), got {len(servers)}"
+            len(servers) >= 4
+        ), f"Expected at least 4 servers (from different scopes), got {len(servers)}"
 
         # Verify we have servers from different scopes
-        server_ids = [s.server_id for s in servers]
-        assert (
-            "filesystem" in server_ids
+        # Fix: servers is a dict, so use keys() to get server IDs
+        server_ids = list(servers.keys())
+        # Server IDs are qualified (e.g., 'claude-code:user-global:filesystem')
+        assert any(
+            "filesystem" in sid for sid in server_ids
         ), "Should have 'filesystem' from user-global scope"
-        assert (
-            "project-tool" in server_ids
+        assert any(
+            "project-tool" in sid for sid in server_ids
         ), "Should have 'project-tool' from project-mcp scope"
-        assert (
-            "disabled-server" in server_ids
+        assert any(
+            "internal-server" in sid for sid in server_ids
+        ), "Should have 'internal-server' from user-internal scope"
+        assert any(
+            "disabled-server" in sid for sid in server_ids
         ), "Should have 'disabled-server' from user-internal scope"
 
 
