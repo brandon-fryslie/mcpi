@@ -1346,7 +1346,9 @@ def rescope(
                 f"[cyan]Dry-run mode: Would rescope server '{server_name}'[/cyan]"
             )
             console.print(f"  Would add to: {to_scope}")
-            console.print(f"  Would remove from: {', '.join(s for s in source_scope_names if s != to_scope)}")
+            console.print(
+                f"  Would remove from: {', '.join(s for s in source_scope_names if s != to_scope)}"
+            )
             console.print(f"  Client: {client_name}")
             console.print("\n[yellow]No changes made (dry-run mode)[/yellow]")
             ctx.exit(0)
@@ -1387,9 +1389,7 @@ def rescope(
                     source_handler = client_plugin.get_scope_handler(source_scope)
                     remove_result = source_handler.remove_server(server_name)
                     if not remove_result.success:
-                        failed_removals.append(
-                            (source_scope, remove_result.message)
-                        )
+                        failed_removals.append((source_scope, remove_result.message))
                 except Exception as e:
                     failed_removals.append((source_scope, str(e)))
 
@@ -1415,13 +1415,10 @@ def rescope(
                 console.print(traceback.format_exc())
             ctx.exit(1)
 
-
         # Step 9: Success output
         console.print(f"[green]✓[/green] Successfully rescoped server '{server_name}'")
         if scopes_to_remove_from:
-            console.print(
-                f"  Removed from: {', '.join(scopes_to_remove_from)}"
-            )
+            console.print(f"  Removed from: {', '.join(scopes_to_remove_from)}")
         console.print(f"  Now in: {to_scope}")
         console.print(f"  Client: {client_name}")
 
@@ -1452,7 +1449,9 @@ def rescope(
     help="Plain text output (no box characters)",
 )
 @click.pass_context
-def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], plain: bool) -> None:
+def info(
+    ctx: click.Context, server_id: Optional[str], client: Optional[str], plain: bool
+) -> None:
     """Show detailed information about a server or system status."""
     try:
         if server_id:
@@ -1486,13 +1485,17 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], pl
                 if plain:
                     info_text += f"Arguments: {' '.join(registry_info.args)}\n"
                 else:
-                    info_text += f"[bold]Arguments:[/bold] {' '.join(registry_info.args)}\n"
+                    info_text += (
+                        f"[bold]Arguments:[/bold] {' '.join(registry_info.args)}\n"
+                    )
 
             if registry_info.repository:
                 if plain:
                     info_text += f"Repository: {registry_info.repository}\n"
                 else:
-                    info_text += f"[bold]Repository:[/bold] {registry_info.repository}\n"
+                    info_text += (
+                        f"[bold]Repository:[/bold] {registry_info.repository}\n"
+                    )
 
             # Get installation info
             if plain:
@@ -1526,13 +1529,17 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], pl
                 if plain:
                     info_text += f"Status: Not Installed\n"
                 else:
-                    info_text += f"[bold]Status:[/bold] [yellow]Not Installed[/yellow]\n"
+                    info_text += (
+                        f"[bold]Status:[/bold] [yellow]Not Installed[/yellow]\n"
+                    )
 
             # Output result
             if plain:
                 console.print(info_text)
             else:
-                console.print(Panel(info_text, title=f"Server Information: {server_id}"))
+                console.print(
+                    Panel(info_text, title=f"Server Information: {server_id}")
+                )
         else:
             # Show system status
             manager = get_mcp_manager(ctx)
@@ -1540,14 +1547,14 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], pl
 
             if plain:
                 # Plain text system status
-                status_text = f"Default Client: {status.get('default_client', 'None')}\n"
+                status_text = (
+                    f"Default Client: {status.get('default_client', 'None')}\n"
+                )
                 status_text += f"Available Clients: {', '.join(status.get('available_clients', []))}\n"
                 status_text += f"Total Servers: {status.get('total_servers', 0)}\n"
             else:
                 # Rich formatted system status
-                status_text = (
-                    f"[bold]Default Client:[/bold] {status.get('default_client', 'None')}\n"
-                )
+                status_text = f"[bold]Default Client:[/bold] {status.get('default_client', 'None')}\n"
                 status_text += f"[bold]Available Clients:[/bold] {', '.join(status.get('available_clients', []))}\n"
                 status_text += (
                     f"[bold]Total Servers:[/bold] {status.get('total_servers', 0)}\n"
@@ -1584,11 +1591,12 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], pl
 
     except Exception as e:
         error_msg = f"Error getting information: {e}"
-        if plain:
+        plain_flag = plain if "plain" in locals() else False
+        if plain_flag:
             console.print(error_msg)
         else:
             console.print(f"[red]{error_msg}[/red]")
-
+        ctx.exit(1)
 
 
 @main.command()
