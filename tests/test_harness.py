@@ -283,9 +283,8 @@ def mcp_manager_with_harness(mcp_harness):
     registry.inject_client_instance("claude-code", custom_plugin)
 
     # Create manager with our custom registry
-    manager = MCPManager(default_client="claude-code")
-    manager.registry = registry
-
+    # Create manager with our custom registry - FIXED: pass registry parameter
+    manager = MCPManager(registry=registry, default_client="claude-code")
     return manager, mcp_harness
 
 
