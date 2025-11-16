@@ -11,8 +11,9 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
-from mcpi.clients import MCPManager, ServerConfig, ServerState
-from mcpi.registry.catalog import ServerCatalog
+from mcpi.clients import ServerConfig, ServerState
+from mcpi.clients.manager import MCPManager, create_default_manager
+from mcpi.registry.catalog import ServerCatalog, create_default_catalog
 
 console = Console()
 
@@ -50,11 +51,11 @@ def shorten_path(path: Optional[str]) -> str:
             return str(path)
 
 
-def get_mcp_manager(ctx: click.Context) -> MCPManager:
-    """Lazy initialization of MCPManager."""
+def get_mcp_manager(ctx: click.Context):
+    """Lazy initialization of MCPManager using factory function."""
     if "mcp_manager" not in ctx.obj:
         try:
-            ctx.obj["mcp_manager"] = MCPManager()
+            ctx.obj["mcp_manager"] = create_default_manager()
         except Exception as e:
             if ctx.obj.get("verbose", False):
                 console.print(f"[red]MCP manager initialization error: {e}[/red]")
@@ -67,13 +68,13 @@ def get_mcp_manager(ctx: click.Context) -> MCPManager:
     return ctx.obj["mcp_manager"]
 
 
-def get_catalog(ctx: click.Context) -> ServerCatalog:
-    """Lazy initialization of ServerCatalog."""
+def get_catalog(ctx: click.Context):
+    """Lazy initialization of ServerCatalog using factory function."""
     if "catalog" not in ctx.obj:
         try:
-            # Use the default registry path
-            ctx.obj["catalog"] = ServerCatalog()
-            ctx.obj["catalog"].load_registry()
+            # Use factory function for default registry path
+            ctx.obj["catalog"] = create_default_catalog()
+            ctx.obj["catalog"].load_catalog()
         except Exception as e:
             if ctx.obj.get("verbose", False):
                 console.print(f"[red]Catalog initialization error: {e}[/red]")
@@ -181,7 +182,7 @@ class DynamicScopeType(click.ParamType):
                 # Initialize manager if not present
                 if "mcp_manager" not in ctx.obj:
                     log_completion("Initializing MCPManager", ctx=ctx)
-                    ctx.obj["mcp_manager"] = MCPManager()
+                    ctx.obj["mcp_manager"] = create_default_manager()
 
                 manager = ctx.obj.get("mcp_manager")
                 client_name = ctx.params.get("client") if ctx.params else None
@@ -297,7 +298,7 @@ def complete_client_names(
         # Initialize manager if not present
         if "mcp_manager" not in ctx.obj:
             log_completion("Initializing MCPManager", ctx=ctx)
-            ctx.obj["mcp_manager"] = MCPManager()
+            ctx.obj["mcp_manager"] = create_default_manager()
 
         manager = ctx.obj["mcp_manager"]
 
@@ -411,7 +412,7 @@ def complete_server_ids(
             # Initialize manager if not present
             if "mcp_manager" not in ctx.obj:
                 log_completion("Initializing MCPManager", ctx=ctx)
-                ctx.obj["mcp_manager"] = MCPManager()
+                ctx.obj["mcp_manager"] = create_default_manager()
 
             manager = ctx.obj["mcp_manager"]
 
@@ -473,8 +474,8 @@ def complete_server_ids(
         # For add and other commands, show servers from registry
         # Initialize catalog if not present
         if "catalog" not in ctx.obj:
-            ctx.obj["catalog"] = ServerCatalog()
-            ctx.obj["catalog"].load_registry()
+            ctx.obj["catalog"] = create_default_catalog()
+            ctx.obj["catalog"].load_catalog()
 
         catalog = ctx.obj["catalog"]
         servers = catalog.list_servers()
@@ -1445,8 +1446,13 @@ def rescope(
     shell_complete=complete_client_names,
     help="Target client (uses default if not specified)",
 )
+@click.option(
+    "--plain",
+    is_flag=True,
+    help="Plain text output (no box characters)",
+)
 @click.pass_context
-def info(ctx: click.Context, server_id: Optional[str], client: Optional[str]) -> None:
+def info(ctx: click.Context, server_id: Optional[str], client: Optional[str], plain: bool) -> None:
     """Show detailed information about a server or system status."""
     try:
         if server_id:
@@ -1455,57 +1461,105 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str]) ->
             registry_info = catalog.get_server(server_id)
 
             if not registry_info:
-                console.print(f"[red]Server '{server_id}' not found in registry[/red]")
+                error_msg = f"Server '{server_id}' not found in registry"
+                if plain:
+                    console.print(error_msg)
+                else:
+                    console.print(f"[red]{error_msg}[/red]")
                 ctx.exit(1)
 
             # Build registry section
-            info_text = "[bold cyan]Registry Information:[/bold cyan]\n"
-            info_text += f"[bold]ID:[/bold] {server_id}\n"
-            info_text += f"[bold]Description:[/bold] {registry_info.description}\n"
-            info_text += f"[bold]Command:[/bold] {registry_info.command}\n"
+            if plain:
+                # Plain text output (no Rich markup)
+                info_text = "Registry Information:\n"
+                info_text += f"ID: {server_id}\n"
+                info_text += f"Description: {registry_info.description}\n"
+                info_text += f"Command: {registry_info.command}\n"
+            else:
+                # Rich formatted output
+                info_text = "[bold cyan]Registry Information:[/bold cyan]\n"
+                info_text += f"[bold]ID:[/bold] {server_id}\n"
+                info_text += f"[bold]Description:[/bold] {registry_info.description}\n"
+                info_text += f"[bold]Command:[/bold] {registry_info.command}\n"
 
             if registry_info.args:
-                info_text += f"[bold]Arguments:[/bold] {' '.join(registry_info.args)}\n"
+                if plain:
+                    info_text += f"Arguments: {' '.join(registry_info.args)}\n"
+                else:
+                    info_text += f"[bold]Arguments:[/bold] {' '.join(registry_info.args)}\n"
 
             if registry_info.repository:
-                info_text += f"[bold]Repository:[/bold] {registry_info.repository}\n"
+                if plain:
+                    info_text += f"Repository: {registry_info.repository}\n"
+                else:
+                    info_text += f"[bold]Repository:[/bold] {registry_info.repository}\n"
 
             # Get installation info
-            info_text += "\n[bold cyan]Local Installation:[/bold cyan]\n"
+            if plain:
+                info_text += "\nLocal Installation:\n"
+            else:
+                info_text += "\n[bold cyan]Local Installation:[/bold cyan]\n"
+
             manager = get_mcp_manager(ctx)
             server_info = manager.get_server_info(server_id, client)
 
             if server_info:
-                info_text += f"[bold]Status:[/bold] [green]Installed[/green]\n"
-                info_text += f"[bold]Client:[/bold] {server_info.client}\n"
-                info_text += f"[bold]Scope:[/bold] {server_info.scope}\n"
-                info_text += f"[bold]State:[/bold] {server_info.state.name}\n"
+                if plain:
+                    info_text += f"Status: Installed\n"
+                    info_text += f"Client: {server_info.client}\n"
+                    info_text += f"Scope: {server_info.scope}\n"
+                    info_text += f"State: {server_info.state.name}\n"
+                else:
+                    info_text += f"[bold]Status:[/bold] [green]Installed[/green]\n"
+                    info_text += f"[bold]Client:[/bold] {server_info.client}\n"
+                    info_text += f"[bold]Scope:[/bold] {server_info.scope}\n"
+                    info_text += f"[bold]State:[/bold] {server_info.state.name}\n"
 
                 if server_info.env:
-                    info_text += "[bold]Environment Variables:[/bold]\n"
+                    if plain:
+                        info_text += "Environment Variables:\n"
+                    else:
+                        info_text += "[bold]Environment Variables:[/bold]\n"
                     for key, value in server_info.env.items():
                         info_text += f"  {key}={value}\n"
             else:
-                info_text += f"[bold]Status:[/bold] [yellow]Not Installed[/yellow]\n"
+                if plain:
+                    info_text += f"Status: Not Installed\n"
+                else:
+                    info_text += f"[bold]Status:[/bold] [yellow]Not Installed[/yellow]\n"
 
-            console.print(Panel(info_text, title=f"Server Information: {server_id}"))
+            # Output result
+            if plain:
+                console.print(info_text)
+            else:
+                console.print(Panel(info_text, title=f"Server Information: {server_id}"))
         else:
             # Show system status
             manager = get_mcp_manager(ctx)
             status = manager.get_status_summary()
 
-            status_text = (
-                f"[bold]Default Client:[/bold] {status.get('default_client', 'None')}\n"
-            )
-            status_text += f"[bold]Available Clients:[/bold] {', '.join(status.get('available_clients', []))}\n"
-            status_text += (
-                f"[bold]Total Servers:[/bold] {status.get('total_servers', 0)}\n"
-            )
+            if plain:
+                # Plain text system status
+                status_text = f"Default Client: {status.get('default_client', 'None')}\n"
+                status_text += f"Available Clients: {', '.join(status.get('available_clients', []))}\n"
+                status_text += f"Total Servers: {status.get('total_servers', 0)}\n"
+            else:
+                # Rich formatted system status
+                status_text = (
+                    f"[bold]Default Client:[/bold] {status.get('default_client', 'None')}\n"
+                )
+                status_text += f"[bold]Available Clients:[/bold] {', '.join(status.get('available_clients', []))}\n"
+                status_text += (
+                    f"[bold]Total Servers:[/bold] {status.get('total_servers', 0)}\n"
+                )
 
             # Server states
             states = status.get("server_states", {})
             if states:
-                status_text += "[bold]Server States:[/bold]\n"
+                if plain:
+                    status_text += "Server States:\n"
+                else:
+                    status_text += "[bold]Server States:[/bold]\n"
                 for state, count in states.items():
                     if count > 0:
                         status_text += f"  {state}: {count}\n"
@@ -1513,16 +1567,28 @@ def info(ctx: click.Context, server_id: Optional[str], client: Optional[str]) ->
             # Registry stats
             registry_stats = status.get("registry_stats", {})
             if registry_stats:
-                status_text += "[bold]Registry:[/bold]\n"
+                if plain:
+                    status_text += "Registry:\n"
+                else:
+                    status_text += "[bold]Registry:[/bold]\n"
                 status_text += f"  Clients: {registry_stats.get('total_clients', 0)}\n"
                 status_text += (
                     f"  Loaded: {registry_stats.get('loaded_instances', 0)}\n"
                 )
 
-            console.print(Panel(status_text, title="MCPI Status"))
+            # Output result
+            if plain:
+                console.print(status_text)
+            else:
+                console.print(Panel(status_text, title="MCPI Status"))
 
     except Exception as e:
-        console.print(f"[red]Error getting information: {e}[/red]")
+        error_msg = f"Error getting information: {e}"
+        if plain:
+            console.print(error_msg)
+        else:
+            console.print(f"[red]{error_msg}[/red]")
+
 
 
 @main.command()
@@ -1754,12 +1820,12 @@ def completion(ctx: click.Context, shell: Optional[str]) -> None:
 
 def tui_reload_entry() -> None:
     """Entry point for mcpi-tui-reload console script.
-    
+
     This function is called when the user runs `mcpi-tui-reload` directly.
     It creates a Click context and invokes the tui-reload command.
     """
     from mcpi.tui import reload_server_list
-    
+
     try:
         # Create a minimal Click context for initialization
         ctx = click.Context(main)
@@ -1767,11 +1833,11 @@ def tui_reload_entry() -> None:
         ctx.obj["verbose"] = False
         ctx.obj["dry_run"] = False
         ctx.obj["debug"] = False
-        
+
         # Initialize manager and catalog
         manager = get_mcp_manager(ctx)
         catalog = get_catalog(ctx)
-        
+
         # Call reload function
         reload_server_list(catalog, manager)
     except Exception as e:

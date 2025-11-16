@@ -160,5 +160,16 @@
       "@modelcontextprotocol/server-sequential-thinking"
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
+  },
+  "design-patterns": {
+    "description": "Deterministic access to software design pattern documentation with section-addressable queries",
+    "command": "node",
+    "args": [
+      "/Users/bmf/icode/design-pattern-mcp/dist/server.js"
+    ],
+    "repository": null,
+    "env": {
+      "PATTERNS_DIR": "/Users/bmf/icode/design-pattern-mcp/corpus"
+    }
   }
 }

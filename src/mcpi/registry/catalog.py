@@ -130,21 +130,14 @@ class ServerRegistry(BaseModel):
 class ServerCatalog:
     """Central catalog for MCP servers."""
 
-    def __init__(
-        self, registry_path: Optional[Path] = None, validate_with_cue: bool = True
-    ):
-        """Initialize the catalog with optional custom registry path.
+    def __init__(self, catalog_path: Path, validate_with_cue: bool = True):
+        """Initialize the catalog with catalog path.
 
         Args:
-            registry_path: Path to registry file
+            catalog_path: Path to catalog file (required for DI/testability)
             validate_with_cue: Whether to validate with CUE schema
         """
-        if registry_path is None:
-            # Default to package data directory
-            package_dir = Path(__file__).parent.parent.parent.parent
-            registry_path = package_dir / "data" / "registry.json"
-
-        self.registry_path = registry_path
+        self.catalog_path = catalog_path
         self._registry: Optional[ServerRegistry] = None
         self._loaded = False
         self.validate_with_cue = validate_with_cue
@@ -157,68 +150,66 @@ class ServerCatalog:
                 print(f"Warning: CUE validation disabled - {e}")
                 self.validate_with_cue = False
 
-    def load_registry(self) -> None:
-        """Load servers from registry file."""
-        if not self.registry_path.exists():
+    def load_catalog(self) -> None:
+        """Load servers from catalog file."""
+        if not self.catalog_path.exists():
             # Start with empty registry if file doesn't exist
             self._registry = ServerRegistry()
         else:
             # Load based on file extension
-            if self.registry_path.suffix.lower() in [".yaml", ".yml"]:
-                self._load_yaml_registry()
+            if self.catalog_path.suffix.lower() in [".yaml", ".yml"]:
+                self._load_yaml_catalog()
             else:
                 # Default to JSON
-                self._load_json_registry()
+                self._load_json_catalog()
 
         self._loaded = True
 
-    def _load_json_registry(self) -> None:
-        """Load registry from JSON format."""
+    def _load_json_catalog(self) -> None:
+        """Load catalog from JSON format."""
         try:
             # Validate with CUE before loading if enabled
             if self.validate_with_cue:
-                is_valid, error = self.cue_validator.validate_file(self.registry_path)
+                is_valid, error = self.cue_validator.validate_file(self.catalog_path)
                 if not is_valid:
-                    raise RuntimeError(f"Registry validation failed: {error}")
+                    raise RuntimeError(f"Catalog validation failed: {error}")
 
-            with open(self.registry_path, encoding="utf-8") as f:
+            with open(self.catalog_path, encoding="utf-8") as f:
                 data = json.load(f)
             # Convert flat dictionary to ServerRegistry format
             servers = {k: MCPServer(**v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to load registry from {self.registry_path}: {e}"
-            )
+            raise RuntimeError(f"Failed to load catalog from {self.catalog_path}: {e}")
 
-    def _load_yaml_registry(self) -> None:
-        """Load registry from YAML format."""
+    def _load_yaml_catalog(self) -> None:
+        """Load catalog from YAML format."""
         try:
-            with open(self.registry_path, encoding="utf-8") as f:
+            with open(self.catalog_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             # Convert flat dictionary to ServerRegistry format
             servers = {k: MCPServer(**v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
             raise RuntimeError(
-                f"Failed to load YAML registry from {self.registry_path}: {e}"
+                f"Failed to load YAML catalog from {self.catalog_path}: {e}"
             )
 
-    def save_registry(self, format_type: str = "json") -> bool:
-        """Save registry to file."""
+    def save_catalog(self, format_type: str = "json") -> bool:
+        """Save catalog to file."""
         try:
-            self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+            self.catalog_path.parent.mkdir(parents=True, exist_ok=True)
 
             if format_type == "yaml":
-                return self._save_yaml_registry()
+                return self._save_yaml_catalog()
             else:
-                return self._save_json_registry()
+                return self._save_json_catalog()
         except Exception as e:
-            print(f"Error saving registry: {e}")
+            print(f"Error saving catalog: {e}")
             return False
 
-    def _save_json_registry(self) -> bool:
-        """Save registry in JSON format."""
+    def _save_json_catalog(self) -> bool:
+        """Save catalog in JSON format."""
         try:
             # Prepare data as flat dictionary
             data = {k: v.model_dump() for k, v in self._registry.servers.items()}
@@ -228,55 +219,53 @@ class ServerCatalog:
                 is_valid, error = self.cue_validator.validate(data)
                 if not is_valid:
                     raise RuntimeError(
-                        f"Registry validation failed before save: {error}"
+                        f"Catalog validation failed before save: {error}"
                     )
 
             # Write to file
-            with open(self.registry_path, "w", encoding="utf-8") as f:
+            with open(self.catalog_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             # Validate file after writing if enabled
             if self.validate_with_cue:
-                is_valid, error = self.cue_validator.validate_file(self.registry_path)
+                is_valid, error = self.cue_validator.validate_file(self.catalog_path)
                 if not is_valid:
-                    raise RuntimeError(
-                        f"Registry validation failed after save: {error}"
-                    )
+                    raise RuntimeError(f"Catalog validation failed after save: {error}")
 
             return True
         except Exception as e:
-            print(f"Error saving JSON registry: {e}")
+            print(f"Error saving JSON catalog: {e}")
             return False
 
-    def _save_yaml_registry(self) -> bool:
-        """Save registry in YAML format."""
+    def _save_yaml_catalog(self) -> bool:
+        """Save catalog in YAML format."""
         try:
-            yaml_path = self.registry_path.with_suffix(".yaml")
+            yaml_path = self.catalog_path.with_suffix(".yaml")
             with open(yaml_path, "w", encoding="utf-8") as f:
                 # Export as flat dictionary
                 data = {k: v.model_dump() for k, v in self._registry.servers.items()}
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
             return True
         except Exception as e:
-            print(f"Error saving YAML registry: {e}")
+            print(f"Error saving YAML catalog: {e}")
             return False
 
     def get_server(self, server_id: str) -> Optional[MCPServer]:
         """Get server by ID."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
         return self._registry.get_server(server_id)
 
     def list_servers(self) -> List[tuple[str, MCPServer]]:
         """List all servers."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
         return self._registry.list_servers()
 
     def search_servers(self, query: str) -> List[tuple[str, MCPServer]]:
         """Search servers by query string."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
         return self._registry.search_servers(query)
 
     def list_categories(self) -> Dict[str, int]:
@@ -286,13 +275,13 @@ class ServerCatalog:
             Dictionary mapping category name to count of servers in that category
         """
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
         return self._registry.list_categories()
 
     def add_server(self, server_id: str, server: MCPServer) -> bool:
         """Add a server to the catalog."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
 
         if server_id in self._registry.servers:
             return False
@@ -303,7 +292,7 @@ class ServerCatalog:
     def remove_server(self, server_id: str) -> bool:
         """Remove a server from the catalog."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
 
         if server_id not in self._registry.servers:
             return False
@@ -314,10 +303,53 @@ class ServerCatalog:
     def update_server(self, server_id: str, server: MCPServer) -> bool:
         """Update an existing server."""
         if not self._loaded:
-            self.load_registry()
+            self.load_catalog()
 
         if server_id not in self._registry.servers:
             return False
 
         self._registry.servers[server_id] = server
         return True
+
+
+# Factory Functions for DIP Compliance
+
+
+def create_default_catalog(validate_with_cue: bool = True) -> ServerCatalog:
+    """Create ServerCatalog with default production catalog path.
+
+    This factory function provides the default behavior that was previously
+    in ServerCatalog.__init__. Use this for production code that needs
+    the standard catalog location.
+
+    Args:
+        validate_with_cue: Whether to validate with CUE schema
+
+    Returns:
+        ServerCatalog instance configured with production catalog path
+    """
+    # Calculate production catalog path
+    package_dir = Path(__file__).parent.parent.parent.parent
+    catalog_path = package_dir / "data" / "catalog.json"
+
+    return ServerCatalog(catalog_path=catalog_path, validate_with_cue=validate_with_cue)
+
+
+def create_test_catalog(
+    test_data_path: Path, validate_with_cue: bool = False
+) -> ServerCatalog:
+    """Create ServerCatalog with custom test data path.
+
+    This factory function makes it easy to create test catalogs with
+    isolated test data. Validation is disabled by default for tests.
+
+    Args:
+        test_data_path: Path to test catalog file
+        validate_with_cue: Whether to validate with CUE schema (default False for tests)
+
+    Returns:
+        ServerCatalog instance configured with test data path
+    """
+    return ServerCatalog(
+        catalog_path=test_data_path, validate_with_cue=validate_with_cue
+    )

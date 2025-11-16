@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from mcpi.registry.catalog import MCPServer, ServerCatalog
+from mcpi.registry.catalog import MCPServer, ServerCatalog, create_default_catalog
 
 
 class ServerDiscovery:
@@ -14,9 +14,9 @@ class ServerDiscovery:
         Args:
             catalog: Optional ServerCatalog instance
         """
-        self.catalog = catalog or ServerCatalog()
+        self.catalog = catalog or create_default_catalog()
         if not self.catalog._loaded:
-            self.catalog.load_registry()
+            self.catalog.load_catalog()
 
     def get_verified_servers(self) -> List[MCPServer]:
         """Get all verified servers.
