@@ -69,10 +69,18 @@ class TestInstallerWorkflowsWithHarness:
         assert server_config["env"]["GITHUB_TOKEN"] == "${GITHUB_TOKEN}"
 
     def test_server_state_transitions(self, mcp_manager_with_harness):
-        """Test server state changes using Claude's actual enable/disable format."""
+        """Test server state changes using Claude's actual enable/disable format.
+
+        NOTE: Different scopes use different disable mechanisms:
+        - project-mcp: inline 'disabled' field in server config
+        - user-global: file-move mechanism (disabled-mcp.json)
+        - user-internal: file-move mechanism (.disabled-servers.json)
+
+        This test uses project-mcp scope which uses the inline field mechanism.
+        """
         manager, harness = mcp_manager_with_harness
 
-        # Add a server to MCP config
+        # Add a server to project-mcp scope
         config = ServerConfig(command="node", args=["server.js"], type="stdio")
         result = manager.add_server("state-test", config, "project-mcp", "claude-code")
         assert result.success
@@ -83,23 +91,22 @@ class TestInstallerWorkflowsWithHarness:
         assert server_info is not None
         assert server_info.state == ServerState.ENABLED
 
-        # Test real disable operation using Claude's format
+        # Test real disable operation
         result = manager.disable_server("state-test", "claude-code")
         assert result.success
 
-        # Check that a Claude settings file was created/updated with disabled array
-        settings_scopes = ["project-local", "user-local", "user-global"]
-        disabled_found = False
+        # Check that the server config has the inline 'disabled' field
+        # (project-mcp scope uses inline field, not separate disabled file)
+        project_mcp_content = harness.read_scope_file("project-mcp")
+        assert project_mcp_content is not None, "project-mcp file should exist"
+        assert "mcpServers" in project_mcp_content, "project-mcp should have mcpServers"
+        assert "state-test" in project_mcp_content["mcpServers"], \
+            "state-test should still be in project-mcp after disable"
 
-        for scope in settings_scopes:
-            settings_content = harness.read_scope_file(scope)
-            if settings_content and "disabledMcpjsonServers" in settings_content:
-                disabled_servers = settings_content.get("disabledMcpjsonServers", [])
-                if "state-test" in disabled_servers:
-                    disabled_found = True
-                    break
-
-        assert disabled_found, "Server should be in disabledMcpjsonServers array"
+        # Verify inline disabled field (project-mcp scope mechanism)
+        server_config = project_mcp_content["mcpServers"]["state-test"]
+        assert "disabled" in server_config and server_config["disabled"] is True, \
+            "Server should have disabled=true field in project-mcp scope"
 
         # Verify the server now shows as disabled
         servers_after_disable = manager.list_servers("claude-code", "project-mcp")
@@ -112,6 +119,13 @@ class TestInstallerWorkflowsWithHarness:
         # Test enable operation
         result = manager.enable_server("state-test", "claude-code")
         assert result.success
+
+        # Verify the disabled field is removed or set to false
+        project_mcp_content_after_enable = harness.read_scope_file("project-mcp")
+        server_config_after_enable = project_mcp_content_after_enable["mcpServers"]["state-test"]
+        # The disabled field should either be absent or set to false
+        assert server_config_after_enable.get("disabled", False) is False, \
+            "Server should not have disabled=true after enable"
 
         # Verify the server is now enabled
         servers_after_enable = manager.list_servers("claude-code", "project-mcp")
