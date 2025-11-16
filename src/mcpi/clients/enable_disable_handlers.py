@@ -47,7 +47,7 @@ class ArrayBasedEnableDisableHandler:
         except Exception:
             return False
 
-    def disable(self, server_id: str) -> bool:
+    def disable_server(self, server_id: str) -> bool:
         """Mark a server as disabled by adding to disabledMcpjsonServers array.
 
         Args:
@@ -86,7 +86,7 @@ class ArrayBasedEnableDisableHandler:
         except Exception:
             return False
 
-    def enable(self, server_id: str) -> bool:
+    def enable_server(self, server_id: str) -> bool:
         """Mark a server as enabled by adding to enabledMcpjsonServers array.
 
         Args:
@@ -153,7 +153,7 @@ class FileTrackedEnableDisableHandler:
         """
         return self.tracker.is_disabled(server_id)
 
-    def disable(self, server_id: str) -> bool:
+    def disable_server(self, server_id: str) -> bool:
         """Mark a server as disabled by adding to tracking file.
 
         Args:
@@ -164,7 +164,7 @@ class FileTrackedEnableDisableHandler:
         """
         return self.tracker.disable(server_id)
 
-    def enable(self, server_id: str) -> bool:
+    def enable_server(self, server_id: str) -> bool:
         """Mark a server as enabled by removing from tracking file.
 
         Args:
@@ -174,3 +174,109 @@ class FileTrackedEnableDisableHandler:
             True if operation succeeded
         """
         return self.tracker.enable(server_id)
+
+
+class InlineEnableDisableHandler:
+    """Enable/disable handler using inline 'disabled' field in server config.
+
+    This handler is used for scopes like project-mcp that use .mcp.json format,
+    which doesn't support enabledMcpjsonServers/disabledMcpjsonServers arrays.
+    Instead, each server can have a 'disabled' field directly in its configuration.
+    """
+
+    def __init__(
+        self, config_path: Path, reader: ConfigReader, writer: ConfigWriter
+    ) -> None:
+        """Initialize the inline handler.
+
+        Args:
+            config_path: Path to the configuration file
+            reader: Configuration file reader
+            writer: Configuration file writer
+        """
+        self.config_path = config_path
+        self.reader = reader
+        self.writer = writer
+
+    def is_disabled(self, server_id: str) -> bool:
+        """Check if a server is disabled.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if server has 'disabled' field set to true
+        """
+        if not self.config_path.exists():
+            return False
+
+        try:
+            data = self.reader.read(self.config_path)
+            servers = data.get("mcpServers", {})
+            server_config = servers.get(server_id, {})
+            return server_config.get("disabled") is True
+        except Exception:
+            return False
+
+    def disable_server(self, server_id: str) -> bool:
+        """Mark a server as disabled by setting 'disabled': true in config.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if operation succeeded
+        """
+        try:
+            # Read current data
+            if not self.config_path.exists():
+                return False  # Can't disable if config doesn't exist
+
+            data = self.reader.read(self.config_path)
+
+            # Get servers
+            servers = data.get("mcpServers", {})
+            if server_id not in servers:
+                return False  # Can't disable if server doesn't exist
+
+            # Set disabled flag
+            servers[server_id]["disabled"] = True
+
+            # Write back
+            self.writer.write(self.config_path, data)
+            return True
+
+        except Exception:
+            return False
+
+    def enable_server(self, server_id: str) -> bool:
+        """Mark a server as enabled by removing 'disabled' field from config.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if operation succeeded
+        """
+        try:
+            # Read current data
+            if not self.config_path.exists():
+                return False  # Can't enable if config doesn't exist
+
+            data = self.reader.read(self.config_path)
+
+            # Get servers
+            servers = data.get("mcpServers", {})
+            if server_id not in servers:
+                return False  # Can't enable if server doesn't exist
+
+            # Remove disabled flag if present
+            if "disabled" in servers[server_id]:
+                del servers[server_id]["disabled"]
+
+            # Write back
+            self.writer.write(self.config_path, data)
+            return True
+
+        except Exception:
+            return False

@@ -9,6 +9,7 @@ from .disabled_tracker import DisabledServersTracker
 from .enable_disable_handlers import (
     ArrayBasedEnableDisableHandler,
     FileTrackedEnableDisableHandler,
+    InlineEnableDisableHandler,
 )
 from .file_based import (
     FileBasedScope,
@@ -72,20 +73,23 @@ class ClaudeCodePlugin(MCPClientPlugin):
         json_writer = JSONFileWriter()
 
         # Project-level MCP configuration (.mcp.json)
-        # This scope does NOT support enable/disable (no arrays in .mcp.json format)
+        # This scope DOES support enable/disable via inline 'disabled' field
+        project_mcp_path = self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json")
         scopes["project-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-mcp",
                 description="Project-level MCP configuration (.mcp.json)",
                 priority=1,
-                path=self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json"),
+                path=project_mcp_path,
                 is_project_level=True,
             ),
             reader=json_reader,
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
-            enable_disable_handler=None,  # project-mcp doesn't support enable/disable
+            enable_disable_handler=InlineEnableDisableHandler(
+                project_mcp_path, json_reader, json_writer
+            ),
         )
 
         # Project-local Claude settings (.claude/settings.local.json)
@@ -160,22 +164,29 @@ class ClaudeCodePlugin(MCPClientPlugin):
         )
 
         # User internal configuration (~/.claude.json)
-        # This scope does NOT support enable/disable (no arrays in this format)
+        # This scope NOW supports enable/disable via separate tracking file
+        user_internal_path = self._get_scope_path(
+            "user-internal", Path.home() / ".claude.json"
+        )
+        user_internal_disabled_tracker_path = self._get_scope_path(
+            "user-internal-disabled",
+            Path.home() / ".claude" / ".mcpi-disabled-servers-internal.json",
+        )
         scopes["user-internal"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-internal",
                 description="User internal Claude configuration (~/.claude.json)",
                 priority=5,
-                path=self._get_scope_path(
-                    "user-internal", Path.home() / ".claude.json"
-                ),
+                path=user_internal_path,
                 is_user_level=True,
             ),
             reader=json_reader,
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "internal-config-schema.yaml",
-            enable_disable_handler=None,  # user-internal doesn't support enable/disable
+            enable_disable_handler=FileTrackedEnableDisableHandler(
+                DisabledServersTracker(user_internal_disabled_tracker_path)
+            ),
         )
 
         # User MCP servers configuration (~/.claude/mcp_servers.json)
@@ -199,18 +210,24 @@ class ClaudeCodePlugin(MCPClientPlugin):
 
         return scopes
 
-    def _get_server_state(self, server_id: str, scope: str) -> ServerState:
+    def _get_server_state(
+        self, server_id: str, scope: str, config_dict: Optional[Dict[str, Any]] = None
+    ) -> ServerState:
         """Get the actual state of a server in a specific scope.
 
         Uses the scope's enable/disable handler to determine state. Different scopes
         have different mechanisms:
+        - project-mcp: Use inline 'disabled' field in server config
         - project-local, user-local: Use enabledMcpjsonServers/disabledMcpjsonServers arrays
-        - user-global: Uses separate disabled tracking file
+        - user-global, user-internal: Use separate disabled tracking files
         - Other scopes: Don't support enable/disable (always ENABLED)
+
+        Additionally checks for inline "disabled" field in config for backward compatibility.
 
         Args:
             server_id: Server identifier
             scope: The scope where the server exists (ONLY check this scope)
+            config_dict: Optional server configuration to check for inline disabled field
 
         Returns:
             Server state (ENABLED, DISABLED, or NOT_INSTALLED)
@@ -219,6 +236,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
             return ServerState.ENABLED
 
         handler = self._scopes[scope]
+
+        # First check if the config itself has a "disabled" field set to True
+        # This handles legacy/inline disabled flags
+        if config_dict and config_dict.get("disabled") is True:
+            return ServerState.DISABLED
 
         # If this scope has an enable/disable handler, use it
         if (
@@ -263,8 +285,8 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 qualified_id = f"{self.name}:{scope_name}:{server_id}"
 
                 # Determine server state using ONLY the server's own scope
-                # BUG-FIX: Pass the scope so we only check that scope's enable/disable arrays
-                state = self._get_server_state(server_id, scope_name)
+                # Pass config_dict to check for inline "disabled" field
+                state = self._get_server_state(server_id, scope_name, config_dict)
 
                 # Create ServerInfo object
                 servers[qualified_id] = ServerInfo(
@@ -292,44 +314,190 @@ class ClaudeCodePlugin(MCPClientPlugin):
             Operation result
         """
         if not self.has_scope(scope):
-            available = ", ".join(self.get_scope_names())
-            return OperationResult.failure_result(
-                f"Unknown scope '{scope}' for client '{self.name}'. Available: {available}"
-            )
+            return OperationResult(success=False, message=f"Unknown scope: {scope}")
 
-        # Validate server configuration
-        validation_errors = self.validate_server_config(config)
-        if validation_errors:
-            return OperationResult.failure_result(
-                f"Invalid server configuration: {'; '.join(validation_errors)}",
-                errors=validation_errors,
-            )
-
-        # Add server to the specified scope
         handler = self._scopes[scope]
-        return handler.add_server(server_id, config)
+
+        # Add the server to the scope
+        result = handler.add_server(server_id, config)
+
+        if result:
+            return OperationResult(
+                success=True, message=f"Server '{server_id}' added to scope '{scope}'"
+            )
+        else:
+            return OperationResult(
+                success=False,
+                message=f"Failed to add server '{server_id}' to scope '{scope}'",
+            )
+
+    def update_server(
+        self, server_id: str, config: ServerConfig, scope: str
+    ) -> OperationResult:
+        """Update a server in the specified scope.
+
+        Args:
+            server_id: Server identifier
+            config: New server configuration
+            scope: Target scope name
+
+        Returns:
+            Operation result
+        """
+        if not self.has_scope(scope):
+            return OperationResult(success=False, message=f"Unknown scope: {scope}")
+
+        handler = self._scopes[scope]
+
+        # Update the server
+        result = handler.update_server(server_id, config)
+
+        if result:
+            return OperationResult(
+                success=True,
+                message=f"Server '{server_id}' updated in scope '{scope}'",
+            )
+        else:
+            return OperationResult(
+                success=False,
+                message=f"Failed to update server '{server_id}' in scope '{scope}'",
+            )
 
     def remove_server(self, server_id: str, scope: str) -> OperationResult:
         """Remove a server from the specified scope.
 
         Args:
             server_id: Server identifier
-            scope: Source scope name
+            scope: Target scope name
 
         Returns:
             Operation result
         """
         if not self.has_scope(scope):
-            available = ", ".join(self.get_scope_names())
-            return OperationResult.failure_result(
-                f"Unknown scope '{scope}' for client '{self.name}'. Available: {available}"
-            )
+            return OperationResult(success=False, message=f"Unknown scope: {scope}")
 
         handler = self._scopes[scope]
-        return handler.remove_server(server_id)
+
+        # Remove the server
+        result = handler.remove_server(server_id)
+
+        if result:
+            return OperationResult(
+                success=True,
+                message=f"Server '{server_id}' removed from scope '{scope}'",
+            )
+        else:
+            return OperationResult(
+                success=False,
+                message=f"Failed to remove server '{server_id}' from scope '{scope}'",
+            )
+
+    def enable_server(
+        self, server_id: str, scope: Optional[str] = None
+    ) -> OperationResult:
+        """Enable a disabled server in the specified scope.
+
+        Args:
+            server_id: Server identifier
+            scope: Optional target scope name. If not provided, auto-detects scope.
+
+        Returns:
+            Operation result
+        """
+        # Auto-detect scope if not provided
+        if scope is None:
+            info = self.get_server_info(server_id)
+            if not info:
+                return OperationResult(
+                    success=False,
+                    message=f"Server '{server_id}' not found in any scope",
+                )
+            scope = info.scope
+
+        if not self.has_scope(scope):
+            return OperationResult(success=False, message=f"Unknown scope: {scope}")
+
+        handler = self._scopes[scope]
+
+        # Check if this scope supports enable/disable
+        if (
+            not hasattr(handler, "enable_disable_handler")
+            or not handler.enable_disable_handler
+        ):
+            return OperationResult(
+                success=False,
+                message=f"Scope '{scope}' does not support enable/disable operations",
+            )
+
+        # Enable the server
+        result = handler.enable_disable_handler.enable_server(server_id)
+
+        if result:
+            return OperationResult(
+                success=True, message=f"Server '{server_id}' enabled in scope '{scope}'"
+            )
+        else:
+            return OperationResult(
+                success=False,
+                message=f"Failed to enable server '{server_id}' in scope '{scope}'",
+            )
+
+    def disable_server(
+        self, server_id: str, scope: Optional[str] = None
+    ) -> OperationResult:
+        """Disable an enabled server in the specified scope.
+
+        Args:
+            server_id: Server identifier
+            scope: Optional target scope name. If not provided, auto-detects scope.
+
+        Returns:
+            Operation result
+        """
+        # Auto-detect scope if not provided
+        if scope is None:
+            info = self.get_server_info(server_id)
+            if not info:
+                return OperationResult(
+                    success=False,
+                    message=f"Server '{server_id}' not found in any scope",
+                )
+            scope = info.scope
+
+        if not self.has_scope(scope):
+            return OperationResult(success=False, message=f"Unknown scope: {scope}")
+
+        handler = self._scopes[scope]
+
+        # Check if this scope supports enable/disable
+        if (
+            not hasattr(handler, "enable_disable_handler")
+            or not handler.enable_disable_handler
+        ):
+            return OperationResult(
+                success=False,
+                message=f"Scope '{scope}' does not support enable/disable operations",
+            )
+
+        # Disable the server
+        result = handler.enable_disable_handler.disable_server(server_id)
+
+        if result:
+            return OperationResult(
+                success=True,
+                message=f"Server '{server_id}' disabled in scope '{scope}'",
+            )
+        else:
+            return OperationResult(
+                success=False,
+                message=f"Failed to disable server '{server_id}' in scope '{scope}'",
+            )
 
     def get_server_state(self, server_id: str) -> ServerState:
         """Get the current state of a server.
+
+        Searches all scopes to find the server and returns its state.
+        Uses highest priority scope if server exists in multiple scopes.
 
         Args:
             server_id: Server identifier
@@ -337,206 +505,45 @@ class ClaudeCodePlugin(MCPClientPlugin):
         Returns:
             Current server state
         """
-        # Find server across all scopes first
-        server_exists = False
-        server_scope = None
-        for scope_name, handler in self._scopes.items():
-            if handler.has_server(server_id):
-                server_exists = True
-                server_scope = scope_name
-                break
+        # Get server info from all scopes (will use highest priority)
+        info = self.get_server_info(server_id)
 
-        if not server_exists:
+        if info:
+            return info.state
+        else:
             return ServerState.NOT_INSTALLED
 
-        # Use the same logic as _get_server_state to check enabled/disabled arrays
-        # BUG-FIX: Pass the server's actual scope
-        return self._get_server_state(server_id, server_scope)
-
-    def enable_server(self, server_id: str) -> OperationResult:
-        """Enable a server in its current scope.
-
-        Uses scope-specific enable/disable handlers:
-        - project-local, user-local: Modifies enabledMcpjsonServers/disabledMcpjsonServers arrays
-        - user-global: Removes from separate disabled tracking file (~/.claude/.mcpi-disabled-servers.json)
-        - Other scopes: Don't support enable/disable (return success as already enabled)
+    def get_server_info(
+        self, server_id: str, scope: Optional[str] = None
+    ) -> Optional[ServerInfo]:
+        """Get information about a specific server.
 
         Args:
             server_id: Server identifier
+            scope: Optional scope to search in
 
         Returns:
-            Operation result
+            Server information if found, None otherwise
         """
-        # Find the server's actual scope
-        server_scope = None
-        for scope_name, handler in self._scopes.items():
-            if handler.has_server(server_id):
-                server_scope = scope_name
-                break
+        servers = self.list_servers(scope)
 
-        if not server_scope:
-            return OperationResult.failure_result(
-                f"Server '{server_id}' not found in any scope"
-            )
+        # Look for the server in the results
+        for qualified_id, info in servers.items():
+            if info.id == server_id:
+                # If scope specified, must match
+                if scope and info.scope != scope:
+                    continue
+                return info
 
-        # Get the scope handler
-        handler = self._scopes[server_scope]
+        return None
 
-        # Check if this scope supports enable/disable
-        if (
-            not hasattr(handler, "enable_disable_handler")
-            or not handler.enable_disable_handler
-        ):
-            # Scopes without enable/disable support have servers always enabled
-            return OperationResult.success_result(
-                f"Server '{server_id}' in scope '{server_scope}' is always enabled "
-                f"(scope does not support enable/disable)"
-            )
-
-        # Use the scope's enable/disable handler
-        if handler.enable_disable_handler.enable(server_id):
-            return OperationResult.success_result(
-                f"Enabled server '{server_id}' in scope '{server_scope}'"
-            )
-        else:
-            return OperationResult.failure_result(
-                f"Failed to enable server '{server_id}' in scope '{server_scope}'"
-            )
-
-    def disable_server(self, server_id: str) -> OperationResult:
-        """Disable a server in its current scope.
-
-        Uses scope-specific enable/disable handlers:
-        - project-local, user-local: Modifies enabledMcpjsonServers/disabledMcpjsonServers arrays
-        - user-global: Writes to separate disabled tracking file (~/.claude/.mcpi-disabled-servers.json)
-        - Other scopes: Don't support disable (return failure)
+    def get_scope_handler(self, scope: str) -> Optional[ScopeHandler]:
+        """Get a specific scope handler.
 
         Args:
-            server_id: Server identifier
+            scope: Scope name
 
         Returns:
-            Operation result
+            Scope handler if found, None otherwise
         """
-        # Find the server's actual scope
-        server_scope = None
-        for scope_name, handler in self._scopes.items():
-            if handler.has_server(server_id):
-                server_scope = scope_name
-                break
-
-        if not server_scope:
-            return OperationResult.failure_result(
-                f"Server '{server_id}' not found in any scope"
-            )
-
-        # Get the scope handler
-        handler = self._scopes[server_scope]
-
-        # Check if this scope supports enable/disable
-        if (
-            not hasattr(handler, "enable_disable_handler")
-            or not handler.enable_disable_handler
-        ):
-            return OperationResult.failure_result(
-                f"Scope '{server_scope}' does not support enable/disable operations"
-            )
-
-        # Use the scope's enable/disable handler
-        if handler.enable_disable_handler.disable(server_id):
-            return OperationResult.success_result(
-                f"Disabled server '{server_id}' in scope '{server_scope}'"
-            )
-        else:
-            return OperationResult.failure_result(
-                f"Failed to disable server '{server_id}' in scope '{server_scope}'"
-            )
-
-    def validate_server_config(self, config: ServerConfig) -> List[str]:
-        """Validate server configuration for Claude Code.
-
-        Args:
-            config: Server configuration to validate
-
-        Returns:
-            List of validation errors (empty if valid)
-        """
-        errors = super().validate_server_config(config)
-
-        # Claude Code specific validations
-        if config.type and config.type not in ["stdio", "websocket", "http"]:
-            errors.append(
-                f"Invalid server type '{config.type}'. Must be one of: stdio, websocket, http"
-            )
-
-        # Validate command accessibility
-        if config.command:
-            # Check for common Claude Code MCP server patterns
-            if config.command.startswith("npx") and not config.args:
-                errors.append("NPX commands should specify a package in args")
-
-            if config.command == "python" and not any(
-                arg.startswith("-m") for arg in config.args
-            ):
-                errors.append("Python commands should use module syntax (-m package)")
-
-        return errors
-
-    def get_primary_scope(self) -> str:
-        """Get the primary scope for this client.
-
-        Returns:
-            Primary scope name (user-mcp for Claude Code)
-        """
-        return "user-mcp"
-
-    def get_project_scopes(self) -> List[str]:
-        """Get all project-level scopes.
-
-        Returns:
-            List of project-level scope names
-        """
-        return [scope.name for scope in self.get_scopes() if scope.is_project_level]
-
-    def get_user_scopes(self) -> List[str]:
-        """Get all user-level scopes.
-
-        Returns:
-            List of user-level scope names
-        """
-        return [scope.name for scope in self.get_scopes() if scope.is_user_level]
-
-    def is_installed(self) -> bool:
-        """Check if Claude Code is installed.
-
-        Returns:
-            True if Claude Code appears to be installed
-        """
-        # Check for Claude Code installation by looking for config directory
-        claude_dir = Path.home() / ".claude"
-        return claude_dir.exists()
-
-    def get_installation_info(self) -> Dict[str, Any]:
-        """Get information about Claude Code installation.
-
-        Returns:
-            Dictionary with installation information
-        """
-        info = {
-            "client": self.name,
-            "installed": self.is_installed(),
-            "config_dir": str(Path.home() / ".claude"),
-            "scopes": {},
-        }
-
-        # Check each scope's existence
-        for scope_name, handler in self._scopes.items():
-            info["scopes"][scope_name] = {
-                "path": str(handler.config.path),
-                "exists": handler.exists(),
-                "description": handler.config.description,
-                "priority": handler.config.priority,
-                "is_user_level": handler.config.is_user_level,
-                "is_project_level": handler.config.is_project_level,
-            }
-
-        return info
+        return self._scopes.get(scope)
