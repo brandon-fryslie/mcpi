@@ -50,7 +50,7 @@ pytest
 pytest --cov=src/mcpi
 
 # Run specific test file or class
-pytest tests/test_registry.py
+pytest tests/test_catalog.py
 pytest tests/test_cli_scope_features.py::TestDynamicScopeType
 
 # Run tests with verbose output and short traceback
@@ -59,11 +59,11 @@ pytest -v --tb=short
 # Run with PYTHONPATH set (for when imports fail)
 PYTHONPATH=src uv run pytest tests/test_cli_scope_features.py::TestDynamicScopeType -v --tb=short
 
-# Validate registry data (integration tests for data/registry.json)
+# Validate catalog data (integration tests for data/catalog.json)
 pytest tests/test_registry_integration.py -v
 ```
 
-**Registry Validation**: The test suite includes integration tests that validate the actual `data/registry.json` file through multiple layers (JSON syntax, CUE schema, Pydantic models, semantic validation). This eliminates the need for ad-hoc validation commands. See `.agent_planning/REGISTRY_VALIDATION_TESTING.md` for details.
+**Catalog Validation**: The test suite includes integration tests that validate the actual `data/catalog.json` file through multiple layers (JSON syntax, CUE schema, Pydantic models, semantic validation). This eliminates the need for ad-hoc validation commands.
 
 ### Code Quality
 ```bash
@@ -159,7 +159,7 @@ The project uses GitHub Actions for continuous integration and quality assurance
 ### Quality Gates
 
 **Blocking (Must Pass)**:
-- All tests must pass (currently ~85% pass rate expected)
+- All tests must pass
 - Black formatting must be clean
 
 **Non-Blocking (Warnings Only)**:
@@ -194,28 +194,6 @@ ruff check src/ tests/ --fix
 pytest --tb=no -q
 ```
 
-### Viewing CI Results
-
-**GitHub Actions UI**:
-1. Navigate to repository on GitHub
-2. Click "Actions" tab
-3. Select workflow run to view results
-4. Download coverage report from artifacts
-
-**Status Badge**:
-The README displays a CI status badge showing the current build status.
-
-### Python Version Support
-
-**Current**: Python 3.12+ (as specified in `pyproject.toml`)
-
-**CI Testing**: Tests on both Python 3.12 and 3.13
-
-**Future**: To support older Python versions (3.9-3.11), update:
-1. `requires-python` in `pyproject.toml`
-2. `python-version` matrix in `.github/workflows/test.yml`
-3. Test and fix any compatibility issues
-
 ## Project Architecture
 
 MCPI (Model Context Protocol Interface) is a command-line tool and Python library for managing MCP servers across different MCP-compatible clients. The architecture uses a **plugin-based design** with scope-based configuration management.
@@ -228,7 +206,7 @@ The system uses a plugin architecture where each MCP client (Claude Code, Cursor
 
 - `base.py`: Abstract base classes (`MCPClientPlugin`, `ScopeHandler`)
 - `file_based.py`: Reusable file-based scope implementations (`FileBasedScope`, `JSONFileReader`, `JSONFileWriter`)
-- `claude_code.py`: Claude Code plugin with 4 configuration scopes
+- `claude_code.py`: Claude Code plugin with 6 configuration scopes
 - `protocols.py`: Protocol definitions for dependency injection
 - `types.py`: Shared type definitions (`ServerInfo`, `ServerConfig`, `ServerState`, `OperationResult`)
 - `manager.py`: Main `MCPManager` orchestrating all clients
@@ -243,19 +221,28 @@ Each client plugin defines multiple configuration scopes (e.g., project-level, u
 3. **File-Based Implementation**: Most scopes use file-based configuration with JSON/YAML support
 4. **Schema Validation**: Each scope validates against a schema (located in `clients/schemas/`)
 
-**Registry System (`mcpi.registry/`)**
+**Server Catalog System (`mcpi.registry/`)**
 
-- `catalog.py`: Server catalog with Pydantic models (`MCPServer`)
+- `catalog.py`: Server catalog with Pydantic models (`MCPServer`, `ServerRegistry`)
 - `discovery.py`: Server search and discovery functionality
-- `validation.py`: Registry data validation
-- Data source: `data/registry.json` contains all known MCP servers
+- `validation.py`: Catalog data validation
+- `cue_validator.py`: CUE schema validation for catalog data
+- Data source: `data/catalog.json` contains all known MCP servers
 
 **CLI Interface (`mcpi.cli`)**
 
 - Click-based command structure with lazy initialization
 - Rich console output for enhanced user experience
 - Dynamic scope parameter type that validates based on selected client
-- Commands: `list`, `search`, `info`, `install`, `uninstall`, `status`, etc.
+- Commands: `list`, `search`, `info`, `add`, `remove`, `enable`, `disable`, `rescope`, etc.
+
+### Terminology: Catalog vs Registry
+
+**Important distinction**:
+- **Server Catalog** (`data/catalog.json`): The data file containing definitions of available MCP servers
+- **Client Registry** (`ClientRegistry` class): The registry of MCP client plugins (Claude Code, Cursor, VS Code)
+
+When updating code or documentation, use "catalog" when referring to the server data, and "registry" only when referring to the client plugin system.
 
 ### Key Design Patterns
 
@@ -272,7 +259,7 @@ Each client plugin defines multiple configuration scopes (e.g., project-level, u
 ### Data Flow
 
 1. **Client Detection**: `MCPManager` auto-detects installed clients (priority: claude-code, cursor, vscode)
-2. **Registry Loading**: `ServerCatalog` loads `data/registry.json` with available servers
+2. **Catalog Loading**: `ServerCatalog` loads `data/catalog.json` with available servers
 3. **Scope Resolution**: Plugin determines which scope to use based on CLI flags (--scope, --client)
 4. **Configuration Operations**: Scope handler reads/writes configuration files with validation
 5. **Installation**: Servers installed using method-specific commands (npx, npm, pip, uv, git)
@@ -304,14 +291,14 @@ MCPI follows the Dependency Inversion Principle to enable true unit testing, imp
 **Before (v1.x)**:
 ```python
 # Components created dependencies internally (hidden dependencies)
-catalog = ServerCatalog()  # Hardcoded path to data/registry.json
+catalog = ServerCatalog()  # Hardcoded path to data/catalog.json
 manager = MCPManager()      # Created ClientRegistry internally
 ```
 
 **After (v2.0)**:
 ```python
 # Dependencies must be injected explicitly
-catalog = ServerCatalog(registry_path=Path("data/registry.json"))
+catalog = ServerCatalog(catalog_path=Path("data/catalog.json"))
 manager = MCPManager(registry=ClientRegistry())
 
 # OR use factory functions (recommended)
@@ -339,7 +326,7 @@ from mcpi.clients.registry import ClientRegistry
 from pathlib import Path
 
 # Testing with custom dependencies
-test_catalog = ServerCatalog(registry_path=Path("/tmp/test.json"))
+test_catalog = ServerCatalog(catalog_path=Path("/tmp/test.json"))
 test_manager = MCPManager(registry=mock_registry)
 
 # Or use test factories
@@ -352,9 +339,9 @@ test_manager = create_test_manager(mock_registry)
 **Unit Testing** (No File I/O):
 ```python
 # Create catalog with explicit path to temp file
-test_path = tmp_path / "test-registry.json"
+test_path = tmp_path / "test-catalog.json"
 test_path.write_text(json.dumps({...}))
-catalog = ServerCatalog(registry_path=test_path)
+catalog = ServerCatalog(catalog_path=test_path)
 
 # Or use test factory
 catalog = create_test_catalog(test_path)
@@ -395,17 +382,69 @@ If updating code that uses MCPI as a library:
 - [ ] Use explicit injection for advanced use cases
 - [ ] Run tests to verify no regressions
 
-### Implementation Status
+## User-Global Disable Mechanism
 
-- ✅ Phase 1 (P0): ServerCatalog and MCPManager (Complete)
-- ⏳ Phase 2 (P1): ClaudeCodePlugin, FileBasedScope, etc. (5 items, 2-3 weeks)
-- ⏳ Phase 3 (P2): Medium priority components (4 items, 1-2 weeks)
-- ⏳ Phase 4 (P3): Low priority components (2 items, 1 week)
+### Overview
 
-See `.agent_planning/DIP_AUDIT-2025-11-07-010149.md` for complete audit details.
-- No!  I already explained how to implement this multiple times.  PLEASE DOCUMENT THIS IN A WAY IT WILL BE ACCESSIBLE FOREVER.  
-For user global mcp servers
-There is NO BUILT IN DISABLE MECHANISM
-WE WILL IMPLEMENT A CUSTOM DDisable mechanism .. Make a file. ~/.claude.disabled-mcp.json.  ThThis file will contain the configuration object from the ~/.claude.json FilFile for the disable MCP servers.  wwe will remove them from the current configuration and add them to this file.  ThiThis will indicate that they are disabled.  AAny MCP servers in this file will be counted as disabled in this scope.  TThe MCP servers in the main configuration file WilWill be considered enabled.  ThThe combination of the MCP servers defined in these two file files will be considered added.  WhWhen I run 'mcpi list' ItIt will display the combination of configurations from these files.  TThe configurations in the active file will be shown as enabled.  TThe configurations in the disabled-mcp.json FiFile WWill be shown as disabled.  RuRunning 'mcpi disable <server name>' WeWell, remove the configuration from the active configuration file and add it to the disabled-mcp.json file.  RuRunning 'mcpi enable <server name>' will remove it from the disabled-mcp.json file and add it to the active configuration file.
+For user-global MCP servers in Claude Code, there is NO built-in disable mechanism. MCPI implements a custom disable mechanism using a shadow configuration file.
 
-To To validate this functionality, Run 'claude mcp list'.  This will show the currently enabled mcp servers.  Note one of the values in this list.  Running 'mcpi list' must show all of these servers as enabled.  NO servers in the list shown by 'claude mcp list' should appear as 'enabled'.  NO servers in the user-global scope that are disabled should show in the list returned by 'claude mcp list'.  YOU ARE NOT FINISHED IMPLEMENTING THIS FUNCTIONALITY UNTIL THIS BEHAVIOR IS OBSERVED.  THIS IS THE TOP PRIORITY AND NO OTHER WORK, WITHOUT EXCEPTION, is to be done until this is completed 100%.  This means: the functionality works in manual testing in all cases, there are unit tests, integration tests, AND e2e tests around this functionality, AND around all edge cases, and most importantly ALL TESTS ARE PASSING.  100% test coverage AND 100% tests passing.
+### Implementation Design
+
+**Files**:
+- `~/.config/claude/settings.json`: Active (enabled) MCP servers
+- `~/.claude/disabled-mcp.json`: Disabled MCP servers (custom MCPI file)
+
+**Behavior**:
+1. **Enabled servers**: Stored in the active configuration file
+2. **Disabled servers**: Configuration moved from active file to disabled file
+3. **Added servers**: Combination of configurations from both files
+4. **State detection**: Servers in active file = enabled, servers in disabled file = disabled
+
+### Operations
+
+**Enable a server** (`mcpi enable <server-name>`):
+1. Remove server configuration from `~/.claude/disabled-mcp.json`
+2. Add server configuration to `~/.config/claude/settings.json`
+3. Result: Server appears in `claude mcp list` output
+
+**Disable a server** (`mcpi disable <server-name>`):
+1. Remove server configuration from `~/.config/claude/settings.json`
+2. Add server configuration to `~/.claude/disabled-mcp.json`
+3. Result: Server removed from `claude mcp list` output
+
+**List servers** (`mcpi list`):
+1. Read configurations from both active and disabled files
+2. Display combined list with state indicators (enabled/disabled)
+3. Show accurate state for each server
+
+### Validation Requirements
+
+**Critical validation**:
+- Running `claude mcp list` shows only enabled servers
+- Running `mcpi list` shows ALL servers (enabled + disabled) with correct state
+- No servers in user-global scope should appear as 'disabled' in `claude mcp list` output
+- Servers disabled via `mcpi disable` must not appear in `claude mcp list` output
+- Servers enabled via `mcpi enable` must appear in `claude mcp list` output
+
+**Test Coverage Requirements**:
+- Unit tests for enable/disable operations
+- Integration tests for file operations
+- End-to-end tests validating `claude mcp list` behavior
+- Edge case tests (already enabled, already disabled, non-existent server)
+- 100% test coverage for this functionality
+- 100% tests passing
+
+### Implementation Files
+
+- `src/mcpi/clients/file_move_enable_disable_handler.py`: Handler for file-based enable/disable
+- `src/mcpi/clients/claude_code.py`: Integration with Claude Code plugin
+- `tests/test_user_global_disable_mechanism.py`: Comprehensive test suite
+
+### Status
+
+This is the **TOP PRIORITY** feature. All work must be paused until:
+1. Functionality works correctly in manual testing
+2. All unit, integration, and E2E tests pass
+3. 100% test coverage achieved
+4. All edge cases handled
+5. Validation against `claude mcp list` succeeds

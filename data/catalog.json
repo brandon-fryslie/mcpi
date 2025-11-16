@@ -134,6 +134,15 @@
     ],
     "repository": "https://github.com/executeautomation/playwright-mcp-server"
   },
+  "peekaboo": {
+    "description": "Peekaboo MCP server",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@steipete/peekaboo-mcp@beta"
+    ],
+    "repository": "https://github.com/steipete/Peekaboo"
+  },
   "time": {
     "description": "Get current time and timezone information",
     "command": "npx",
