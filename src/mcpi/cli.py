@@ -1688,7 +1688,12 @@ def info(
 
 
 @main.command()
-@click.argument("query", required=False)
+@click.option(
+    "--query",
+    "-q",
+    required=True,
+    help="Search query (term to search for in server descriptions)",
+)
 @click.option(
     "--catalog",
     type=click.Choice(["official", "local"], case_sensitive=False),
@@ -1704,7 +1709,7 @@ def info(
 @click.pass_context
 def search(
     ctx: click.Context,
-    query: Optional[str],
+    query: str,
     catalog: Optional[str],
     all_catalogs: bool,
     limit: int,
@@ -1713,9 +1718,9 @@ def search(
     """Search for MCP servers in the registry.
 
     Examples:
-        mcpi search filesystem
-        mcpi search database --catalog local
-        mcpi search git --all-catalogs
+        mcpi search --query filesystem
+        mcpi search -q database --catalog local
+        mcpi search --query git --all-catalogs
     """
     try:
         # Validate mutually exclusive flags
@@ -1725,20 +1730,7 @@ def search(
         if all_catalogs:
             # Search all catalogs
             manager = get_catalog_manager(ctx)
-            results = manager.search_all(query) if query else []
-
-            if not query:
-                # List all servers from all catalogs
-                official = manager.get_catalog("official")
-                local = manager.get_catalog("local")
-
-                results = []
-                if official:
-                    for server_id, server in official.list_servers():
-                        results.append(("official", server_id, server))
-                if local:
-                    for server_id, server in local.list_servers():
-                        results.append(("local", server_id, server))
+            results = manager.search_all(query)
 
             # Limit results
             results = results[:limit]
@@ -1748,8 +1740,7 @@ def search(
                     import json
                     print(json.dumps([]))
                 else:
-                    query_msg = f"matching '{query}'" if query else ""
-                    console.print(f"[yellow]No servers found {query_msg}[/yellow]")
+                    console.print(f"[yellow]No servers found matching '{query}'[/yellow]")
                 return
 
             # Output JSON if requested
@@ -1795,10 +1786,7 @@ def search(
             cat = get_catalog(ctx, catalog)
 
             # Search servers (returns list of (server_id, MCPServer) tuples)
-            if query:
-                servers = cat.search_servers(query)
-            else:
-                servers = cat.list_servers()
+            servers = cat.search_servers(query)
 
             # Limit results
             servers = servers[:limit]
@@ -2013,7 +2001,7 @@ def catalog_info(ctx: click.Context, name: str) -> None:
             if len(servers) > 5:
                 console.print(f"  ... and {len(servers) - 5} more")
 
-        console.print(f"\nUse [cyan]mcpi search <query> --catalog {name}[/cyan] to search this catalog")
+        console.print(f"\nUse [cyan]mcpi search --query <term> --catalog {name}[/cyan] to search this catalog")
 
     except (SystemExit, click.exceptions.Exit):
         # Re-raise exit exceptions to preserve exit codes
