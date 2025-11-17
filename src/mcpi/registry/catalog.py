@@ -167,13 +167,23 @@ class ServerCatalog:
 
     def _load_json_catalog(self) -> None:
         """Load catalog from JSON format."""
-        try:
-            # Validate with CUE before loading if enabled
-            if self.validate_with_cue:
-                is_valid, error = self.cue_validator.validate_file(self.catalog_path)
-                if not is_valid:
-                    raise RuntimeError(f"Catalog validation failed: {error}")
+        # Check for JSON decode errors from CUE validation first
+        if self.validate_with_cue:
+            is_valid, error = self.cue_validator.validate_file(self.catalog_path)
+            if not is_valid:
+                # Check if it's a JSON decode error from CUE
+                if "invalid JSON" in error or "invalid character" in error:
+                    # Re-parse with json.load to get proper JSONDecodeError
+                    # This preserves the specific exception type for testing
+                    try:
+                        with open(self.catalog_path, encoding="utf-8") as f:
+                            json.load(f)  # This will raise JSONDecodeError
+                    except json.JSONDecodeError:
+                        # Let JSONDecodeError propagate as-is (don't wrap it)
+                        raise
+                raise RuntimeError(f"Catalog validation failed: {error}")
 
+        try:
             with open(self.catalog_path, encoding="utf-8") as f:
                 data = json.load(f)
             # Convert flat dictionary to ServerRegistry format
@@ -318,6 +328,10 @@ class ServerCatalog:
 def create_default_catalog(validate_with_cue: bool = True) -> ServerCatalog:
     """Create ServerCatalog with default production catalog path.
 
+    .. deprecated::
+        Use :func:`create_default_catalog_manager` for multi-catalog support.
+        This function is maintained for backward compatibility only.
+
     This factory function provides the default behavior that was previously
     in ServerCatalog.__init__. Use this for production code that needs
     the standard catalog location.
@@ -328,6 +342,15 @@ def create_default_catalog(validate_with_cue: bool = True) -> ServerCatalog:
     Returns:
         ServerCatalog instance configured with production catalog path
     """
+    import warnings
+
+    warnings.warn(
+        "create_default_catalog() is deprecated. "
+        "Use create_default_catalog_manager() from mcpi.registry.catalog_manager for multi-catalog support.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     # Calculate production catalog path
     package_dir = Path(__file__).parent.parent.parent.parent
     catalog_path = package_dir / "data" / "catalog.json"

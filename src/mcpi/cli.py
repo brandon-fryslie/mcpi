@@ -17,6 +17,7 @@ from mcpi.bundles.installer import BundleInstaller
 from mcpi.clients import ServerConfig, ServerState
 from mcpi.clients.manager import MCPManager, create_default_manager
 from mcpi.registry.catalog import ServerCatalog, create_default_catalog
+from mcpi.registry.catalog_manager import CatalogManager, create_default_catalog_manager
 
 console = Console()
 
@@ -71,23 +72,56 @@ def get_mcp_manager(ctx: click.Context):
     return ctx.obj["mcp_manager"]
 
 
-def get_catalog(ctx: click.Context):
-    """Lazy initialization of ServerCatalog using factory function."""
-    if "catalog" not in ctx.obj:
+def get_catalog_manager(ctx: click.Context) -> CatalogManager:
+    """Lazy initialization of CatalogManager using factory function.
+
+    Returns:
+        CatalogManager instance for managing multiple catalogs
+    """
+    if "catalog_manager" not in ctx.obj:
         try:
-            # Use factory function for default registry path
-            ctx.obj["catalog"] = create_default_catalog()
-            ctx.obj["catalog"].load_catalog()
+            ctx.obj["catalog_manager"] = create_default_catalog_manager()
         except Exception as e:
             if ctx.obj.get("verbose", False):
-                console.print(f"[red]Catalog initialization error: {e}[/red]")
+                console.print(f"[red]Catalog manager initialization error: {e}[/red]")
                 import traceback
 
                 console.print(traceback.format_exc())
             else:
-                console.print(f"[red]Failed to initialize server catalog: {e}[/red]")
+                console.print(f"[red]Failed to initialize catalog manager: {e}[/red]")
             sys.exit(1)
-    return ctx.obj["catalog"]
+    return ctx.obj["catalog_manager"]
+
+
+def get_catalog(
+    ctx: click.Context, catalog_name: Optional[str] = None
+) -> ServerCatalog:
+    """Get catalog by name (defaults to official catalog).
+
+    Args:
+        ctx: Click context
+        catalog_name: Catalog name ("official" or "local"), or None for default
+
+    Returns:
+        ServerCatalog instance
+
+    Raises:
+        click.ClickException: If catalog_name is invalid
+    """
+    manager = get_catalog_manager(ctx)
+
+    if catalog_name is None:
+        # Default behavior: return official catalog
+        return manager.get_default_catalog()
+
+    # Lookup specific catalog
+    catalog = manager.get_catalog(catalog_name)
+    if catalog is None:
+        raise click.ClickException(
+            f"Unknown catalog: '{catalog_name}'. Available catalogs: official, local"
+        )
+
+    return catalog
 
 
 def get_bundle_catalog(ctx: click.Context):
@@ -493,12 +527,8 @@ def complete_server_ids(
             return completions[:50]
 
         # For add and other commands, show servers from registry
-        # Initialize catalog if not present
-        if "catalog" not in ctx.obj:
-            ctx.obj["catalog"] = create_default_catalog()
-            ctx.obj["catalog"].load_catalog()
-
-        catalog = ctx.obj["catalog"]
+        # Initialize catalog manager if not present (use new multi-catalog context)
+        catalog = get_catalog(ctx)
         servers = catalog.list_servers()
 
         # Filter and limit results
@@ -1926,9 +1956,7 @@ def install_bundle(
 
         console.print()
         if dry_run:
-            console.print(
-                f"[yellow]Dry-run complete. No changes made.[/yellow]"
-            )
+            console.print(f"[yellow]Dry-run complete. No changes made.[/yellow]")
         elif failure_count == 0:
             console.print(
                 f"[green]Successfully installed all {success_count} servers![/green]"
