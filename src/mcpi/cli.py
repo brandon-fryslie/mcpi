@@ -143,6 +143,30 @@ def get_bundle_catalog(ctx: click.Context):
     return ctx.obj["bundle_catalog"]
 
 
+def get_template_manager(ctx: click.Context):
+    """Lazy initialization of TemplateManager using factory function.
+
+    This is lazy-loaded to avoid performance penalty on CLI startup.
+    Only imported and initialized when template-related operations are used.
+    """
+    if "template_manager" not in ctx.obj:
+        try:
+            # Import here to avoid import cost on CLI startup
+            from mcpi.templates.template_manager import create_default_template_manager
+
+            ctx.obj["template_manager"] = create_default_template_manager()
+        except Exception as e:
+            if ctx.obj.get("verbose", False):
+                console.print(f"[red]Template manager initialization error: {e}[/red]")
+                import traceback
+
+                console.print(traceback.format_exc())
+            else:
+                console.print(f"[red]Failed to initialize template manager: {e}[/red]")
+            sys.exit(1)
+    return ctx.obj["template_manager"]
+
+
 def get_registry_manager(ctx: click.Context) -> ServerCatalog:
     """Get the server catalog (backward compat alias)."""
     return get_catalog(ctx)
@@ -971,6 +995,15 @@ def list(
     help="Target scope (available scopes depend on client, uses primary scope if not specified)",
 )
 @click.option(
+    "--template",
+    help="Use a configuration template (e.g., 'production', 'development')",
+)
+@click.option(
+    "--list-templates",
+    is_flag=True,
+    help="List available templates for this server",
+)
+@click.option(
     "--dry-run", is_flag=True, help="Show what would be done without making changes"
 )
 @click.pass_context
@@ -980,6 +1013,8 @@ def add(
     catalog: Optional[str],
     client: Optional[str],
     scope: Optional[str],
+    template: Optional[str],
+    list_templates: bool,
     dry_run: bool,
 ) -> None:
     """Add an MCP server from the registry.
@@ -988,6 +1023,8 @@ def add(
         mcpi add filesystem
         mcpi add my-server --catalog local
         mcpi add filesystem --scope project-mcp
+        mcpi add postgres --list-templates
+        mcpi add postgres --template production
     """
     verbose = ctx.obj.get("verbose", False)
 
@@ -1003,7 +1040,63 @@ def add(
         # Get server info from catalog
         server = cat.get_server(server_id)
         if not server:
-            console.print(f"[red]Server '{server_id}' not found in {catalog or 'official'} catalog[/red]")
+            console.print(
+                f"[red]Server '{server_id}' not found in {catalog or 'official'} catalog[/red]"
+            )
+            return
+
+        # Handle --list-templates flag
+        if list_templates:
+            template_manager = get_template_manager(ctx)
+            templates = template_manager.list_templates(server_id)
+
+            if not templates:
+                console.print(
+                    f"[yellow]No templates available for '{server_id}'[/yellow]"
+                )
+                console.print(
+                    f"[dim]Use 'mcpi add {server_id}' to install with default configuration[/dim]"
+                )
+                return
+
+            # Display templates in a Rich table
+            table = Table(title=f"Available Templates for '{server_id}'")
+            table.add_column("Name", style="cyan", no_wrap=True)
+            table.add_column("Priority", style="magenta")
+            table.add_column("Scope", style="blue")
+            table.add_column("Description", style="white")
+
+            for tmpl in templates:
+                table.add_row(tmpl.name, tmpl.priority, tmpl.scope, tmpl.description)
+
+            console.print(table)
+            console.print(
+                f"\n[dim]Use --template <name> to install with a template[/dim]"
+            )
+            return
+
+        # Handle --template flag
+        if template:
+            # Validate template exists
+            template_manager = get_template_manager(ctx)
+            template_obj = template_manager.get_template(server_id, template)
+
+            if not template_obj:
+                console.print(
+                    f"[red]Template '{template}' not found for server '{server_id}'[/red]"
+                )
+                console.print(
+                    f"[dim]Run 'mcpi add {server_id} --list-templates' to see available templates[/dim]"
+                )
+                return
+
+            # TODO: TMPL-005 will implement interactive prompts here
+            # For now, we just show what would happen
+            console.print(f"[yellow]Template support is not yet implemented[/yellow]")
+            console.print(
+                f"[yellow]Template '{template}' found but interactive prompts not yet available[/yellow]"
+            )
+            console.print(f"[dim]This feature will be completed in TMPL-005[/dim]")
             return
 
         # If no scope specified, show interactive menu (unless in dry-run mode)
@@ -1541,7 +1634,9 @@ def info(
             registry_info = cat.get_server(server_id)
 
             if not registry_info:
-                error_msg = f"Server '{server_id}' not found in {catalog or 'official'} catalog"
+                error_msg = (
+                    f"Server '{server_id}' not found in {catalog or 'official'} catalog"
+                )
                 if plain:
                     console.print(error_msg)
                 else:
@@ -1872,12 +1967,7 @@ def catalog_list(ctx: click.Context) -> None:
         table.add_column("Description", style="white")
 
         for cat in catalogs:
-            table.add_row(
-                cat.name,
-                cat.type,
-                str(cat.server_count),
-                cat.description
-            )
+            table.add_row(cat.name, cat.type, str(cat.server_count), cat.description)
 
         console.print(table)
         console.print(f"\nUse [cyan]mcpi catalog info <name>[/cyan] for details")
@@ -1910,10 +2000,12 @@ def catalog_info(ctx: click.Context, name: str) -> None:
 
         # Display using Rich
         # Catalog header
-        console.print(Panel(
-            f"[bold cyan]{name}[/bold cyan] catalog\n{cat.catalog_path}",
-            title="Catalog Information"
-        ))
+        console.print(
+            Panel(
+                f"[bold cyan]{name}[/bold cyan] catalog\n{cat.catalog_path}",
+                title="Catalog Information",
+            )
+        )
 
         # Stats
         console.print(f"\n[bold]Statistics:[/bold]")
@@ -1936,7 +2028,9 @@ def catalog_info(ctx: click.Context, name: str) -> None:
             if len(servers) > 5:
                 console.print(f"  ... and {len(servers) - 5} more")
 
-        console.print(f"\nUse [cyan]mcpi search --query <term> --catalog {name}[/cyan] to search this catalog")
+        console.print(
+            f"\nUse [cyan]mcpi search --query <term> --catalog {name}[/cyan] to search this catalog"
+        )
 
     except (SystemExit, click.exceptions.Exit):
         # Re-raise exit exceptions to preserve exit codes
