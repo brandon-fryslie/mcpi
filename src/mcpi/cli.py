@@ -11,6 +11,9 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
+from mcpi.bundles import create_default_bundle_catalog
+from mcpi.bundles.catalog import BundleCatalog
+from mcpi.bundles.installer import BundleInstaller
 from mcpi.clients import ServerConfig, ServerState
 from mcpi.clients.manager import MCPManager, create_default_manager
 from mcpi.registry.catalog import ServerCatalog, create_default_catalog
@@ -85,6 +88,24 @@ def get_catalog(ctx: click.Context):
                 console.print(f"[red]Failed to initialize server catalog: {e}[/red]")
             sys.exit(1)
     return ctx.obj["catalog"]
+
+
+def get_bundle_catalog(ctx: click.Context):
+    """Lazy initialization of BundleCatalog using factory function."""
+    if "bundle_catalog" not in ctx.obj:
+        try:
+            # Use factory function for default bundles directory
+            ctx.obj["bundle_catalog"] = create_default_bundle_catalog()
+        except Exception as e:
+            if ctx.obj.get("verbose", False):
+                console.print(f"[red]Bundle catalog initialization error: {e}[/red]")
+                import traceback
+
+                console.print(traceback.format_exc())
+            else:
+                console.print(f"[red]Failed to initialize bundle catalog: {e}[/red]")
+            sys.exit(1)
+    return ctx.obj["bundle_catalog"]
 
 
 def get_registry_manager(ctx: click.Context) -> ServerCatalog:
@@ -1737,6 +1758,195 @@ def status(ctx: click.Context, output_json: bool) -> None:
 
     except Exception as e:
         console.print(f"[red]Error getting status: {e}[/red]")
+
+
+# BUNDLE MANAGEMENT COMMANDS
+
+
+@main.group()
+@click.pass_context
+def bundle(ctx: click.Context) -> None:
+    """Manage MCP server bundles."""
+    pass
+
+
+@bundle.command("list")
+@click.pass_context
+def list_bundles(ctx: click.Context) -> None:
+    """List available server bundles."""
+    try:
+        catalog = get_bundle_catalog(ctx)
+        bundles = catalog.list_bundles()
+
+        if not bundles:
+            console.print("[yellow]No bundles available[/yellow]")
+            return
+
+        table = Table(title="Available Server Bundles")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_column("Servers", style="magenta")
+        table.add_column("Suggested Scope", style="blue")
+
+        for bundle_name, bundle in bundles:
+            server_count = len(bundle.servers)
+            table.add_row(
+                bundle_name,
+                (
+                    bundle.description[:60] + "..."
+                    if len(bundle.description) > 60
+                    else bundle.description
+                ),
+                str(server_count),
+                bundle.suggested_scope,
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error listing bundles: {e}[/red]")
+
+
+@bundle.command("info")
+@click.argument("bundle_id")
+@click.pass_context
+def bundle_info(ctx: click.Context, bundle_id: str) -> None:
+    """Show detailed information about a bundle."""
+    try:
+        catalog = get_bundle_catalog(ctx)
+        bundle = catalog.get_bundle(bundle_id)
+
+        if not bundle:
+            console.print(f"[red]Bundle '{bundle_id}' not found[/red]")
+            console.print(
+                "\n[dim]Run 'mcpi bundle list' to see available bundles[/dim]"
+            )
+            ctx.exit(1)
+
+        # Build info panel
+        info_text = f"[bold]Name:[/bold] {bundle.name}\n"
+        info_text += f"[bold]Description:[/bold] {bundle.description}\n"
+        info_text += f"[bold]Version:[/bold] {bundle.version}\n"
+        if bundle.author:
+            info_text += f"[bold]Author:[/bold] {bundle.author}\n"
+        info_text += f"[bold]Suggested Scope:[/bold] {bundle.suggested_scope}\n"
+        info_text += f"\n[bold]Servers ({len(bundle.servers)}):[/bold]\n"
+
+        for server in bundle.servers:
+            info_text += f"  • {server.id}"
+            if server.config:
+                info_text += " [dim](custom config)[/dim]"
+            info_text += "\n"
+
+        console.print(Panel(info_text, title=f"Bundle: {bundle_id}"))
+
+    except (SystemExit, click.exceptions.Exit):
+        # Re-raise exit exceptions to preserve exit codes
+        raise
+    except Exception as e:
+        console.print(f"[red]Error getting bundle info: {e}[/red]")
+
+
+@bundle.command("install")
+@click.argument("bundle_id")
+@click.option(
+    "--scope",
+    type=DynamicScopeType(),
+    help="Target scope (uses bundle's suggested scope if not specified)",
+)
+@click.option(
+    "--client",
+    shell_complete=complete_client_names,
+    help="Target client (uses default if not specified)",
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be installed without installing"
+)
+@click.pass_context
+def install_bundle(
+    ctx: click.Context,
+    bundle_id: str,
+    scope: Optional[str],
+    client: Optional[str],
+    dry_run: bool,
+) -> None:
+    """Install all servers from a bundle."""
+    verbose = ctx.obj.get("verbose", False)
+
+    try:
+        # Get components
+        bundle_catalog = get_bundle_catalog(ctx)
+        server_catalog = get_catalog(ctx)
+        manager = get_mcp_manager(ctx)
+
+        # Get bundle
+        bundle = bundle_catalog.get_bundle(bundle_id)
+        if not bundle:
+            console.print(f"[red]Bundle '{bundle_id}' not found[/red]")
+            console.print(
+                "\n[dim]Run 'mcpi bundle list' to see available bundles[/dim]"
+            )
+            ctx.exit(1)
+
+        # Determine target scope
+        target_scope = scope or bundle.suggested_scope
+        target_client = client or manager.default_client
+
+        # Show bundle info
+        console.print(f"\n[bold]Bundle:[/bold] {bundle.name}")
+        console.print(f"[bold]Description:[/bold] {bundle.description}")
+        console.print(f"[bold]Servers:[/bold] {len(bundle.servers)}")
+        console.print(f"[bold]Target Client:[/bold] {target_client}")
+        console.print(f"[bold]Target Scope:[/bold] {target_scope}\n")
+
+        # Create installer
+        installer = BundleInstaller(manager=manager, catalog=server_catalog)
+
+        # Install bundle
+        console.print(
+            f"[blue]{'[DRY-RUN] ' if dry_run else ''}Installing bundle '{bundle_id}'...[/blue]\n"
+        )
+
+        results = installer.install_bundle(
+            bundle=bundle,
+            scope=target_scope,
+            client_name=target_client,
+            dry_run=dry_run,
+        )
+
+        # Display results
+        success_count = sum(1 for r in results if r.success)
+        failure_count = len(results) - success_count
+
+        for result in results:
+            if result.success:
+                console.print(f"[green]✓[/green] {result.message}")
+            else:
+                console.print(f"[red]✗[/red] {result.message}")
+
+        console.print()
+        if dry_run:
+            console.print(
+                f"[yellow]Dry-run complete. No changes made.[/yellow]"
+            )
+        elif failure_count == 0:
+            console.print(
+                f"[green]Successfully installed all {success_count} servers![/green]"
+            )
+        else:
+            console.print(
+                f"[yellow]Installed {success_count} servers, {failure_count} failed[/yellow]"
+            )
+
+    except Exception as e:
+        if verbose:
+            console.print(f"[red]Error installing bundle: {e}[/red]")
+            import traceback
+
+            console.print(traceback.format_exc())
+        else:
+            console.print(f"[red]Failed to install bundle: {e}[/red]")
+        ctx.exit(1)
 
 
 # FZF TUI COMMAND
