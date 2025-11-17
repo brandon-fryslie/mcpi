@@ -1090,14 +1090,38 @@ def add(
                 )
                 return
 
-            # TODO: TMPL-005 will implement interactive prompts here
-            # For now, we just show what would happen
-            console.print(f"[yellow]Template support is not yet implemented[/yellow]")
-            console.print(
-                f"[yellow]Template '{template}' found but interactive prompts not yet available[/yellow]"
-            )
-            console.print(f"[dim]This feature will be completed in TMPL-005[/dim]")
-            return
+            # Collect template values via interactive prompts
+            try:
+                from mcpi.templates.prompt_handler import collect_template_values
+
+                # Collect user input for template parameters
+                user_values = collect_template_values(template_obj)
+
+                # Apply template with user values to create configuration
+                config = template_manager.apply_template(template_obj, user_values)
+
+                # Use template's recommended scope if none specified
+                if not scope:
+                    scope = template_obj.scope
+                    console.print(
+                        f"[dim]Using template's recommended scope: {scope}[/dim]\n"
+                    )
+
+                # Skip default config creation - we have config from template
+
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Setup cancelled by user[/yellow]")
+                return
+            except Exception as e:
+                console.print(f"[red]Error collecting template values: {e}[/red]")
+                if verbose:
+                    import traceback
+
+                    console.print(traceback.format_exc())
+                return
+        else:
+            # No template - flag to create default config below
+            config = None
 
         # If no scope specified, show interactive menu (unless in dry-run mode)
         if not scope:
@@ -1156,10 +1180,11 @@ def add(
             )
             return
 
-        # Create server configuration from the new structure
-        config = ServerConfig(
-            command=server.command, args=server.args, env={}, type="stdio"
-        )
+        # Create server configuration (if not already created by template)
+        if config is None:
+            config = ServerConfig(
+                command=server.command, args=server.args, env={}, type="stdio"
+            )
 
         # Show server info
         if not ctx.obj.get("dry_run", False):
