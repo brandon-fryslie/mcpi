@@ -180,5 +180,14 @@
     "env": {
       "PATTERNS_DIR": "/Users/bmf/icode/design-pattern-mcp/corpus"
     }
+  },
+  "xcodebuildmcp": {
+    "description": "Xcode project management, simulator control, and Swift package tools for AI assistants",
+    "command": "npx",
+    "args": [
+      "-y",
+      "xcodebuildmcp@latest"
+    ],
+    "repository": "https://github.com/cameroncooke/XcodeBuildMCP"
   }
 }
