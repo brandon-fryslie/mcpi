@@ -9,6 +9,7 @@ A command-line tool for managing Model Context Protocol (MCP) servers across dif
 ## Features
 
 - **Comprehensive Registry**: Catalog of known MCP servers with metadata
+- **Multi-Catalog Support**: Official catalog + your local custom catalog
 - **Scope-Based Configuration**: Manage servers across multiple configuration scopes (project-level, user-level)
 - **Multi-Client Support**: Works with Claude Code, Cursor, VS Code, and other MCP clients
 - **CLI Interface**: Intuitive command-line interface with shell tab completion
@@ -41,11 +42,62 @@ source .venv/bin/activate
 ### Discover MCP Servers
 ```bash
 # Search for specific functionality
-mcpi search filesystem
+mcpi search --query filesystem
 
 # Get detailed information about a server (shows registry + install status)
 mcpi info filesystem
 ```
+
+## Multiple Catalogs
+
+MCPI v0.4.0+ supports multiple catalogs for organizing MCP servers:
+
+### View Available Catalogs
+
+```bash
+# List all catalogs
+mcpi catalog list
+
+# View catalog details
+mcpi catalog info official
+mcpi catalog info local
+```
+
+### Search Across Catalogs
+
+```bash
+# Search official catalog (default)
+mcpi search --query filesystem
+
+# Search local catalog
+mcpi search --query myserver --catalog local
+
+# Search all catalogs
+mcpi search --query database --all-catalogs
+```
+
+### Use Your Local Catalog
+
+Add custom servers to your local catalog at `~/.mcpi/catalogs/local/catalog.json`:
+
+```bash
+# Add a server definition to local catalog
+# Then use it with --catalog local flag
+mcpi add myserver --catalog local --scope user-global
+```
+
+Your local catalog is separate from the official catalog, so your customizations won't be affected by updates.
+
+### FAQ
+
+**Q: Where is my local catalog stored?**
+A: `~/.mcpi/catalogs/local/catalog.json` (created automatically on first use)
+
+**Q: Can I have more than 2 catalogs?**
+A: Not in v0.4.0 (Phase 1). Phase 2 will add git-based remote catalogs.
+
+**Q: Do my existing commands still work?**
+A: Yes! 100% backward compatible. The --catalog flag is optional.
 
 ### Manage Installed Servers
 ```bash
@@ -139,22 +191,51 @@ Each MCP client (Claude Code, Cursor, VS Code) is implemented as a **plugin** th
 
 ## CLI Commands
 
-### Discovery Commands
+### Catalog Management Commands
 
-#### `mcpi search <query>`
-Search for servers by name or description in the registry.
+#### `mcpi catalog list`
+List all available catalogs.
 
 ```bash
-mcpi search filesystem
-mcpi search "database operations"
+mcpi catalog list
 ```
+
+#### `mcpi catalog info <name>`
+Show detailed information about a catalog.
+
+```bash
+mcpi catalog info official
+mcpi catalog info local
+```
+
+### Discovery Commands
+
+#### `mcpi search --query <query>`
+Search for servers by name or description in the registry.
+
+**Options:**
+- `--query, -q TEXT`: Search query (required)
+- `--catalog TEXT`: Search specific catalog (official or local)
+- `--all-catalogs`: Search all catalogs
+
+```bash
+mcpi search --query filesystem
+mcpi search -q database --catalog local
+mcpi search --query git --all-catalogs
+```
+
+**Note**: v0.4.0 changed search syntax from positional to --query flag for compatibility with multi-catalog features.
 
 #### `mcpi info <server-id>`
 Show detailed information about a server, including registry info and local installation status.
 
+**Options:**
+- `--catalog TEXT`: Look up server in specific catalog
+
 ```bash
 mcpi info filesystem
 mcpi info brave-search
+mcpi info my-server --catalog local
 ```
 
 ### Interactive Interface
@@ -221,6 +302,7 @@ Add an MCP server from the registry.
 **Options:**
 - `--client TEXT`: Target client (uses default if not specified)
 - `--scope TEXT`: Target scope (interactive selection if not specified)
+- `--catalog TEXT`: Source catalog (official or local)
 - `--dry-run`: Show what would be done without making changes
 
 **Examples:**
@@ -230,6 +312,9 @@ mcpi add filesystem
 
 # Add to a specific scope
 mcpi add filesystem --scope project-mcp
+
+# Add from local catalog
+mcpi add myserver --catalog local --scope user-global
 
 # Preview without making changes
 mcpi add filesystem --dry-run
@@ -313,6 +398,7 @@ Show detailed information about a server or system status.
 
 **Options:**
 - `--client TEXT`: Target client (uses default if not specified)
+- `--catalog TEXT`: Look up server in specific catalog
 
 **Examples:**
 ```bash
@@ -321,6 +407,9 @@ mcpi info
 
 # Show server information
 mcpi info filesystem
+
+# Show server from local catalog
+mcpi info myserver --catalog local
 ```
 
 ### Scope Management Commands
@@ -506,9 +595,10 @@ mcpi/
 │   │   ├── claude_code.py # Claude Code plugin
 │   │   └── file_based.py # File-based scope implementations
 │   └── registry/         # Server registry
-│       └── catalog.py    # Server catalog and models
+│       ├── catalog.py    # Server catalog and models
+│       └── catalog_manager.py # Multi-catalog management
 ├── data/                 # Registry data
-│   └── registry.json     # Server definitions
+│   └── catalog.json      # Server definitions
 └── tests/                # Test suite
 ```
 
@@ -584,15 +674,16 @@ MCPI can be used as a Python library for programmatic MCP server management.
 ### Basic Usage
 
 ```python
-from mcpi.registry.catalog import create_default_catalog
+from mcpi.registry.catalog_manager import create_default_catalog_manager
 from mcpi.clients.manager import create_default_manager
 
-# Create catalog to browse available servers
-catalog = create_default_catalog()
-catalog.load_registry()
+# Create catalog manager to browse available servers
+catalog_manager = create_default_catalog_manager()
+official_catalog = catalog_manager.get_catalog("official")
+official_catalog.load_registry()
 
 # Search for servers
-results = catalog.search_servers("filesystem")
+results = official_catalog.search_servers("filesystem")
 for server_id, server in results:
     print(f"{server_id}: {server.description}")
 
@@ -618,16 +709,22 @@ print(result.message)
 For production use, use factory functions that handle default initialization:
 
 ```python
-from mcpi.registry.catalog import create_default_catalog, create_test_catalog
+from mcpi.registry.catalog_manager import (
+    create_default_catalog_manager,
+    create_test_catalog_manager
+)
 from mcpi.clients.manager import create_default_manager, create_test_manager
 
 # Production: Use defaults
-catalog = create_default_catalog()  # Uses data/registry.json
+catalog_manager = create_default_catalog_manager()  # Uses data/catalog.json
 manager = create_default_manager()  # Auto-detects clients
 
 # Testing: Inject dependencies
 from pathlib import Path
-test_catalog = create_test_catalog(Path("/tmp/test-registry.json"))
+test_catalog_manager = create_test_catalog_manager(
+    official_path=Path("/tmp/official.json"),
+    local_path=Path("/tmp/local.json")
+)
 test_manager = create_test_manager(mock_registry)
 ```
 
@@ -636,19 +733,19 @@ test_manager = create_test_manager(mock_registry)
 **Important**: MCPI v2.0 introduced dependency injection for better testability:
 
 ```python
-# ❌ OLD API (no longer works):
+# OLD API (no longer works):
 from mcpi.registry.catalog import ServerCatalog
 from mcpi.clients.manager import MCPManager
 catalog = ServerCatalog()  # TypeError: missing required argument 'registry_path'
 manager = MCPManager()      # TypeError: missing required argument 'registry'
 
-# ✅ NEW API (use factory functions):
+# NEW API (use factory functions):
 from mcpi.registry.catalog import create_default_catalog
 from mcpi.clients.manager import create_default_manager
 catalog = create_default_catalog()  # Provides default path
 manager = create_default_manager()  # Creates default registry
 
-# ✅ NEW API (explicit injection for advanced use):
+# NEW API (explicit injection for advanced use):
 from mcpi.registry.catalog import ServerCatalog
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.registry import ClientRegistry
@@ -669,6 +766,22 @@ manager = MCPManager(registry=ClientRegistry())
 - Component isolation and modularity
 - Easier mocking in tests
 - Better adherence to SOLID principles
+
+### Breaking Changes (v0.4.0)
+
+**Search command syntax**: Changed from positional to --query flag:
+
+```bash
+# OLD (v0.3.0)
+mcpi search filesystem
+
+# NEW (v0.4.0)
+mcpi search --query filesystem
+# or
+mcpi search -q filesystem
+```
+
+All other commands remain unchanged.
 
 ## Troubleshooting
 

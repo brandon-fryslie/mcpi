@@ -229,6 +229,51 @@ Each client plugin defines multiple configuration scopes (e.g., project-level, u
 - `cue_validator.py`: CUE schema validation for catalog data
 - Data source: `data/catalog.json` contains all known MCP servers
 
+### Multi-Catalog System (v0.4.0+)
+
+MCPI supports multiple catalogs for managing MCP servers:
+
+**Available Catalogs**:
+- `official`: Built-in catalog with curated MCP servers (read-only)
+- `local`: User's personal catalog at `~/.mcpi/catalogs/local/` (read-write)
+
+**Architecture**:
+- `CatalogManager` manages multiple catalogs with lazy loading
+- Each catalog is a `ServerCatalog` instance
+- Case-insensitive catalog names (OFFICIAL = official)
+- Local catalog auto-initialized on first use
+
+**CLI Commands**:
+```bash
+# List available catalogs
+mcpi catalog list
+
+# Show catalog details
+mcpi catalog info official
+mcpi catalog info local
+
+# Search specific catalog
+mcpi search --query filesystem --catalog local
+
+# Search all catalogs
+mcpi search --query database --all-catalogs
+```
+
+**Factory Functions**:
+```python
+# Production use - manages multiple catalogs
+from mcpi.registry.catalog_manager import create_default_catalog_manager
+manager = create_default_catalog_manager()
+catalog = manager.get_catalog("official")
+
+# Test use - custom paths
+from mcpi.registry.catalog_manager import create_test_catalog_manager
+manager = create_test_catalog_manager(official_path, local_path)
+```
+
+**Backward Compatibility**:
+The old `create_default_catalog()` still works but shows a deprecation warning. Migrate to `create_default_catalog_manager()` for multi-catalog support.
+
 **CLI Interface (`mcpi.cli`)**
 
 - Click-based command structure with lazy initialization

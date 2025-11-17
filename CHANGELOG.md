@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-11-17
+
+### Added
+- **Multi-Catalog Support**: Manage MCP servers across multiple catalogs
+  - Two catalogs: `official` (built-in) and `local` (user-created)
+  - Local catalog auto-created at `~/.mcpi/catalogs/local/`
+- **New Commands**:
+  - `mcpi catalog list` - Show all available catalogs
+  - `mcpi catalog info <name>` - Display catalog details
+- **New Flags**:
+  - `--catalog <name>` - Search/use specific catalog (search, info, add commands)
+  - `--all-catalogs` - Search across all catalogs (search command)
+- **CatalogManager API**: New `catalog_manager.py` module for programmatic access
+
+### Changed
+- **Breaking**: `mcpi search` now requires `--query` or `-q` flag (was positional argument)
+  - Old: `mcpi search filesystem`
+  - New: `mcpi search --query filesystem`
+  - Reason: Fixes Click parser issue with --all-catalogs flag
+
+### Deprecated
+- `create_default_catalog()` - Use `create_default_catalog_manager()` instead
+  - Still works with deprecation warning
+  - Will be removed in v1.0.0
+
+### Fixed
+- Click argument parser confusion with --all-catalogs flag
+
+### Migration Guide: v0.3.0 → v0.4.0
+
+**No action required** - 100% backward compatible except for search command syntax.
+
+If you use `mcpi search <term>`, change to `mcpi search --query <term>`:
+```bash
+# Old (v0.3.0)
+mcpi search filesystem
+
+# New (v0.4.0)
+mcpi search --query filesystem
+# or
+mcpi search -q filesystem
+```
+
+All other commands work unchanged.
+
+## [0.3.0] - 2025-11-16
+
 ### Added
 - Factory functions for `ServerCatalog` and `MCPManager` to simplify API usage
   - `create_default_catalog()` - Creates catalog with default registry path
@@ -33,24 +80,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite maintained at 85% pass rate (583/682 tests)
 - Zero regressions from architectural changes
 
-### Migration Guide
+### Migration Guide: v0.2.0 → v0.3.0
 
 If you were using MCPI as a Python library, update your code:
 
 ```python
-# OLD (v1.x) - No longer works in v2.0:
+# OLD (v0.2.0) - No longer works in v0.3.0:
 from mcpi.registry.catalog import ServerCatalog
 from mcpi.clients.manager import MCPManager
 catalog = ServerCatalog()
 manager = MCPManager()
 
-# NEW (v2.0) - Use factory functions:
+# NEW (v0.3.0) - Use factory functions:
 from mcpi.registry.catalog import create_default_catalog
 from mcpi.clients.manager import create_default_manager
 catalog = create_default_catalog()
 manager = create_default_manager()
 
-# NEW (v2.0) - Or pass required parameters explicitly:
+# NEW (v0.3.0) - Or pass required parameters explicitly:
 from mcpi.registry.catalog import ServerCatalog
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.registry import ClientRegistry
@@ -74,5 +121,7 @@ manager = MCPManager(registry=ClientRegistry())
 - Shell tab completion
 - Plugin architecture for extensibility
 
-[Unreleased]: https://github.com/user/mcpi/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/user/mcpi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/user/mcpi/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/user/mcpi/compare/v1.0.0...v0.3.0
 [1.0.0]: https://github.com/user/mcpi/releases/tag/v1.0.0
