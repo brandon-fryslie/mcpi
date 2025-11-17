@@ -30,6 +30,9 @@ import pytest
 from click.testing import CliRunner
 
 from mcpi.cli import main as cli
+from mcpi.clients.claude_code import ClaudeCodePlugin
+from mcpi.clients.manager import MCPManager
+from mcpi.clients.registry import ClientRegistry
 from mcpi.registry.catalog_manager import (
     CatalogManager,
     create_test_catalog_manager,
@@ -411,27 +414,71 @@ class TestInfoWithCatalog:
 class TestAddWithCatalog:
     """Test mcpi add with --catalog flag."""
 
-    def test_add_default_catalog(self, cli_runner, test_catalogs, monkeypatch):
+    def test_add_default_catalog(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
         """mcpi add <server> uses official by default (backward compat)."""
-        manager, _, _ = test_catalogs
-        if manager is None:
+        catalog_manager, _, _ = test_catalogs
+        if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["add", "filesystem"])
+        # Setup: Create user-global scope file
+        mcp_harness.setup_scope_files()
+        mcp_harness.prepopulate_file(
+            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+        )
+
+        # Create plugin with path overrides
+        plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
+        registry = ClientRegistry(auto_discover=False)
+        registry.inject_client_instance("claude-code", plugin)
+        manager = MCPManager(registry=registry, default_client="claude-code")
+
+        # Mock both catalog_manager and mcp_manager
+        inject_catalog_manager_into_cli(catalog_manager, monkeypatch)
+
+        def mock_get_mcp_manager(ctx):
+            return manager
+
+        monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
+
+        # Test: Run add command
+        result = cli_runner.invoke(cli, ["add", "filesystem", "--scope", "user-global"])
 
         # Exit code depends on whether it's in a valid project context
         # At minimum, it should recognize the server exists
         assert "filesystem" in result.output.lower() or result.exit_code == 0 or "not found" in result.output.lower()
 
-    def test_add_with_catalog_local(self, cli_runner, test_catalogs, monkeypatch):
+    def test_add_with_catalog_local(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
         """mcpi add <server> --catalog local works."""
-        manager, _, _ = test_catalogs
-        if manager is None:
+        catalog_manager, _, _ = test_catalogs
+        if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["add", "custom-tool", "--catalog", "local"])
+        # Setup: Create user-global scope file
+        mcp_harness.setup_scope_files()
+        mcp_harness.prepopulate_file(
+            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+        )
+
+        # Create plugin with path overrides
+        plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
+        registry = ClientRegistry(auto_discover=False)
+        registry.inject_client_instance("claude-code", plugin)
+        manager = MCPManager(registry=registry, default_client="claude-code")
+
+        # Mock both catalog_manager and mcp_manager
+        inject_catalog_manager_into_cli(catalog_manager, monkeypatch)
+
+        def mock_get_mcp_manager(ctx):
+            return manager
+
+        monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
+
+        # Test: Run add command
+        result = cli_runner.invoke(cli, [
+            "add", "custom-tool",
+            "--catalog", "local",
+            "--scope", "user-global"
+        ])
 
         # Should recognize the server from local catalog
         assert "custom" in result.output.lower() or result.exit_code == 0 or "not found" in result.output.lower()
@@ -499,14 +546,34 @@ class TestBackwardCompatibility:
         # Should work with or without new features
         assert result.exit_code == 0 or "not implemented" in result.output.lower() or "not found" in result.output.lower()
 
-    def test_add_without_flags(self, cli_runner, test_catalogs, monkeypatch):
+    def test_add_without_flags(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
         """Old: mcpi add <server> still works (uses official)."""
-        manager, _, _ = test_catalogs
-        if manager is None:
+        catalog_manager, _, _ = test_catalogs
+        if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["add", "database"])
+        # Setup: Create user-global scope file
+        mcp_harness.setup_scope_files()
+        mcp_harness.prepopulate_file(
+            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+        )
+
+        # Create plugin with path overrides
+        plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
+        registry = ClientRegistry(auto_discover=False)
+        registry.inject_client_instance("claude-code", plugin)
+        manager = MCPManager(registry=registry, default_client="claude-code")
+
+        # Mock both catalog_manager and mcp_manager
+        inject_catalog_manager_into_cli(catalog_manager, monkeypatch)
+
+        def mock_get_mcp_manager(ctx):
+            return manager
+
+        monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
+
+        # Test: Run add command
+        result = cli_runner.invoke(cli, ["add", "database", "--scope", "user-global"])
 
         # Should recognize server from official catalog
         # Exit code may vary based on project context
