@@ -341,7 +341,8 @@ def prepopulated_harness(mcp_harness):
                     "args": ["-m", "project_mcp_server"],
                     "type": "stdio",
                 }
-            }
+            },
+            "enabledMcpServers": ["project-tool"]
         },
     )
 

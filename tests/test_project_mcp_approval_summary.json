@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "bug_description": "Servers in .mcp.json show ENABLED in mcpi list but don't appear in claude mcp list",
+    "root_cause": "MCPI uses InlineEnableDisableHandler which only checks inline disabled field, not Claude's approval mechanism (enabledMcpjsonServers array)",
+    "fix": "Create ApprovalRequiredEnableDisableHandler that checks both inline disabled field AND approval arrays",
+    "severity": "CRITICAL",
+    "priority": "P0"
+  },
+  "tests_added": {
+    "total_tests": 26,
+    "unit_tests": 17,
+    "integration_tests": 5,
+    "e2e_tests": 4,
+    "files": [
+      "tests/test_approval_required_handler.py",
+      "tests/test_project_mcp_approval_integration.py",
+      "tests/test_project_mcp_claude_validation.py"
+    ]
+  },
+  "workflows_covered": [
+    "Add server to .mcp.json without approval → Shows DISABLED",
+    "Enable server (approve) → Adds to enabledMcpjsonServers → Shows ENABLED",
+    "Disable server → Adds to disabledMcpjsonServers → Shows DISABLED",
+    "List servers shows correct state for all approval combinations",
+    "Inline disabled field overrides approval (backward compatibility)",
+    "MCPI state matches claude mcp list output (E2E validation)"
+  ],
+  "initial_status": "failing",
+  "expected_status_after_fix": "passing",
+  "gaming_resistance": "maximum",
+  "status_gaps_addressed": [
+    "State detection for project-mcp scope (approval mechanism)",
+    "Enable/disable operations for project-mcp scope",
+    "Consistency between MCPI and Claude Code behavior"
+  ],
+  "plan_items_validated": [
+    "ITEM-1: ApprovalRequiredEnableDisableHandler implementation",
+    "ITEM-2: ClaudeCodePlugin integration",
+    "ITEM-3: Unit tests (11 required, 17 provided - exceeds requirement)",
+    "ITEM-4: Integration tests (5 required, 5 provided)",
+    "ITEM-5: E2E tests (4 required, 4 provided)"
+  ],
+  "test_categories": {
+    "unit_tests": {
+      "file": "test_approval_required_handler.py",
+      "count": 17,
+      "coverage": "100% of ApprovalRequiredEnableDisableHandler",
+      "categories": {
+        "state_detection": {
+          "count": 7,
+          "tests": [
+            "test_server_not_in_any_list_is_disabled",
+            "test_server_in_enabled_array_is_enabled",
+            "test_server_in_disabled_array_is_disabled",
+            "test_server_in_both_arrays_is_disabled",
+            "test_inline_disabled_overrides_enabled_array",
+            "test_inline_disabled_false_with_approval_is_enabled",
+            "test_inline_disabled_true_without_approval_is_disabled"
+          ]
+        },
+        "edge_cases": {
+          "count": 4,
+          "tests": [
+            "test_missing_approval_file_treats_all_as_disabled",
+            "test_empty_approval_arrays_treats_all_as_disabled",
+            "test_invalid_json_in_approval_file_handled_gracefully",
+            "test_approval_file_permissions_error_handled_gracefully"
+          ]
+        },
+        "operations": {
+          "count": 6,
+          "tests": [
+            "test_enable_server_adds_to_enabled_array",
+            "test_enable_server_removes_from_disabled_array",
+            "test_disable_server_adds_to_disabled_array",
+            "test_disable_server_removes_from_enabled_array",
+            "test_enable_server_creates_settings_file_if_missing",
+            "test_operations_verify_file_contents"
+          ]
+        }
+      }
+    },
+    "integration_tests": {
+      "file": "test_project_mcp_approval_integration.py",
+      "count": 5,
+      "coverage": "Full stack (MCPManager → Plugin → Scope → Handler)",
+      "tests": [
+        "test_add_server_shows_disabled_not_approved",
+        "test_enable_server_adds_to_approval_array",
+        "test_disable_server_adds_to_disabled_array",
+        "test_list_servers_shows_correct_state_for_all_combinations",
+        "test_inline_disabled_field_still_works"
+      ]
+    },
+    "e2e_tests": {
+      "file": "test_project_mcp_claude_validation.py",
+      "count": 4,
+      "coverage": "Validation against actual claude mcp list command",
+      "requirements": "claude CLI must be installed (tests skip if unavailable)",
+      "tests": [
+        "test_unapproved_server_not_in_claude_list",
+        "test_approved_server_appears_in_claude_list",
+        "test_disabled_server_not_in_claude_list",
+        "test_mcpi_state_matches_claude_state_comprehensive"
+      ]
+    }
+  },
+  "why_ungameable": {
+    "real_file_io": "Tests create actual files on disk and verify contents",
+    "observable_behavior": "Tests verify what users see, not internal state",
+    "external_validation": "E2E tests run actual claude mcp list command",
+    "multiple_verification_points": "Tests check return values, file contents, and state consistency",
+    "comprehensive_coverage": "All state combinations and edge cases tested",
+    "no_mocks_for_critical_paths": "Real file operations, no stubbing of approval logic",
+    "cannot_pass_with_stubs": "Tests verify actual file modifications and command output"
+  },
+  "acceptance_criteria": {
+    "functional_requirements": {
+      "FR1": "Server in .mcp.json WITHOUT approval shows as DISABLED",
+      "FR2": "Server in .mcp.json WITH approval shows as ENABLED",
+      "FR3": "mcpi enable adds to enabledMcpjsonServers",
+      "FR4": "mcpi disable adds to disabledMcpjsonServers",
+      "FR5": "ENABLED server appears in claude mcp list",
+      "FR6": "DISABLED server does NOT appear in claude mcp list"
+    },
+    "validation_requirements": {
+      "VR1": "mcpi list output matches claude mcp list output (state accuracy)",
+      "VR2": "Inline disabled field still works (backward compatibility)",
+      "VR3": "Other scopes unaffected (regression prevention)",
+      "VR4": "All unit tests pass (17 tests)",
+      "VR5": "All integration tests pass (5 tests)",
+      "VR6": "All E2E tests pass (4 tests, if claude CLI available)"
+    },
+    "quality_requirements": {
+      "QR1": "100% test coverage for ApprovalRequiredEnableDisableHandler",
+      "QR2": "No exceptions during enable/disable operations",
+      "QR3": "Settings file created with proper permissions if missing",
+      "QR4": "Atomic writes to settings file (no partial updates)",
+      "QR5": "Clear error messages if operations fail"
+    }
+  },
+  "how_to_run": {
+    "all_tests": "pytest tests/test_approval_required_handler.py tests/test_project_mcp_approval_integration.py tests/test_project_mcp_claude_validation.py -v",
+    "unit_only": "pytest tests/test_approval_required_handler.py -v",
+    "integration_only": "pytest tests/test_project_mcp_approval_integration.py -v",
+    "e2e_only": "pytest tests/test_project_mcp_claude_validation.py -v",
+    "with_coverage": "pytest tests/test_approval_required_handler.py tests/test_project_mcp_approval_integration.py --cov=src/mcpi/clients/enable_disable_handlers --cov-report=term --cov-report=html"
+  },
+  "expected_results": {
+    "before_fix": {
+      "unit_tests": "SKIPPED (ApprovalRequiredEnableDisableHandler not implemented)",
+      "integration_tests": "FAILED (servers show ENABLED without approval)",
+      "e2e_tests": "FAILED (MCPI state doesn't match claude mcp list)"
+    },
+    "after_fix": {
+      "unit_tests": "17 PASSED",
+      "integration_tests": "5 PASSED",
+      "e2e_tests": "4 PASSED (or SKIPPED if claude CLI not available)"
+    }
+  },
+  "documentation": {
+    "readme": "tests/README_PROJECT_MCP_APPROVAL_TESTS.md",
+    "test_files": [
+      "tests/test_approval_required_handler.py (17 unit tests)",
+      "tests/test_project_mcp_approval_integration.py (5 integration tests)",
+      "tests/test_project_mcp_claude_validation.py (4 E2E tests)"
+    ]
+  },
+  "traceability": {
+    "status_report": ".agent_planning/STATUS-2025-11-16-PROJECT-MCP-APPROVAL-BUG.md",
+    "implementation_plan": ".agent_planning/PLAN-PROJECT-MCP-APPROVAL-FIX-2025-11-16-173714.md",
+    "spec_reference": "CLAUDE.md (User-Global Disable Mechanism section, lines 406-467)"
+  },
+  "test_quality_metrics": {
+    "total_assertions": "60+ assertions across all tests",
+    "file_operations_verified": "Yes (all tests check actual file contents)",
+    "error_handling_tested": "Yes (4 edge case tests)",
+    "backward_compatibility_tested": "Yes (inline disabled field tests)",
+    "state_combinations_covered": "7 state detection scenarios",
+    "e2e_validation": "Yes (4 tests against actual Claude Code)"
+  },
+  "meta": {
+    "created": "2025-11-16",
+    "test_framework": "pytest",
+    "test_pattern": "Given-When-Then",
+    "isolation": "tmp_path fixtures + MCPTestHarness",
+    "coverage_target": "100% of ApprovalRequiredEnableDisableHandler",
+    "gaming_resistance_level": "MAXIMUM"
+  }
+}

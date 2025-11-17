@@ -1,0 +1,150 @@
+{
+  "feature": "Smart Server Bundles",
+  "test_file": "tests/test_bundles.py",
+  "documentation": "tests/README_BUNDLES_TESTS.md",
+  "created_date": "2025-11-16",
+  "status": "tests_written_awaiting_implementation",
+  "tests_added": [
+    "test_catalog_loads_bundle_from_file",
+    "test_catalog_lists_all_bundles",
+    "test_catalog_handles_missing_directory",
+    "test_catalog_rejects_invalid_json",
+    "test_catalog_validates_bundle_schema",
+    "test_install_bundle_adds_all_servers_to_scope",
+    "test_install_bundle_to_different_scope",
+    "test_install_bundle_skips_existing_servers",
+    "test_install_bundle_dry_run_mode",
+    "test_install_bundle_handles_missing_server_in_catalog",
+    "test_bundle_list_command_shows_available_bundles",
+    "test_bundle_info_command_shows_bundle_details",
+    "test_bundle_info_command_handles_missing_bundle",
+    "test_bundle_install_command_installs_bundle",
+    "test_bundle_install_command_dry_run_flag",
+    "test_complete_bundle_workflow_list_info_install",
+    "test_bundle_installation_isolated_in_test_harness",
+    "test_bundle_with_custom_server_configs"
+  ],
+  "test_count": 18,
+  "test_categories": {
+    "catalog": 5,
+    "installation": 5,
+    "cli_commands": 5,
+    "integration": 3
+  },
+  "workflows_covered": [
+    "Load bundle definitions from JSON files",
+    "List all available bundles",
+    "Get bundle information by ID",
+    "Install bundle to specific scope",
+    "Install bundle to multiple scopes",
+    "Skip already-installed servers",
+    "Dry-run mode for preview",
+    "Handle missing servers gracefully",
+    "CLI: bundle list command",
+    "CLI: bundle info command",
+    "CLI: bundle install command",
+    "Complete workflow: list -> info -> install -> verify",
+    "Custom server configurations in bundles"
+  ],
+  "initial_status": "all_skipped",
+  "expected_status_after_implementation": "all_passing",
+  "gaming_resistance": "high",
+  "gaming_resistance_mechanisms": [
+    "Verify actual file I/O from disk",
+    "Check parsed data matches file contents",
+    "Validate Pydantic schema enforcement",
+    "Test error handling with real invalid data",
+    "Verify actual servers added to config files",
+    "Check file contents match expected structure",
+    "Test with real MCPManager integration",
+    "Execute actual CLI commands via Click test runner",
+    "Verify command output and exit codes",
+    "Test complete user workflows start to finish",
+    "Verify integration between all components",
+    "Check real file system state changes"
+  ],
+  "status_gaps_addressed": [
+    "Bundle catalog loading and validation",
+    "Bundle installation with real file operations",
+    "CLI commands for bundle management",
+    "Error handling for invalid bundles and missing servers",
+    "Integration with existing MCPManager"
+  ],
+  "plan_items_validated": [
+    "BUNDLE-001: Create bundle data models",
+    "BUNDLE-002: Implement BundleCatalog class",
+    "BUNDLE-003: Create built-in bundle JSON files",
+    "BUNDLE-004: Write unit tests for models and catalog",
+    "BUNDLE-005-010: BundleInstaller implementation",
+    "BUNDLE-011-017: CLI commands",
+    "BUNDLE-019: Functional end-to-end tests"
+  ],
+  "acceptance_criteria_coverage": {
+    "bundle_list_shows_all_bundles": true,
+    "bundle_info_shows_details": true,
+    "bundle_install_installs_servers": true,
+    "dry_run_mode_works": true,
+    "interactive_scope_selection": true,
+    "clear_error_messages": true,
+    "skip_already_installed_servers": true,
+    "handle_installation_failures": true,
+    "validate_bundle_json": true,
+    "server_catalog_integration": true,
+    "config_file_correctness": true,
+    "scope_isolation": true
+  },
+  "test_dependencies": [
+    "pytest",
+    "pytest-cov",
+    "click",
+    "pydantic",
+    "MCPTestHarness (existing)"
+  ],
+  "implementation_modules_required": [
+    "src/mcpi/bundles/__init__.py",
+    "src/mcpi/bundles/models.py",
+    "src/mcpi/bundles/catalog.py",
+    "src/mcpi/bundles/installer.py",
+    "src/mcpi/cli.py (bundle command group)"
+  ],
+  "test_execution": {
+    "current_command": "pytest tests/test_bundles.py -v",
+    "current_result": "18 skipped in 0.03s",
+    "expected_after_implementation": "18 passed in <5s",
+    "coverage_target": "90%+ for src/mcpi/bundles/"
+  },
+  "test_quality_metrics": {
+    "user_workflow_tests": 18,
+    "multiple_verification_points": true,
+    "real_file_operations": true,
+    "real_component_integration": true,
+    "error_case_coverage": true,
+    "dry_run_support": true,
+    "test_isolation": true,
+    "parallel_test_safe": true
+  },
+  "traceability": {
+    "status_report": ".agent_planning/STATUS-SMART-BUNDLES-EVALUATION-2025-11-16-165533.md",
+    "implementation_plan": ".agent_planning/PLAN-SMART-BUNDLES-2025-11-16-165848.md",
+    "test_documentation": "tests/README_BUNDLES_TESTS.md"
+  },
+  "notes": [
+    "Tests written BEFORE implementation to define the contract",
+    "All tests currently skip because feature not implemented",
+    "Tests use real MCPTestHarness for isolation",
+    "Tests follow existing patterns from test_installer_workflows_integration.py",
+    "Tests cannot be satisfied by stubs or shortcuts",
+    "Implementation must fulfill test contract, not modify tests to pass",
+    "Tests validate real user workflows end-to-end",
+    "All tests include detailed docstrings explaining user journey"
+  ],
+  "next_steps": [
+    "Implement Bundle and BundleServer Pydantic models",
+    "Implement BundleCatalog class",
+    "Create built-in bundle JSON files in data/bundles/",
+    "Implement BundleInstaller class",
+    "Add bundle command group to CLI",
+    "Run tests and iterate until all pass",
+    "Verify 90%+ code coverage for bundle module"
+  ]
+}

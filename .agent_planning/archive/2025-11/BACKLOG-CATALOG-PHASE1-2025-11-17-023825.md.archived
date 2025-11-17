@@ -1,0 +1,941 @@
+# Multi-Catalog Phase 1 Implementation Backlog
+
+**Generated**: 2025-11-17 02:38:25
+**Source STATUS**: STATUS-CATALOG-PHASE1-EVALUATION-2025-11-17-023400.md
+**Source PLAN**: PLAN-CATALOG-IMPLEMENTATION-2025-11-17-022352.md
+**Source SPRINT**: SPRINT-CATALOG-PHASE1-2025-11-17-022352.md
+**Phase**: 1 (MVP Foundation - v0.4.0)
+**Timeline**: 2-3 weeks
+**Overall Readiness**: 95% READY - GO FOR IMPLEMENTATION
+
+---
+
+## Executive Summary
+
+**Status**: **GO FOR IMPLEMENTATION** - All blockers resolved, spec clarifications decided
+
+**Phase 1 Goal**: Implement MVP foundation with two catalogs (official + local)
+
+**Readiness Assessment**:
+- ✅ DIP Phase 1 COMPLETE - Foundation ready
+- ✅ Existing architecture ready for extension
+- ✅ Test infrastructure mature (752 tests, 48 test files)
+- ✅ Zero blockers identified
+- ✅ All 3 spec clarifications resolved with pragmatic defaults
+
+**Spec Clarifications Resolved**:
+1. **Local catalog init errors**: WARN and continue (graceful degradation)
+2. **Catalog name case**: Case-insensitive (consistent with CLI)
+3. **Search ordering**: Sort by catalog priority then server_id (predictable)
+
+**Work Breakdown**:
+- 10 implementation tasks across 3 weeks
+- 34 test scenarios (14 unit + 11 integration + 9 E2E)
+- Clear dependencies and critical path identified
+- Each task is atomic and independently testable
+
+---
+
+## Pragmatic Decisions on Spec Clarifications
+
+### Decision 1: Local Catalog Initialization Error Handling
+
+**Question** (from STATUS evaluation, Section 5.1):
+> What if parent directory permissions prevent creation? Should we error or warn?
+
+**Decision**: **WARN and continue** (graceful degradation)
+
+**Rationale**:
+- Official catalog always works (read-only, included in package)
+- Local catalog is optional enhancement, not core functionality
+- Failing hard would break backward compatibility
+- User can still use MCPI without local catalog
+
+**Implementation**:
+```python
+def create_default_catalog_manager() -> CatalogManager:
+    """Create CatalogManager with default production paths."""
+    # Official catalog (existing location)
+    package_dir = Path(__file__).parent.parent.parent.parent
+    official_path = package_dir / "data" / "catalog.json"
+
+    # Local catalog (new user directory)
+    local_dir = Path.home() / ".mcpi" / "catalogs" / "local"
+
+    try:
+        local_dir.mkdir(parents=True, exist_ok=True)
+        local_path = local_dir / "catalog.json"
+
+        # Initialize if missing
+        if not local_path.exists():
+            local_path.write_text("{}")
+    except (PermissionError, OSError) as e:
+        # Log warning but continue (official catalog still works)
+        import warnings
+        warnings.warn(
+            f"Failed to initialize local catalog at {local_dir}: {e}. "
+            f"Local catalog will not be available. You can still use the official catalog.",
+            RuntimeWarning,
+            stacklevel=2
+        )
+        # Use fallback: point to non-existent path (will be handled gracefully)
+        local_path = local_dir / "catalog.json"
+
+    return CatalogManager(
+        official_path=official_path,
+        local_path=local_path
+    )
+```
+
+**Testing Requirements**:
+- Unit test for successful initialization
+- Unit test for PermissionError handling
+- Unit test for OSError handling
+- Integration test verifying official catalog works even when local fails
+
+---
+
+### Decision 2: Catalog Name Case Sensitivity
+
+**Question** (from STATUS evaluation, Section 5.2):
+> Should we accept any case (OFFICIAL, Official)? CatalogManager should match CLI?
+
+**Decision**: **Case-insensitive** (normalize to lowercase)
+
+**Rationale**:
+- CLI uses `case_sensitive=False` for Choice parameters
+- Consistent user experience across CLI and API
+- Follows principle of least surprise
+- Common convention in CLI tools
+
+**Implementation**:
+```python
+def get_catalog(self, name: str) -> Optional[ServerCatalog]:
+    """Get catalog by name (lazy loading).
+
+    Args:
+        name: Catalog name (case-insensitive: "official", "OFFICIAL", "Official" all work)
+
+    Returns:
+        ServerCatalog instance or None if not found
+    """
+    # Normalize to lowercase for case-insensitive lookup
+    name = name.lower()
+
+    if name == "official":
+        if self._official is None:
+            self._official = ServerCatalog(
+                catalog_path=self.official_path,
+                validate_with_cue=True
+            )
+            self._official.load_catalog()
+        return self._official
+    elif name == "local":
+        if self._local is None:
+            self._local = ServerCatalog(
+                catalog_path=self.local_path,
+                validate_with_cue=False  # Local catalog is user-controlled
+            )
+            self._local.load_catalog()
+        return self._local
+
+    return None  # Unknown catalog
+```
+
+**Testing Requirements**:
+- Unit test with "official", "OFFICIAL", "Official"
+- Unit test with "local", "LOCAL", "Local"
+- Integration test with mixed case from CLI
+- E2E test verifying case-insensitive behavior
+
+---
+
+### Decision 3: Search Result Ordering
+
+**Question** (from STATUS evaluation, Section 5.3):
+> How should multi-catalog search results be ordered? By catalog priority? By server_id? Deduplicate?
+
+**Decision**: **Catalog priority order, then alphabetically by server_id within catalog. NO deduplication.**
+
+**Rationale**:
+- Predictable ordering helps users understand source
+- Catalog priority (official first) matches default behavior
+- Alphabetical within catalog is intuitive
+- No deduplication allows seeing same server_id in both catalogs (useful for override scenarios in Phase 3)
+- Users can see which catalog provides which server
+
+**Implementation**:
+```python
+def search_all(self, query: str) -> List[tuple[str, str, MCPServer]]:
+    """Search across all catalogs.
+
+    Returns results in catalog priority order (official first),
+    then alphabetically by server_id within each catalog.
+
+    Duplicate server_ids across catalogs are NOT deduplicated.
+    This allows users to see all matching servers and their sources.
+
+    Args:
+        query: Search query string
+
+    Returns:
+        List of (catalog_name, server_id, server) tuples, ordered by:
+        1. Catalog priority (official, local)
+        2. Server ID alphabetically within each catalog
+    """
+    results = []
+
+    # Search in priority order: official, local
+    for catalog_name in ["official", "local"]:
+        catalog = self.get_catalog(catalog_name)
+        if catalog is None:
+            continue  # Skip if catalog unavailable
+
+        catalog_results = catalog.search_servers(query)
+
+        # Sort results alphabetically by server_id within this catalog
+        for server_id, server in sorted(catalog_results, key=lambda x: x[0]):
+            results.append((catalog_name, server_id, server))
+
+    return results
+```
+
+**Testing Requirements**:
+- Unit test with single match (official only)
+- Unit test with single match (local only)
+- Unit test with matches in both catalogs (verify order)
+- Unit test with same server_id in both catalogs (verify not deduplicated)
+- Unit test with empty results
+- Integration test verifying CLI displays results in correct order
+
+---
+
+## Implementation Backlog
+
+### Week 1: Core Infrastructure (Days 1-5)
+
+#### CATALOG-001: CatalogManager Implementation
+
+**Status**: Not Started
+**Effort**: Medium (2 days)
+**Priority**: P0 (Critical - Foundation)
+**Dependencies**: None
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Phase 1 Architecture • STATUS § 2.1
+
+**Description**:
+Implement `CatalogManager` class with dependency injection patterns. This is the core component managing multiple catalogs.
+
+**Files to Create**:
+- `src/mcpi/registry/catalog_manager.py` (~200 lines)
+
+**Implementation Tasks**:
+- [ ] Create `CatalogInfo` dataclass (5 fields)
+- [ ] Create `CatalogManager` class skeleton
+- [ ] Implement `__init__(official_path, local_path)` constructor
+- [ ] Implement `get_catalog(name)` with lazy loading + case-insensitive lookup
+- [ ] Implement `get_default_catalog()` (returns official)
+- [ ] Implement `list_catalogs()` (returns 2 CatalogInfo objects)
+- [ ] Implement `search_all(query)` with ordering logic
+- [ ] Create `create_default_catalog_manager()` factory with error handling
+- [ ] Create `create_test_catalog_manager(official_path, local_path)` factory
+- [ ] Add comprehensive docstrings and type hints
+
+**Acceptance Criteria**:
+- [ ] CatalogManager class created with DI constructor accepting two paths
+- [ ] `get_catalog()` lazy loads catalogs (doesn't load until first access)
+- [ ] `get_catalog()` is case-insensitive (accepts "official", "OFFICIAL", etc.)
+- [ ] `get_default_catalog()` returns official catalog
+- [ ] `list_catalogs()` returns 2 CatalogInfo objects with correct metadata
+- [ ] `search_all()` searches both catalogs in priority order (official, local)
+- [ ] Search results sorted: catalog priority → alphabetically by server_id
+- [ ] Factory functions handle errors gracefully (warn, continue with fallback)
+- [ ] Local catalog auto-initialized at `~/.mcpi/catalogs/local/catalog.json`
+- [ ] Code passes mypy type checking (no type errors)
+- [ ] Code formatted with black (no formatting issues)
+- [ ] Code passes ruff linting (no linting errors)
+
+**Technical Notes**:
+- Use `Path` objects for all filesystem paths
+- Lazy loading prevents unnecessary I/O
+- Local catalog has CUE validation disabled (user-controlled content)
+- Error handling: warn on init failure, continue with official catalog only
+
+---
+
+#### CATALOG-002: Unit Tests for CatalogManager
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-001
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 1.2 • STATUS § 9.1
+
+**Description**:
+Write comprehensive unit tests for CatalogManager. Achieve 100% code coverage.
+
+**Files to Create**:
+- `tests/test_catalog_manager.py` (~300 lines, 14 test functions)
+
+**Test Scenarios** (14 tests):
+1. **test_init_with_paths()** - Constructor accepts official and local paths
+2. **test_get_catalog_official()** - Returns official catalog when requested
+3. **test_get_catalog_local()** - Returns local catalog when requested
+4. **test_get_catalog_invalid()** - Returns None for unknown catalog name
+5. **test_get_catalog_case_insensitive()** - Works with "OFFICIAL", "Official", etc.
+6. **test_get_catalog_lazy_loading()** - Catalogs only loaded on first access
+7. **test_get_catalog_caching()** - Second access returns same instance
+8. **test_get_default_catalog()** - Returns official catalog
+9. **test_list_catalogs()** - Returns 2 CatalogInfo objects
+10. **test_list_catalogs_metadata()** - CatalogInfo has correct name, type, path, description
+11. **test_list_catalogs_server_count()** - Shows accurate server counts
+12. **test_search_all_official_only()** - Finds server in official catalog
+13. **test_search_all_local_only()** - Finds server in local catalog
+14. **test_search_all_both_catalogs()** - Finds servers in both, correct order
+15. **test_search_all_same_id()** - Duplicate server_ids not deduplicated
+16. **test_search_all_empty()** - Returns empty list when no matches
+17. **test_create_default_catalog_manager()** - Factory creates manager with correct paths
+18. **test_create_default_catalog_manager_init_error()** - Handles PermissionError gracefully
+19. **test_create_test_catalog_manager()** - Test factory accepts custom paths
+20. **test_local_catalog_missing()** - Handles missing local catalog gracefully
+
+**Acceptance Criteria**:
+- [ ] All 14+ tests pass
+- [ ] 100% code coverage for CatalogManager class
+- [ ] Tests use `tmp_path` fixture for filesystem isolation
+- [ ] Tests verify both success and error paths
+- [ ] Tests verify lazy loading behavior
+- [ ] Tests verify case-insensitive name lookup
+- [ ] Tests verify search result ordering
+- [ ] Test execution time < 1 second total
+
+**Technical Notes**:
+- Use `tmp_path` for test catalog files
+- Create minimal test catalogs (JSON with 1-2 servers)
+- Mock filesystem errors where appropriate
+- Test both official and local catalog paths
+
+---
+
+#### CATALOG-003: CLI Context Integration
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-001
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 1.3 • STATUS § 8.1
+
+**Description**:
+Update CLI context helpers to use CatalogManager while maintaining backward compatibility.
+
+**Files to Modify**:
+- `src/mcpi/cli.py` - Add `get_catalog_manager()`, update `get_catalog()` (~40 lines)
+- `src/mcpi/registry/catalog.py` - Add deprecation warning to `create_default_catalog()` (~15 lines)
+
+**Implementation Tasks**:
+- [ ] Add `get_catalog_manager(ctx)` lazy initialization function
+- [ ] Update `get_catalog(ctx, catalog_name=None)` signature
+- [ ] Implement catalog_name parameter handling (case-insensitive)
+- [ ] Add error handling for unknown catalog names
+- [ ] Add deprecation warning to `create_default_catalog()` in catalog.py
+- [ ] Update imports at top of cli.py
+- [ ] Verify all existing CLI commands still work
+
+**Acceptance Criteria**:
+- [ ] `get_catalog_manager(ctx)` function added and working
+- [ ] `get_catalog(ctx)` with no args returns official (backward compat)
+- [ ] `get_catalog(ctx, "local")` returns local catalog
+- [ ] `get_catalog(ctx, "OFFICIAL")` works (case-insensitive)
+- [ ] Unknown catalog name raises ClickException with helpful message
+- [ ] Deprecation warning added to `create_default_catalog()`
+- [ ] Warning uses DeprecationWarning category, stacklevel=2
+- [ ] Warning message is clear: points to `create_default_catalog_manager()`
+- [ ] Code passes type checking (mypy)
+- [ ] All existing CLI commands work unchanged
+
+**Technical Notes**:
+- Use Click context object for storage (ctx.obj)
+- Lazy initialization prevents unnecessary catalog loading
+- Maintain backward compatibility: no breaking changes
+- Clear error messages guide users to correct catalog names
+
+---
+
+### Week 2: CLI Commands (Days 6-10)
+
+#### CATALOG-004: Add --catalog Flag to search Command
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-003
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 2.1
+
+**Description**:
+Add `--catalog` and `--all-catalogs` flags to `search` command.
+
+**Files to Modify**:
+- `src/mcpi/cli.py` - Update `search` command (~50 lines)
+
+**Implementation Tasks**:
+- [ ] Add `--catalog` option (Choice: official, local, case_sensitive=False)
+- [ ] Add `--all-catalogs` flag
+- [ ] Make flags mutually exclusive
+- [ ] Default behavior: search official only (backward compat)
+- [ ] `--catalog <name>`: search specific catalog
+- [ ] `--all-catalogs`: search both, group results by catalog
+- [ ] Update help text with examples
+- [ ] Preserve Rich table formatting
+
+**Acceptance Criteria**:
+- [ ] `mcpi search <query>` searches official (backward compat)
+- [ ] `mcpi search <query> --catalog official` works
+- [ ] `mcpi search <query> --catalog local` works
+- [ ] `mcpi search <query> --catalog OFFICIAL` works (case-insensitive)
+- [ ] `mcpi search <query> --all-catalogs` searches both
+- [ ] `--all-catalogs` groups results by catalog name
+- [ ] `--catalog` and `--all-catalogs` mutually exclusive (error if both used)
+- [ ] Help text includes examples
+- [ ] Rich output formatted correctly
+- [ ] Unknown catalog name shows clear error
+
+**Technical Notes**:
+- Use `collections.defaultdict` to group results by catalog
+- Display format: catalog name header, then servers
+- Preserve existing Rich table patterns
+
+---
+
+#### CATALOG-005: Add --catalog Flag to info and add Commands
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-003
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 2.1
+
+**Description**:
+Add `--catalog` flag to `info` and `add` commands.
+
+**Files to Modify**:
+- `src/mcpi/cli.py` - Update `info` and `add` commands (~30 lines total)
+
+**Implementation Tasks**:
+- [ ] Add `--catalog` option to `info` command
+- [ ] Add `--catalog` option to `add` command
+- [ ] Update help text for both commands
+- [ ] Test with official and local catalogs
+
+**Acceptance Criteria**:
+- [ ] `mcpi info <server>` searches official first, then local (backward compat)
+- [ ] `mcpi info <server> --catalog official` searches official only
+- [ ] `mcpi info <server> --catalog local` searches local only
+- [ ] `mcpi add <server>` searches official (backward compat)
+- [ ] `mcpi add <server> --catalog local` searches local
+- [ ] Help text includes examples
+- [ ] Unknown catalog name shows clear error
+
+**Technical Notes**:
+- `info` command: default searches official first for backward compat
+- `add` command: default uses official catalog
+- Clear error messages when server not found in specified catalog
+
+---
+
+#### CATALOG-006: Implement catalog Subcommand Group
+
+**Status**: Not Started
+**Effort**: Medium (2 days)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-003
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 2.2
+
+**Description**:
+Add new `mcpi catalog` command group with `list` and `info` subcommands.
+
+**Files to Modify**:
+- `src/mcpi/cli.py` - Add catalog group and commands (~100 lines)
+
+**Implementation Tasks**:
+- [ ] Create `catalog` command group with docstring
+- [ ] Implement `catalog list` command
+- [ ] Implement `catalog info <name>` command
+- [ ] Use Rich tables for `list` output
+- [ ] Use Rich panels/tables for `info` output
+- [ ] Add help text and examples
+- [ ] Follow existing CLI style (colors, formatting)
+
+**Acceptance Criteria**:
+- [ ] `mcpi catalog` group created with help text
+- [ ] `mcpi catalog list` shows Rich table with: name, type, servers, description
+- [ ] `mcpi catalog list` shows 2 rows (official + local)
+- [ ] `mcpi catalog info official` shows: path, server count, categories, sample servers
+- [ ] `mcpi catalog info local` shows local catalog details
+- [ ] `mcpi catalog info unknown` shows error and exits with code 1
+- [ ] Help text includes examples
+- [ ] Output follows existing CLI style (cyan names, green counts, etc.)
+- [ ] Commands run fast (<100ms for list, <200ms for info)
+
+**Technical Notes**:
+- Use Rich `Table` for list command
+- Use Rich `Panel` and `Table` for info command
+- Show top 10 categories by server count
+- Show first 5 servers as samples
+- Follow color scheme: cyan for names, green for counts, white for descriptions
+
+---
+
+#### CATALOG-007: CLI Integration Tests
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P0 (Critical)
+**Dependencies**: CATALOG-004, CATALOG-005, CATALOG-006
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 2.3 • STATUS § 9.2
+
+**Description**:
+Write integration tests for all CLI commands with catalog support.
+
+**Files to Create**:
+- `tests/test_cli_catalog_commands.py` (~400 lines, 11 test functions)
+
+**Test Scenarios** (11 tests):
+1. **test_search_default_catalog()** - Default searches official
+2. **test_search_with_catalog_official()** - --catalog official works
+3. **test_search_with_catalog_local()** - --catalog local works
+4. **test_search_with_catalog_case_insensitive()** - --catalog OFFICIAL works
+5. **test_search_all_catalogs()** - --all-catalogs searches both
+6. **test_search_all_catalogs_groups_results()** - Results grouped by catalog
+7. **test_search_catalog_mutual_exclusive()** - Error if both flags used
+8. **test_info_default_catalog()** - Default searches official first
+9. **test_info_with_catalog_flag()** - --catalog flag works
+10. **test_add_with_catalog_flag()** - --catalog flag works
+11. **test_catalog_list_command()** - Shows both catalogs
+12. **test_catalog_info_official()** - Shows official details
+13. **test_catalog_info_local()** - Shows local details
+14. **test_catalog_info_unknown()** - Error for unknown catalog
+
+**Acceptance Criteria**:
+- [ ] All 11+ tests pass
+- [ ] Tests use CliRunner for CLI testing
+- [ ] Tests use tmp_path for filesystem isolation
+- [ ] Tests verify command output
+- [ ] Tests verify exit codes (0 for success, 1 for errors)
+- [ ] Tests verify error messages
+- [ ] Test execution time < 5 seconds total
+
+**Technical Notes**:
+- Use Click's CliRunner
+- Create minimal test catalogs
+- Mock CatalogManager in context where appropriate
+- Verify Rich output formatting
+
+---
+
+### Week 3: Testing and Documentation (Days 11-17)
+
+#### CATALOG-008: End-to-End Tests
+
+**Status**: Not Started
+**Effort**: Medium (2 days)
+**Priority**: P1 (High)
+**Dependencies**: All implementation tasks (CATALOG-001 through CATALOG-007)
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 3.1 • STATUS § 9.2
+
+**Description**:
+Write end-to-end tests for complete multi-catalog workflows.
+
+**Files to Create**:
+- `tests/test_multi_catalog_e2e.py` (~500 lines, 9 test functions)
+
+**Test Scenarios** (9 tests):
+1. **test_fresh_install_two_catalogs()** - Fresh install creates official + local
+2. **test_local_catalog_auto_initialization()** - Local catalog auto-created if missing
+3. **test_search_and_add_from_official()** - Complete workflow: search, add from official
+4. **test_search_and_add_from_local()** - Add custom server to local, verify it works
+5. **test_local_catalog_persistence()** - Local catalog persists across sessions
+6. **test_catalog_list_shows_both()** - catalog list shows both catalogs
+7. **test_search_all_catalogs_workflow()** - Search finds servers in both
+8. **test_backward_compatibility()** - Old code patterns still work
+9. **test_deprecation_warning()** - create_default_catalog() shows warning
+
+**Acceptance Criteria**:
+- [ ] All 9 tests pass
+- [ ] Tests use MCPTestHarness for complex scenarios
+- [ ] Tests verify complete user workflows
+- [ ] Tests verify filesystem state after operations
+- [ ] Tests verify persistence (catalog survives session restart)
+- [ ] Tests verify backward compatibility (no breaking changes)
+- [ ] Tests verify deprecation warnings appear
+- [ ] Test execution time < 30 seconds total
+
+**Technical Notes**:
+- Use `monkeypatch` to mock HOME directory
+- Create fresh test environments for each scenario
+- Verify catalog files exist with correct content
+- Test session persistence: create catalog, destroy manager, recreate, verify data
+
+---
+
+#### CATALOG-009: Update Existing Tests
+
+**Status**: Not Started
+**Effort**: Medium (2 days)
+**Priority**: P1 (High)
+**Dependencies**: CATALOG-008
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 3.2 • STATUS § 9.3
+
+**Description**:
+Review and update existing tests for multi-catalog compatibility.
+
+**Files to Review**:
+- All 48 test files referencing catalog (from STATUS evaluation)
+- Focus on files using `create_default_catalog()`
+
+**Implementation Tasks**:
+- [ ] Identify all tests using `create_default_catalog()`
+- [ ] Verify deprecation warnings don't break tests
+- [ ] Suppress warnings where appropriate (Option 1)
+- [ ] Update tests to new pattern where beneficial (Option 2)
+- [ ] Add multi-catalog test scenarios where appropriate
+- [ ] Add TODO comments for Phase 2 enhancements
+- [ ] Run full test suite, ensure 100% pass
+
+**Acceptance Criteria**:
+- [ ] All 752 existing tests reviewed
+- [ ] All existing tests still pass (no regressions)
+- [ ] Deprecation warnings handled (suppressed or tests updated)
+- [ ] No new test failures introduced
+- [ ] Multi-catalog scenarios added where relevant
+- [ ] TODO comments for Phase 2 enhancements
+- [ ] Test suite execution time unchanged (no performance regression)
+
+**Technical Notes**:
+- Option 1 (suppress warnings):
+  ```python
+  import warnings
+  with warnings.catch_warnings():
+      warnings.simplefilter("ignore", DeprecationWarning)
+      catalog = create_default_catalog()
+  ```
+- Option 2 (new pattern):
+  ```python
+  manager = create_default_catalog_manager()
+  catalog = manager.get_catalog("official")
+  ```
+- Prefer Option 1 for existing tests (minimize churn)
+- Use Option 2 for new tests or tests being heavily modified
+
+---
+
+#### CATALOG-010: Documentation
+
+**Status**: Not Started
+**Effort**: Medium (2 days)
+**Priority**: P1 (High)
+**Dependencies**: CATALOG-009
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 3.3 • STATUS § 10.1
+
+**Description**:
+Update all project documentation for multi-catalog feature.
+
+**Files to Update**:
+- `CLAUDE.md` - Architecture, testing strategy, development commands
+- `README.md` - User-facing examples, quick start, FAQ
+- `CHANGELOG.md` - v0.4.0 release notes, migration guide
+- CLI help text - Verify completeness
+
+**Implementation Tasks**:
+
+**CLAUDE.md**:
+- [ ] Update "Project Architecture" section with multi-catalog design
+- [ ] Add "Multi-Catalog System" subsection explaining CatalogManager
+- [ ] Update "Server Catalog System" section with two-catalog model
+- [ ] Add factory function examples (old vs. new)
+- [ ] Update "Testing Strategy" with multi-catalog test patterns
+- [ ] Add backward compatibility section
+- [ ] Update "Development Commands" with catalog examples
+
+**README.md**:
+- [ ] Add "Multiple Catalogs" section
+- [ ] Show `mcpi catalog list` example
+- [ ] Show `mcpi catalog info` example
+- [ ] Show `mcpi search --catalog` example
+- [ ] Show `mcpi search --all-catalogs` example
+- [ ] Document local catalog location (`~/.mcpi/catalogs/local/`)
+- [ ] Add FAQ section about catalogs
+- [ ] Update quick start guide with catalog commands
+
+**CHANGELOG.md**:
+- [ ] Add v0.4.0 section header
+- [ ] List new features (multi-catalog support)
+- [ ] List new commands (catalog list/info)
+- [ ] List new flags (--catalog, --all-catalogs)
+- [ ] List deprecations (create_default_catalog())
+- [ ] Add migration guide: v0.3.0 → v0.4.0
+- [ ] Add backward compatibility notes (no action required)
+
+**CLI Help**:
+- [ ] Verify `mcpi --help` shows catalog group
+- [ ] Verify `mcpi catalog --help` shows list/info commands
+- [ ] Verify `mcpi search --help` shows --catalog and --all-catalogs
+- [ ] Verify `mcpi info --help` shows --catalog
+- [ ] Verify `mcpi add --help` shows --catalog
+- [ ] Verify all examples are clear and working
+
+**Acceptance Criteria**:
+- [ ] CLAUDE.md fully updated with multi-catalog architecture
+- [ ] README.md has clear user-facing examples
+- [ ] CHANGELOG.md has complete v0.4.0 release notes
+- [ ] Migration guide is clear: "no action required, backward compatible"
+- [ ] CLI help text verified for all commands
+- [ ] Examples tested and working
+- [ ] Documentation reviewed for accuracy and completeness
+
+**Technical Notes**:
+- Emphasize backward compatibility throughout
+- Show both old and new code patterns
+- Make migration guide prominent
+- Include troubleshooting section for common issues
+
+---
+
+#### CATALOG-011: Manual Testing and Bug Fixes
+
+**Status**: Not Started
+**Effort**: Small (1 day)
+**Priority**: P1 (High)
+**Dependencies**: CATALOG-010
+**Spec Reference**: PLAN-CATALOG-IMPLEMENTATION § Task 3.4
+
+**Description**:
+Manual testing of complete feature and bug fixes before release.
+
+**Manual Test Checklist**:
+- [ ] Fresh install: verify local catalog created at `~/.mcpi/catalogs/local/`
+- [ ] `mcpi catalog list`: shows official + local
+- [ ] `mcpi catalog info official`: shows stats, categories, sample servers
+- [ ] `mcpi catalog info local`: shows local catalog (initially empty)
+- [ ] `mcpi search filesystem`: searches official (default)
+- [ ] `mcpi search filesystem --catalog official`: same as above
+- [ ] `mcpi search filesystem --catalog local`: searches local (empty initially)
+- [ ] `mcpi search filesystem --all-catalogs`: searches both
+- [ ] Add custom server to local catalog (manual JSON edit)
+- [ ] `mcpi search <custom>`: doesn't find it (official only)
+- [ ] `mcpi search <custom> --catalog local`: finds it
+- [ ] `mcpi search <custom> --all-catalogs`: finds it in local catalog
+- [ ] `mcpi info <custom> --catalog local`: shows details
+- [ ] Restart terminal, verify local catalog persists
+- [ ] Old code patterns: verify `create_default_catalog()` works (with warning)
+- [ ] Error messages: verify they're clear and helpful
+- [ ] Performance: no noticeable slowdowns vs. v0.3.0
+
+**Performance Benchmarks**:
+- [ ] `mcpi catalog list` runs in <100ms
+- [ ] `mcpi search <query>` runs in <500ms (official catalog, same as v0.3.0)
+- [ ] `mcpi search <query> --all-catalogs` runs in <1000ms
+- [ ] No performance regression vs. v0.3.0
+
+**Bug Fix Checklist**:
+- [ ] List all bugs discovered during manual testing
+- [ ] Create unit/integration test for each bug (regression test)
+- [ ] Fix each bug
+- [ ] Verify fix doesn't break other functionality
+- [ ] Re-run full test suite (all 752+ tests pass)
+- [ ] Re-run manual test checklist to verify all tests pass
+
+**Acceptance Criteria**:
+- [ ] All manual tests pass
+- [ ] All bugs discovered are fixed
+- [ ] Regression tests added for all bugs
+- [ ] Performance benchmarks met (<100ms list, <500ms search)
+- [ ] No regressions vs. v0.3.0
+- [ ] Feature ready for v0.4.0 release
+
+**Technical Notes**:
+- Use clean system for fresh install test (or clean up `~/.mcpi`)
+- Use `time` command for performance measurements
+- Document any issues in GitHub issues
+- Be thorough: this is final gate before release
+
+---
+
+## Dependency Graph
+
+```
+CATALOG-001: CatalogManager Implementation (2 days) - Foundation
+  │
+  ├─> CATALOG-002: Unit Tests (1 day)
+  │
+  └─> CATALOG-003: CLI Context Integration (1 day)
+       │
+       ├─> CATALOG-004: search --catalog (1 day)
+       │
+       ├─> CATALOG-005: info/add --catalog (1 day)
+       │
+       └─> CATALOG-006: catalog subcommand (2 days)
+            │
+            └─> CATALOG-007: CLI Integration Tests (1 day)
+                 │
+                 └─> CATALOG-008: E2E Tests (2 days)
+                      │
+                      └─> CATALOG-009: Update Existing Tests (2 days)
+                           │
+                           └─> CATALOG-010: Documentation (2 days)
+                                │
+                                └─> CATALOG-011: Manual Testing (1 day)
+```
+
+**Critical Path**: CATALOG-001 → CATALOG-003 → CATALOG-006 → CATALOG-007 → CATALOG-008 → CATALOG-009 → CATALOG-010 → CATALOG-011
+
+**Parallelization Opportunities**:
+- CATALOG-004, CATALOG-005, CATALOG-006 can run in parallel after CATALOG-003 (all depend on CLI context, not each other)
+- CATALOG-002 can run in parallel with CATALOG-003 (both depend on CATALOG-001)
+
+**Total Timeline**: 17 days (3.4 weeks) if sequential, 14 days (2.8 weeks) if parallelized
+
+---
+
+## Sprint Planning Recommendation
+
+### Sprint 1: Foundation (Week 1)
+- **Goal**: Core infrastructure working, fully tested
+- **Tasks**: CATALOG-001, CATALOG-002, CATALOG-003
+- **Deliverable**: CatalogManager working with tests, CLI context integrated
+
+### Sprint 2: CLI Commands (Week 2)
+- **Goal**: All CLI commands support catalogs
+- **Tasks**: CATALOG-004, CATALOG-005, CATALOG-006, CATALOG-007
+- **Deliverable**: Complete CLI with catalog support, integration tests passing
+
+### Sprint 3: Testing & Release (Week 3)
+- **Goal**: Production ready, documented, shipped
+- **Tasks**: CATALOG-008, CATALOG-009, CATALOG-010, CATALOG-011
+- **Deliverable**: v0.4.0 ready to ship
+
+---
+
+## Success Criteria (Phase 1 Complete)
+
+### Functional Requirements ✅
+
+- [ ] Two catalogs working (official + local)
+- [ ] `mcpi catalog list` shows both catalogs with correct metadata
+- [ ] `mcpi catalog info <name>` shows catalog details
+- [ ] `mcpi search --catalog <name>` searches specific catalog
+- [ ] `mcpi search --all-catalogs` searches both, groups results
+- [ ] `mcpi info --catalog <name>` works
+- [ ] `mcpi add --catalog <name>` works
+- [ ] Local catalog auto-initialized at `~/.mcpi/catalogs/local/catalog.json`
+- [ ] Local catalog persists across sessions
+- [ ] Catalog names case-insensitive (OFFICIAL = official)
+
+### Quality Requirements ✅
+
+- [ ] 100% backward compatibility (no breaking changes)
+- [ ] All new tests pass (14 unit + 11 integration + 9 E2E = 34 tests)
+- [ ] 100% code coverage for CatalogManager
+- [ ] All existing 752 tests still pass
+- [ ] Zero test regressions
+- [ ] Documentation complete (CLAUDE.md, README.md, CHANGELOG.md)
+- [ ] CLI help text verified
+- [ ] Zero performance regression vs. v0.3.0
+- [ ] Code passes mypy type checking
+- [ ] Code formatted with black
+- [ ] Code passes ruff linting
+
+### Release Requirements ✅
+
+- [ ] CHANGELOG.md updated with v0.4.0 release notes
+- [ ] Migration guide complete (emphasizes: no action needed)
+- [ ] All manual tests pass
+- [ ] All bugs fixed
+- [ ] Performance benchmarks met:
+  - `mcpi catalog list` < 100ms
+  - `mcpi search <query>` < 500ms (no regression)
+  - `mcpi search --all-catalogs` < 1000ms
+- [ ] Ready to tag v0.4.0 and ship
+
+---
+
+## Risk Assessment
+
+### Technical Risks (All LOW)
+
+| Risk | Probability | Impact | Mitigation | Status |
+|------|-------------|--------|------------|--------|
+| Breaking changes | VERY LOW | HIGH | Backward compat design, deprecation warnings | ✅ Mitigated |
+| Performance regression | LOW | MEDIUM | Lazy loading, benchmarking, caching | ✅ Mitigated |
+| Test failures | LOW | HIGH | Incremental updates, careful review | ✅ Mitigated |
+| Local catalog init fails | MEDIUM | LOW | Graceful degradation, warn and continue | ✅ Mitigated |
+
+### Schedule Risks (All LOW-MEDIUM)
+
+| Risk | Probability | Impact | Mitigation | Status |
+|------|-------------|--------|------------|--------|
+| Tasks take longer | MEDIUM | MEDIUM | 2-3 week buffer in estimates | ✅ Mitigated |
+| Bugs discovered | MEDIUM | MEDIUM | Thorough testing, regression tests | ✅ Planned |
+| Documentation takes longer | LOW | LOW | Clear structure, examples provided | ✅ Mitigated |
+
+### Overall Risk: **LOW** - Well-scoped, proven patterns, backward compatible
+
+---
+
+## Next Steps
+
+### Immediate (Before Starting)
+1. ✅ Review this backlog with user
+2. ✅ Confirm pragmatic decisions on 3 spec clarifications
+3. ✅ Create GitHub issue or task tracker for Phase 1
+4. ✅ Set up test environment
+
+### Week 1 (Start Implementation)
+5. Begin CATALOG-001: CatalogManager implementation
+6. Daily progress reviews
+7. Complete CATALOG-001, CATALOG-002, CATALOG-003
+
+### Week 2-3 (Continue Implementation)
+8. Complete all CLI tasks (CATALOG-004 through CATALOG-007)
+9. Complete all testing tasks (CATALOG-008, CATALOG-009)
+10. Complete documentation (CATALOG-010)
+11. Manual testing and bug fixes (CATALOG-011)
+
+### Ship v0.4.0
+12. Create release tag
+13. Update GitHub release notes
+14. Announce feature to users
+15. Monitor for issues
+
+---
+
+## Appendix: Spec Clarification Summary
+
+**Question 1**: Local catalog init error handling
+**Decision**: WARN and continue (graceful degradation)
+**Rationale**: Official catalog always works, local is optional
+
+**Question 2**: Catalog name case sensitivity
+**Decision**: Case-insensitive (normalize to lowercase)
+**Rationale**: Consistent with CLI, principle of least surprise
+
+**Question 3**: Search result ordering
+**Decision**: Catalog priority → alphabetically by server_id, no deduplication
+**Rationale**: Predictable, shows all matches with sources
+
+All decisions documented in code comments and docstrings.
+
+---
+
+**END OF BACKLOG**
+
+**Status**: READY FOR IMPLEMENTATION
+**Confidence**: 95% (comprehensive plan, clear tasks, all blockers resolved)
+**Next Action**: Begin CATALOG-001 (CatalogManager implementation)
+**First Task**: Create `src/mcpi/registry/catalog_manager.py` with CatalogManager class
+
+---
+
+*Backlog created by: Implementation Planner Agent*
+*Date: 2025-11-17 02:38:25*
+*Source: STATUS-CATALOG-PHASE1-EVALUATION-2025-11-17-023400.md*
+*Phase: 1 (MVP Foundation - v0.4.0)*
+*Timeline: 2-3 weeks (11 tasks, 34 tests)*

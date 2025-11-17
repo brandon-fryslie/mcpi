@@ -1,0 +1,161 @@
+{
+  "test_suite": "User-Internal Scope Enable/Disable",
+  "created": "2025-11-16",
+  "test_file": "tests/test_user_internal_disable_enable.py",
+  "documentation": "tests/README_USER_INTERNAL_DISABLE_ENABLE_TESTS.md",
+  
+  "tests_added": [
+    "test_disable_moves_server_from_active_to_disabled_file",
+    "test_enable_moves_server_from_disabled_to_active_file",
+    "test_is_disabled_returns_correct_status",
+    "test_disable_nonexistent_server_returns_false",
+    "test_enable_nonexistent_server_returns_false",
+    "test_get_disabled_servers_returns_correct_list",
+    "test_disable_idempotent",
+    "test_enable_idempotent",
+    "test_disable_removes_server_from_active_file",
+    "test_disable_adds_server_to_disabled_file",
+    "test_enable_moves_server_back_to_active_file",
+    "test_list_servers_shows_correct_state",
+    "test_disabled_server_does_not_appear_in_claude_mcp_list",
+    "test_enabled_server_appears_in_claude_mcp_list",
+    "test_multiple_servers_disable_enable_independently"
+  ],
+  
+  "test_counts": {
+    "total": 15,
+    "unit_tests": 8,
+    "integration_tests": 4,
+    "e2e_tests": 3
+  },
+  
+  "current_results": {
+    "passing": 8,
+    "failing": 3,
+    "skipped": 3,
+    "pass_rate": "53%"
+  },
+  
+  "expected_after_fix": {
+    "passing": 12,
+    "failing": 0,
+    "skipped": 3,
+    "pass_rate": "100% (excluding skipped)"
+  },
+  
+  "workflows_covered": [
+    "Disable server in user-internal scope (file-move mechanism)",
+    "Enable server in user-internal scope (file-move mechanism)",
+    "Verify disabled servers don't appear in Claude Code",
+    "Verify enabled servers do appear in Claude Code",
+    "State tracking for user-internal scope",
+    "Error handling for non-existent servers",
+    "Idempotency of disable/enable operations"
+  ],
+  
+  "gaming_resistance": "high",
+  "gaming_resistance_features": [
+    "Unit tests use real file I/O (JSONFileReader/Writer, not mocks)",
+    "Integration tests verify actual file contents on disk",
+    "E2E tests run actual 'claude mcp list' command via subprocess",
+    "All tests verify observable outcomes (file contents, command output)",
+    "No mocks of core functionality (only test harness path overrides)",
+    "Tests verify ACTUAL Claude Code behavior, not internal MCPI state",
+    "E2E tests are THE SOURCE OF TRUTH - they test exactly what user sees"
+  ],
+  
+  "critical_finding": "Integration tests PROVE the bug exists - servers are not removed from active file after disable, which means Claude Code still loads them even when 'disabled'",
+  
+  "the_bug": {
+    "current_implementation": "FileTrackedEnableDisableHandler (tracking file mechanism)",
+    "problem": "Claude Code ignores tracking file and loads ALL servers from ~/.claude.json",
+    "evidence": [
+      "mcpi list --scope user-internal shows frida-mcp as DISABLED",
+      "claude mcp list shows frida-mcp as '✓ Connected' (running!)",
+      "Integration test shows server still in active file after disable"
+    ],
+    "user_impact": "Disabled servers continue running, defeating the purpose of disable"
+  },
+  
+  "the_fix": {
+    "new_implementation": "FileMoveEnableDisableHandler (file-move mechanism)",
+    "solution": "MOVE server configs between files instead of tracking in separate file",
+    "active_file": "~/.claude.json (ENABLED servers only)",
+    "disabled_file": "~/.claude/.disabled-servers.json (DISABLED servers)",
+    "result": "Claude Code only sees servers in ~/.claude.json, truly disabling removed servers",
+    "pattern": "Matches user-global scope implementation (proven to work)"
+  },
+  
+  "status_gaps_addressed": [
+    "Current user-internal disable doesn't actually prevent Claude from loading servers"
+  ],
+  
+  "plan_items_validated": [
+    "P0-FIX-USER-INTERNAL-DISABLE - Change user-internal to use FileMoveEnableDisableHandler",
+    "Verify disabled servers don't appear in 'claude mcp list'",
+    "Verify enabled servers do appear in 'claude mcp list'"
+  ],
+  
+  "files_created": [
+    "tests/test_user_internal_disable_enable.py",
+    "tests/README_USER_INTERNAL_DISABLE_ENABLE_TESTS.md",
+    "tests/test_user_internal_disable_enable_summary.json"
+  ],
+  
+  "files_to_modify": [
+    "src/mcpi/clients/claude_code.py (lines ~174-198)"
+  ],
+  
+  "commit_message_template": "test(user-internal): add comprehensive tests for enable/disable with file-move mechanism\n\nThese tests PROVE the current bug and will PASS after implementing the fix.\n\nCurrent bug:\n- FileTrackedEnableDisableHandler leaves servers in ~/.claude.json\n- Claude Code ignores tracking file and loads ALL servers\n- Disabled servers still run (defeats purpose of disable)\n\nFix (to implement):\n- Switch to FileMoveEnableDisableHandler (like user-global)\n- MOVE servers between active and disabled files\n- Claude Code only sees active file, truly disabling removed servers\n\nTests:\n- 8 unit tests (PASSING - handler works correctly)\n- 4 integration tests (FAILING - proves bug exists)\n- 3 E2E tests (SKIPPED - need careful implementation)\n\nAfter fix: All 12 non-E2E tests will pass",
+  
+  "manual_verification_steps": [
+    "Install test server: mcpi add test-server --scope user-internal",
+    "Verify appears in: claude mcp list",
+    "Disable server: mcpi disable test-server --scope user-internal",
+    "CRITICAL: Verify does NOT appear in: claude mcp list",
+    "Enable server: mcpi enable test-server --scope user-internal",
+    "Verify appears in: claude mcp list (again)",
+    "Clean up: mcpi remove test-server --scope user-internal"
+  ],
+  
+  "implementation_checklist": {
+    "code_changes": [
+      "Update src/mcpi/clients/claude_code.py (lines ~174-198)",
+      "Change from FileTrackedEnableDisableHandler to FileMoveEnableDisableHandler",
+      "Update disabled file path to ~/.claude/.disabled-servers.json",
+      "Add user_internal_disabled_file_path variable",
+      "Use self._get_scope_path() for path override support",
+      "Update comment from 'does NOT support' to 'NOW supports via file-move mechanism'"
+    ],
+    "test_updates": [
+      "Run pytest tests/test_user_internal_disable_enable.py -v",
+      "Verify all 12 non-E2E tests pass",
+      "Update test harness if needed (path override for user-internal-disabled)"
+    ],
+    "manual_verification": [
+      "Follow manual_verification_steps above"
+    ],
+    "documentation": [
+      "Update CLAUDE.md with user-internal enable/disable documentation",
+      "Update docstrings in _get_server_state() to include user-internal",
+      "Update docstrings in enable_server() to include user-internal",
+      "Update docstrings in disable_server() to include user-internal"
+    ]
+  },
+  
+  "success_criteria": {
+    "before_implementation": [
+      "Tests written and committed",
+      "Unit tests pass (verify handler works)",
+      "Integration tests FAIL (prove bug exists)",
+      "E2E tests documented with implementation guide"
+    ],
+    "after_implementation": [
+      "All 12 non-E2E tests pass",
+      "Integration tests pass (servers removed from active file)",
+      "Manual verification confirms servers don't appear in 'claude mcp list'",
+      "Documentation updated",
+      "Code committed with test results"
+    ]
+  }
+}

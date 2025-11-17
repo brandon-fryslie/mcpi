@@ -1790,6 +1790,117 @@ def status(ctx: click.Context, output_json: bool) -> None:
         console.print(f"[red]Error getting status: {e}[/red]")
 
 
+# CATALOG MANAGEMENT COMMANDS
+
+
+@main.group()
+@click.pass_context
+def catalog(ctx: click.Context) -> None:
+    """Manage MCP server catalogs.
+
+    MCPI supports multiple server catalogs:
+    - official: Built-in catalog of MCP servers
+    - local: Your custom servers
+    """
+    pass
+
+
+@catalog.command("list")
+@click.pass_context
+def catalog_list(ctx: click.Context) -> None:
+    """List all available catalogs.
+
+    Example:
+        mcpi catalog list
+    """
+    try:
+        manager = get_catalog_manager(ctx)
+        catalogs = manager.list_catalogs()
+
+        if not catalogs:
+            console.print("[yellow]No catalogs available[/yellow]")
+            return
+
+        table = Table(title="Available Catalogs", show_header=True)
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Type", style="magenta")
+        table.add_column("Servers", justify="right", style="green")
+        table.add_column("Description", style="white")
+
+        for cat in catalogs:
+            table.add_row(
+                cat.name,
+                cat.type,
+                str(cat.server_count),
+                cat.description
+            )
+
+        console.print(table)
+        console.print(f"\nUse [cyan]mcpi catalog info <name>[/cyan] for details")
+
+    except Exception as e:
+        console.print(f"[red]Error listing catalogs: {e}[/red]")
+
+
+@catalog.command("info")
+@click.argument("name", type=click.Choice(["official", "local"], case_sensitive=False))
+@click.pass_context
+def catalog_info(ctx: click.Context, name: str) -> None:
+    """Show detailed information about a catalog.
+
+    Examples:
+        mcpi catalog info official
+        mcpi catalog info local
+    """
+    try:
+        manager = get_catalog_manager(ctx)
+        cat = manager.get_catalog(name)
+
+        if not cat:
+            console.print(f"[red]Catalog '{name}' not found[/red]")
+            ctx.exit(1)
+
+        # Get catalog metadata
+        servers = cat.list_servers()
+        categories = cat.list_categories()
+
+        # Display using Rich
+        # Catalog header
+        console.print(Panel(
+            f"[bold cyan]{name}[/bold cyan] catalog\n{cat.catalog_path}",
+            title="Catalog Information"
+        ))
+
+        # Stats
+        console.print(f"\n[bold]Statistics:[/bold]")
+        console.print(f"  Servers: {len(servers)}")
+        console.print(f"  Categories: {len(categories)}")
+
+        # Top categories
+        if categories:
+            console.print(f"\n[bold]Top Categories:[/bold]")
+            sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)
+            for category, count in sorted_cats[:10]:
+                console.print(f"  {category}: {count}")
+
+        # Sample servers
+        if servers:
+            console.print(f"\n[bold]Sample Servers:[/bold]")
+            for server_id, server in servers[:5]:
+                console.print(f"  {server_id}: {server.description}")
+
+            if len(servers) > 5:
+                console.print(f"  ... and {len(servers) - 5} more")
+
+        console.print(f"\nUse [cyan]mcpi search <query> --catalog {name}[/cyan] to search this catalog")
+
+    except (SystemExit, click.exceptions.Exit):
+        # Re-raise exit exceptions to preserve exit codes
+        raise
+    except Exception as e:
+        console.print(f"[red]Error getting catalog info: {e}[/red]")
+
+
 # BUNDLE MANAGEMENT COMMANDS
 
 
