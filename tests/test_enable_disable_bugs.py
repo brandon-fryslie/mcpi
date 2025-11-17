@@ -705,7 +705,6 @@ class TestOriginalBugClientInfo:
         )
 
 
-
 class TestUserInternalEnableDisable:
     """Test enable/disable for user-internal scope using file-move mechanism.
 
@@ -783,12 +782,14 @@ class TestUserInternalEnableDisable:
         # Verify: Server is in disabled file (file-move mechanism)
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file"
+        assert "test-server" in disabled.get(
+            "mcpServers", {}
+        ), "Server not in disabled file"
 
         # Verify: Server REMOVED from active file (critical for file-move mechanism)
         config_data_after = mcp_harness.read_scope_file("user-internal")
-        assert (
-            "test-server" not in config_data_after.get("mcpServers", {})
+        assert "test-server" not in config_data_after.get(
+            "mcpServers", {}
         ), "Server still in active file (file-move didn't happen)"
 
     def test_user_internal_enable_server_removes_from_tracking_file(
@@ -829,7 +830,9 @@ class TestUserInternalEnableDisable:
 
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file after disable"
+        assert "test-server" in disabled.get(
+            "mcpServers", {}
+        ), "Server not in disabled file after disable"
 
         # Execute: Enable the server
         result = plugin.enable_server("test-server")
@@ -840,12 +843,14 @@ class TestUserInternalEnableDisable:
         # Verify: Server removed from disabled file
         with tracking_path.open("r") as f:
             disabled = json.load(f)
-        assert "test-server" not in disabled.get("mcpServers", {}), "Server still in disabled file"
+        assert "test-server" not in disabled.get(
+            "mcpServers", {}
+        ), "Server still in disabled file"
 
         # Verify: Server ADDED back to active file (critical for file-move mechanism)
         config_after = mcp_harness.read_scope_file("user-internal")
-        assert (
-            "test-server" in config_after.get("mcpServers", {})
+        assert "test-server" in config_after.get(
+            "mcpServers", {}
         ), "Server not restored to active file"
 
     def test_user_internal_disabled_server_shows_correct_state(
@@ -931,7 +936,9 @@ class TestUserInternalEnableDisable:
 
         # Verify: First succeeds, second fails (server already disabled)
         assert result1.success, f"First disable failed: {result1.message}"
-        assert not result2.success, f"Second disable should fail (server already disabled)"
+        assert (
+            not result2.success
+        ), f"Second disable should fail (server already disabled)"
 
         # Verify: Server appears only once in disabled file
         import json
@@ -944,8 +951,12 @@ class TestUserInternalEnableDisable:
             disabled = json.load(f)
 
         # Count occurrences in mcpServers dict
-        assert "test-server" in disabled.get("mcpServers", {}), "Server not in disabled file"
-        assert len(disabled.get("mcpServers", {})) == 1, "Multiple servers in disabled file (expected 1)"
+        assert "test-server" in disabled.get(
+            "mcpServers", {}
+        ), "Server not in disabled file"
+        assert (
+            len(disabled.get("mcpServers", {})) == 1
+        ), "Multiple servers in disabled file (expected 1)"
 
     def test_user_internal_idempotent_enable(self, plugin, mcp_harness):
         """Test that enabling a user-internal server twice is idempotent.
@@ -979,7 +990,9 @@ class TestUserInternalEnableDisable:
 
         # Verify: First succeeds, second fails (server already enabled)
         assert result1.success, f"First enable failed: {result1.message}"
-        assert not result2.success, f"Second enable should fail (server already enabled)"
+        assert (
+            not result2.success
+        ), f"Second enable should fail (server already enabled)"
 
         # Verify: Server not in disabled file
         import json
@@ -990,7 +1003,9 @@ class TestUserInternalEnableDisable:
         with tracking_path.open("r") as f:
             disabled = json.load(f)
 
-        assert "test-server" not in disabled.get("mcpServers", {}), "Server still in disabled file"
+        assert "test-server" not in disabled.get(
+            "mcpServers", {}
+        ), "Server still in disabled file"
 
     def test_user_internal_scope_isolation(self, plugin, mcp_harness):
         """Test that user-internal enable/disable doesn't affect other scopes.
@@ -1055,6 +1070,7 @@ class TestUserInternalEnableDisable:
         assert (
             user_local_data.get("disabledMcpjsonServers", []) == []
         ), "user-local disabled array was modified (wrong!)"
+
 
 # Summary of Test Coverage
 """

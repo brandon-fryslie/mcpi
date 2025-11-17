@@ -50,7 +50,7 @@ from tests.test_harness import MCPTestHarness  # noqa: F401
 # Skip all tests if bundle feature not implemented yet
 pytestmark = pytest.mark.skipif(
     Bundle is None,
-    reason="Bundle feature not implemented yet - tests define expected behavior"
+    reason="Bundle feature not implemented yet - tests define expected behavior",
 )
 
 
@@ -89,7 +89,7 @@ def sample_bundle_json() -> Dict[str, Any]:
             {"id": "filesystem"},
             {"id": "fetch"},
         ],
-        "suggested_scope": "project-mcp"
+        "suggested_scope": "project-mcp",
     }
 
 
@@ -128,9 +128,9 @@ def web_dev_bundle_json() -> Dict[str, Any]:
             {"id": "filesystem"},
             {"id": "fetch"},
             {"id": "github"},
-            {"id": "puppeteer"}
+            {"id": "puppeteer"},
         ],
-        "suggested_scope": "project-mcp"
+        "suggested_scope": "project-mcp",
     }
 
 
@@ -169,7 +169,7 @@ def multi_bundle_dir(bundle_data_dir, sample_bundle_json, web_dev_bundle_json):
             {"id": "postgres"},
             {"id": "filesystem"},
         ],
-        "suggested_scope": "user-global"
+        "suggested_scope": "user-global",
     }
     (bundle_data_dir / "data-science.json").write_text(
         json.dumps(data_science, indent=2)
@@ -332,7 +332,7 @@ class TestBundleCatalog:
             "description": "Valid bundle",
             "version": "1.0.0",
             "servers": [{"id": "filesystem"}],
-            "suggested_scope": "user-global"
+            "suggested_scope": "user-global",
         }
         (bundle_data_dir / "valid-bundle.json").write_text(
             json.dumps(valid_bundle, indent=2)
@@ -369,7 +369,7 @@ class TestBundleCatalog:
             "description": "Missing servers field",
             "version": "1.0.0",
             # Missing required 'servers' field
-            "suggested_scope": "user-global"
+            "suggested_scope": "user-global",
         }
         (bundle_data_dir / "invalid-schema.json").write_text(
             json.dumps(invalid_schema, indent=2)
@@ -381,7 +381,7 @@ class TestBundleCatalog:
             "description": "Valid bundle",
             "version": "1.0.0",
             "servers": [{"id": "filesystem"}],
-            "suggested_scope": "user-global"
+            "suggested_scope": "user-global",
         }
         (bundle_data_dir / "valid-bundle.json").write_text(
             json.dumps(valid_bundle, indent=2)
@@ -421,7 +421,7 @@ class TestBundleInstallation:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: User installs bundle and all servers appear in target scope.
 
@@ -455,9 +455,7 @@ class TestBundleInstallation:
 
         # EXECUTE: Install bundle to project-mcp scope
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         # VERIFY: All servers installed successfully
@@ -481,7 +479,7 @@ class TestBundleInstallation:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: User can install same bundle to different scopes.
 
@@ -511,17 +509,13 @@ class TestBundleInstallation:
 
         # EXECUTE: Install to user-global
         results_global = installer.install_bundle(
-            bundle=bundle,
-            scope="user-global",
-            client_name="claude-code"
+            bundle=bundle, scope="user-global", client_name="claude-code"
         )
         assert all(r.success for r in results_global)
 
         # EXECUTE: Install to project-mcp
         results_project = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
         assert all(r.success for r in results_project)
 
@@ -540,7 +534,7 @@ class TestBundleInstallation:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: Installing bundle with already-installed servers handles gracefully.
 
@@ -563,9 +557,11 @@ class TestBundleInstallation:
         fs_config = ServerConfig(
             command="npx",
             args=["-y", "@modelcontextprotocol/server-filesystem"],
-            type="stdio"
+            type="stdio",
         )
-        result = manager.add_server("filesystem", fs_config, "project-mcp", "claude-code")
+        result = manager.add_server(
+            "filesystem", fs_config, "project-mcp", "claude-code"
+        )
         assert result.success
 
         # VERIFY: Pre-existing server there
@@ -585,9 +581,7 @@ class TestBundleInstallation:
 
         # EXECUTE: Install bundle (has filesystem already installed)
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         # VERIFY: Installation completed (may report filesystem as existing)
@@ -606,7 +600,7 @@ class TestBundleInstallation:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: Dry-run mode shows what would be installed without modifying files.
 
@@ -643,10 +637,7 @@ class TestBundleInstallation:
 
         # EXECUTE: Dry-run installation
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code",
-            dry_run=True
+            bundle=bundle, scope="project-mcp", client_name="claude-code", dry_run=True
         )
 
         # VERIFY: Results returned showing what would be installed
@@ -656,8 +647,9 @@ class TestBundleInstallation:
         if config_path:
             if config_path.exists():
                 final_mtime = config_path.stat().st_mtime
-                assert initial_mtime == final_mtime, \
-                    "Dry-run should not modify files (mtime changed)"
+                assert (
+                    initial_mtime == final_mtime
+                ), "Dry-run should not modify files (mtime changed)"
 
         # VERIFY: No actual files created or modified
         config_content = harness.read_scope_file("project-mcp")
@@ -665,14 +657,12 @@ class TestBundleInstallation:
         if config_content is not None:
             # If file exists, should have no servers
             if "mcpServers" in config_content:
-                assert len(config_content["mcpServers"]) == 0, \
-                    "Dry-run should not add servers"
+                assert (
+                    len(config_content["mcpServers"]) == 0
+                ), "Dry-run should not add servers"
 
     def test_install_bundle_handles_missing_server_in_catalog(
-        self,
-        mcp_manager_with_harness,
-        bundle_data_dir,
-        real_server_catalog
+        self, mcp_manager_with_harness, bundle_data_dir, real_server_catalog
     ):
         """Test: Bundle referencing non-existent server handled gracefully.
 
@@ -701,7 +691,7 @@ class TestBundleInstallation:
                 {"id": "nonexistent-server-12345"},  # Invalid - truly doesn't exist
                 {"id": "fetch"},  # Valid
             ],
-            "suggested_scope": "project-mcp"
+            "suggested_scope": "project-mcp",
         }
         (bundle_data_dir / "test-bundle.json").write_text(
             json.dumps(bundle_with_invalid, indent=2)
@@ -715,9 +705,7 @@ class TestBundleInstallation:
 
         # EXECUTE: Install bundle with missing server
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         # VERIFY: Results include error for missing server
@@ -725,8 +713,7 @@ class TestBundleInstallation:
 
         # Find result for nonexistent server
         nonexistent_result = next(
-            (r for r in results if "nonexistent" in str(r.message).lower()),
-            None
+            (r for r in results if "nonexistent" in str(r.message).lower()), None
         )
         assert nonexistent_result is not None, "Should have result for missing server"
         assert not nonexistent_result.success, "Missing server should fail"
@@ -759,7 +746,7 @@ class TestBundleRemoval:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: User removes installed bundle and all servers disappear.
 
@@ -787,9 +774,7 @@ class TestBundleRemoval:
         installer = BundleInstaller(manager=manager, catalog=real_server_catalog)
 
         install_results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
         assert all(r.success for r in install_results)
 
@@ -800,9 +785,7 @@ class TestBundleRemoval:
 
         # EXECUTE: Remove bundle
         remove_results = installer.remove_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         # VERIFY: All servers removed successfully
@@ -827,7 +810,7 @@ class TestBundleRemoval:
         mcp_manager_with_harness,
         bundle_data_dir,
         sample_bundle_json,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: Remove bundle from one scope doesn't affect other scopes.
 
@@ -871,10 +854,7 @@ class TestBundleRemoval:
         assert harness.count_servers_in_scope("user-global") == 2
 
     def test_bundle_remove_handles_missing_bundle(
-        self,
-        mcp_manager_with_harness,
-        bundle_data_dir,
-        real_server_catalog
+        self, mcp_manager_with_harness, bundle_data_dir, real_server_catalog
     ):
         """Test: Removing non-existent bundle shows clear error.
 
@@ -896,7 +876,7 @@ class TestBundleRemoval:
             "description": "Bundle that was never installed",
             "version": "1.0.0",
             "servers": [{"id": "filesystem"}],
-            "suggested_scope": "project-mcp"
+            "suggested_scope": "project-mcp",
         }
         (bundle_data_dir / "uninstalled-bundle.json").write_text(
             json.dumps(bundle_json, indent=2)
@@ -934,9 +914,7 @@ class TestBundleCLICommands:
     """
 
     def test_bundle_list_command_shows_available_bundles(
-        self,
-        multi_bundle_dir,
-        tmp_path
+        self, multi_bundle_dir, tmp_path
     ):
         """Test: User runs 'mcpi bundle list' and sees all available bundles.
 
@@ -954,13 +932,13 @@ class TestBundleCLICommands:
         from mcpi.cli import main
 
         # SETUP: Mock bundle catalog to use test bundles
-        with patch('mcpi.cli.create_default_bundle_catalog') as mock_catalog_factory:
+        with patch("mcpi.cli.create_default_bundle_catalog") as mock_catalog_factory:
             mock_catalog = create_test_bundle_catalog(multi_bundle_dir)
             mock_catalog_factory.return_value = mock_catalog
 
             # EXECUTE: Run bundle list command
             runner = CliRunner()
-            result = runner.invoke(main, ['bundle', 'list'])
+            result = runner.invoke(main, ["bundle", "list"])
 
             # VERIFY: Command succeeded
             assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -974,10 +952,7 @@ class TestBundleCLICommands:
             assert "Test bundle for automated testing" in result.output
             assert "Complete web development stack" in result.output
 
-    def test_bundle_info_command_shows_bundle_details(
-        self,
-        multi_bundle_dir
-    ):
+    def test_bundle_info_command_shows_bundle_details(self, multi_bundle_dir):
         """Test: User runs 'mcpi bundle info web-dev' to see bundle details.
 
         User Journey:
@@ -995,13 +970,13 @@ class TestBundleCLICommands:
         from mcpi.cli import main
 
         # SETUP: Mock bundle catalog
-        with patch('mcpi.cli.create_default_bundle_catalog') as mock_catalog_factory:
+        with patch("mcpi.cli.create_default_bundle_catalog") as mock_catalog_factory:
             mock_catalog = create_test_bundle_catalog(multi_bundle_dir)
             mock_catalog_factory.return_value = mock_catalog
 
             # EXECUTE: Run bundle info command
             runner = CliRunner()
-            result = runner.invoke(main, ['bundle', 'info', 'web-dev'])
+            result = runner.invoke(main, ["bundle", "info", "web-dev"])
 
             # VERIFY: Command succeeded
             assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -1037,28 +1012,28 @@ class TestBundleCLICommands:
         from mcpi.cli import main
 
         # SETUP: Mock empty bundle catalog
-        with patch('mcpi.cli.create_default_bundle_catalog') as mock_catalog_factory:
+        with patch("mcpi.cli.create_default_bundle_catalog") as mock_catalog_factory:
             from pathlib import Path
+
             empty_dir = Path("/tmp/empty-bundles-test")
             mock_catalog = create_test_bundle_catalog(empty_dir)
             mock_catalog_factory.return_value = mock_catalog
 
             # EXECUTE: Run bundle info for nonexistent bundle
             runner = CliRunner()
-            result = runner.invoke(main, ['bundle', 'info', 'nonexistent'])
+            result = runner.invoke(main, ["bundle", "info", "nonexistent"])
 
             # VERIFY: Command failed
             assert result.exit_code != 0, "Should fail for missing bundle"
 
             # VERIFY: Error message helpful
-            assert "not found" in result.output.lower() or \
-                   "does not exist" in result.output.lower()
+            assert (
+                "not found" in result.output.lower()
+                or "does not exist" in result.output.lower()
+            )
 
     def test_bundle_install_command_installs_bundle(
-        self,
-        bundle_data_dir,
-        sample_bundle_json,
-        mcp_test_dir
+        self, bundle_data_dir, sample_bundle_json, mcp_test_dir
     ):
         """Test: User runs 'mcpi bundle install test-bundle' and servers installed.
 
@@ -1083,8 +1058,10 @@ class TestBundleCLICommands:
         )
 
         # SETUP: Mock dependencies
-        with patch('mcpi.cli.create_default_bundle_catalog') as mock_catalog_factory, \
-             patch('mcpi.cli.get_mcp_manager') as mock_manager_factory:
+        with (
+            patch("mcpi.cli.create_default_bundle_catalog") as mock_catalog_factory,
+            patch("mcpi.cli.get_mcp_manager") as mock_manager_factory,
+        ):
 
             # Mock bundle catalog
             mock_catalog = create_test_bundle_catalog(bundle_data_dir)
@@ -1093,18 +1070,24 @@ class TestBundleCLICommands:
             # Mock MCP manager (simplified for CLI test)
             mock_manager = MagicMock()
             mock_manager.add_server.return_value = MagicMock(
-                success=True,
-                message="Server added successfully"
+                success=True, message="Server added successfully"
             )
             mock_manager_factory.return_value = mock_manager
 
             # EXECUTE: Run bundle install command
             runner = CliRunner()
-            result = runner.invoke(main, [
-                'bundle', 'install', 'test-bundle',
-                '--scope', 'project-mcp',
-                '--client', 'claude-code'
-            ])
+            result = runner.invoke(
+                main,
+                [
+                    "bundle",
+                    "install",
+                    "test-bundle",
+                    "--scope",
+                    "project-mcp",
+                    "--client",
+                    "claude-code",
+                ],
+            )
 
             # VERIFY: Command succeeded
             assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -1113,13 +1096,12 @@ class TestBundleCLICommands:
             assert "install" in result.output.lower()
 
             # VERIFY: Manager.add_server called for each server
-            assert mock_manager.add_server.call_count == 2, \
-                "Should call add_server for both servers"
+            assert (
+                mock_manager.add_server.call_count == 2
+            ), "Should call add_server for both servers"
 
     def test_bundle_install_command_dry_run_flag(
-        self,
-        bundle_data_dir,
-        sample_bundle_json
+        self, bundle_data_dir, sample_bundle_json
     ):
         """Test: 'mcpi bundle install --dry-run' shows preview without installing.
 
@@ -1144,8 +1126,10 @@ class TestBundleCLICommands:
         )
 
         # SETUP: Mock dependencies
-        with patch('mcpi.cli.create_default_bundle_catalog') as mock_catalog_factory, \
-             patch('mcpi.cli.get_mcp_manager') as mock_manager_factory:
+        with (
+            patch("mcpi.cli.create_default_bundle_catalog") as mock_catalog_factory,
+            patch("mcpi.cli.get_mcp_manager") as mock_manager_factory,
+        ):
 
             mock_catalog = create_test_bundle_catalog(bundle_data_dir)
             mock_catalog_factory.return_value = mock_catalog
@@ -1155,18 +1139,23 @@ class TestBundleCLICommands:
 
             # EXECUTE: Run with --dry-run flag
             runner = CliRunner()
-            result = runner.invoke(main, [
-                'bundle', 'install', 'test-bundle',
-                '--scope', 'project-mcp',
-                '--dry-run'
-            ])
+            result = runner.invoke(
+                main,
+                [
+                    "bundle",
+                    "install",
+                    "test-bundle",
+                    "--scope",
+                    "project-mcp",
+                    "--dry-run",
+                ],
+            )
 
             # VERIFY: Command succeeded
             assert result.exit_code == 0, f"Command failed: {result.output}"
 
             # VERIFY: Dry-run indicated in output
-            assert "dry" in result.output.lower() or \
-                   "would" in result.output.lower()
+            assert "dry" in result.output.lower() or "would" in result.output.lower()
 
             # VERIFY: No actual installation (add_server not called for real)
             # In dry-run mode, either not called or called with dry_run=True
@@ -1189,10 +1178,7 @@ class TestBundleIntegrationWorkflows:
     """
 
     def test_complete_bundle_workflow_list_info_install(
-        self,
-        multi_bundle_dir,
-        mcp_manager_with_harness,
-        real_server_catalog
+        self, multi_bundle_dir, mcp_manager_with_harness, real_server_catalog
     ):
         """Test: Complete workflow from listing to installation.
 
@@ -1225,9 +1211,7 @@ class TestBundleIntegrationWorkflows:
         installer = BundleInstaller(manager=manager, catalog=real_server_catalog)
 
         results = installer.install_bundle(
-            bundle=web_dev,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=web_dev, scope="project-mcp", client_name="claude-code"
         )
 
         assert all(r.success for r in results), "All servers should install"
@@ -1247,7 +1231,7 @@ class TestBundleIntegrationWorkflows:
         bundle_data_dir,
         sample_bundle_json,
         mcp_manager_with_harness,
-        real_server_catalog
+        real_server_catalog,
     ):
         """Test: Bundle installation uses test harness isolation correctly.
 
@@ -1268,8 +1252,9 @@ class TestBundleIntegrationWorkflows:
 
         # VERIFY: Test harness using temp directory
         test_dir_str = str(harness.tmp_dir)
-        assert "/tmp" in test_dir_str or "/var/folders" in test_dir_str, \
-            "Harness should use temp directory"
+        assert (
+            "/tmp" in test_dir_str or "/var/folders" in test_dir_str
+        ), "Harness should use temp directory"
 
         # SETUP: Create and install bundle
         (bundle_data_dir / "test-bundle.json").write_text(
@@ -1283,9 +1268,7 @@ class TestBundleIntegrationWorkflows:
 
         # EXECUTE: Install bundle
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         assert all(r.success for r in results)
@@ -1297,8 +1280,9 @@ class TestBundleIntegrationWorkflows:
 
         # VERIFY: Config file in temp directory
         config_path_str = str(config_path)
-        assert "/tmp" in config_path_str or "/var/folders" in config_path_str, \
-            "Config should be in temp directory"
+        assert (
+            "/tmp" in config_path_str or "/var/folders" in config_path_str
+        ), "Config should be in temp directory"
 
         # VERIFY: Servers in config file
         content = harness.read_scope_file("project-mcp")
@@ -1308,10 +1292,7 @@ class TestBundleIntegrationWorkflows:
         assert "fetch" in content["mcpServers"]
 
     def test_bundle_with_custom_server_configs(
-        self,
-        bundle_data_dir,
-        mcp_manager_with_harness,
-        real_server_catalog
+        self, bundle_data_dir, mcp_manager_with_harness, real_server_catalog
     ):
         """Test: Bundle can specify custom config overrides for servers.
 
@@ -1338,20 +1319,20 @@ class TestBundleIntegrationWorkflows:
             "servers": [
                 {
                     "id": "github",
-                    "config": {
-                        "env": {
-                            "GITHUB_TOKEN": "${GITHUB_PERSONAL_TOKEN}"
-                        }
-                    }
+                    "config": {"env": {"GITHUB_TOKEN": "${GITHUB_PERSONAL_TOKEN}"}},
                 },
                 {
                     "id": "filesystem",
                     "config": {
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/custom/path"]
-                    }
-                }
+                        "args": [
+                            "-y",
+                            "@modelcontextprotocol/server-filesystem",
+                            "/custom/path",
+                        ]
+                    },
+                },
             ],
-            "suggested_scope": "project-mcp"
+            "suggested_scope": "project-mcp",
         }
 
         (bundle_data_dir / "custom-config-bundle.json").write_text(
@@ -1367,9 +1348,7 @@ class TestBundleIntegrationWorkflows:
 
         # EXECUTE: Install bundle with custom configs
         results = installer.install_bundle(
-            bundle=bundle,
-            scope="project-mcp",
-            client_name="claude-code"
+            bundle=bundle, scope="project-mcp", client_name="claude-code"
         )
 
         assert all(r.success for r in results)
@@ -1380,18 +1359,21 @@ class TestBundleIntegrationWorkflows:
 
         # VERIFY: Custom env var actually present with correct value
         if "env" in github_config:
-            assert "GITHUB_TOKEN" in github_config["env"], \
-                "Custom GITHUB_TOKEN env var should be present"
-            assert github_config["env"]["GITHUB_TOKEN"] == "${GITHUB_PERSONAL_TOKEN}", \
-                "Custom env var should have correct value"
+            assert (
+                "GITHUB_TOKEN" in github_config["env"]
+            ), "Custom GITHUB_TOKEN env var should be present"
+            assert (
+                github_config["env"]["GITHUB_TOKEN"] == "${GITHUB_PERSONAL_TOKEN}"
+            ), "Custom env var should have correct value"
 
         filesystem_config = harness.get_server_config("project-mcp", "filesystem")
         assert filesystem_config is not None, "Filesystem server should be installed"
 
         # VERIFY: Custom args actually present with correct values
         if "args" in filesystem_config:
-            assert "/custom/path" in filesystem_config["args"], \
-                "Custom path argument should be in args"
+            assert (
+                "/custom/path" in filesystem_config["args"]
+            ), "Custom path argument should be in args"
 
 
 # =============================================================================

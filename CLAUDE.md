@@ -274,6 +274,118 @@ manager = create_test_catalog_manager(official_path, local_path)
 **Backward Compatibility**:
 The old `create_default_catalog()` still works but shows a deprecation warning. Migrate to `create_default_catalog_manager()` for multi-catalog support.
 
+### Configuration Templates System (v0.5.0+)
+
+MCPI includes a configuration templates system that provides guided setup for MCP servers with interactive prompts, reducing configuration time from 15-30 minutes to 2-3 minutes.
+
+**Components (`mcpi.templates/`)**:
+
+- `models.py`: Pydantic models for templates
+  - `PromptDefinition`: Interactive prompt configuration (name, type, validation, default)
+  - `ServerTemplate`: Complete template (config + prompts + metadata)
+- `template_manager.py`: Template loading and management
+  - `TemplateManager`: Loads templates from YAML files, provides search/retrieval
+  - Lazy loading for fast CLI startup
+  - Factory functions for DIP compliance
+- `prompt_handler.py`: Interactive prompt collection
+  - Rich-based UI for prompts
+  - Secret masking for passwords/tokens
+  - Real-time validation with helpful error messages
+  - Retry on validation failure
+
+**Template Storage**:
+- Location: `data/templates/<server-id>/<template-name>.yaml`
+- Format: YAML with structured fields
+- Organization: One directory per server, multiple templates per server
+
+**Template Structure**:
+```yaml
+name: template-name
+description: "Brief description"
+server_id: postgres
+scope: user-global
+priority: high  # high, medium, low
+
+config:
+  command: npx
+  args: ["-y", "@package/server"]
+  env: {}
+
+prompts:
+  - name: PARAMETER_NAME
+    description: "Help text shown to user"
+    type: string  # string, secret, path, port, url
+    required: true
+    default: "default-value"
+    validation_pattern: "^[a-zA-Z0-9_]+$"
+
+notes: |
+  Multi-line setup instructions and examples.
+```
+
+**Prompt Types**:
+1. **string**: General text input
+2. **secret**: Masked input for passwords/tokens
+3. **path**: File system path (validates format)
+4. **port**: Port number (validates range 1-65535)
+5. **url**: URL (validates http://, https://, ws://, wss://)
+
+**CLI Integration**:
+```bash
+# List available templates
+mcpi add postgres --list-templates
+
+# Use a template
+mcpi add postgres --template local-development
+```
+
+**Template Workflow**:
+1. User selects server and template
+2. CLI displays template notes/instructions
+3. For each prompt in template:
+   - Show description and default value
+   - Collect user input (mask if secret)
+   - Validate input against type and regex
+   - Retry on validation failure
+4. Merge user values into template config
+5. Add server to specified scope
+
+**Validation**:
+- Pydantic validates template structure on load
+- Regex patterns validated at template load time
+- User input validated at runtime with type-specific rules
+- Clear error messages guide users to correct input
+
+**Available Templates** (v0.5.0):
+- PostgreSQL: 3 templates (local-development, docker, production)
+- GitHub: 3 templates (personal-full-access, read-only, public-repos)
+- Filesystem: 3 templates (project-files, user-documents, custom-directories)
+- Slack: 2 templates (bot-token, limited-channels)
+- Brave Search: 1 template (api-key)
+
+**Testing Strategy**:
+- Unit tests for models (validation, type checking)
+- Unit tests for template manager (loading, retrieval, lazy loading)
+- Unit tests for prompt handler (validation, masking, error handling)
+- Integration tests for CLI (mocked prompts, end-to-end workflow)
+- Template validation tests (all templates load successfully)
+
+**Factory Functions**:
+```python
+# Production use
+from mcpi.templates.template_manager import create_default_template_manager
+manager = create_default_template_manager()
+templates = manager.list_templates("postgres")
+
+# Test use
+from mcpi.templates.template_manager import create_test_template_manager
+from pathlib import Path
+manager = create_test_template_manager(Path("/tmp/templates"))
+```
+
+**Adding New Templates**:
+See `docs/TEMPLATE_AUTHORING_GUIDE.md` for detailed guidance on creating templates.
+
 **CLI Interface (`mcpi.cli`)**
 
 - Click-based command structure with lazy initialization

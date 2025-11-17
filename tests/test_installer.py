@@ -308,9 +308,7 @@ class TestClaudeCodeInstaller:
         """Test uninstalling a server."""
         config_path = tmp_path / "mcp_servers.json"
         test_config = {
-            "mcpServers": {
-                "test_server": {"command": "npx", "args": ["test-package"]}
-            }
+            "mcpServers": {"test_server": {"command": "npx", "args": ["test-package"]}}
         }
 
         with open(config_path, "w") as f:

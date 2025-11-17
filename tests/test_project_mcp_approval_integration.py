@@ -88,15 +88,14 @@ class TestProjectMCPApprovalIntegration:
 
         # Execute: Add server to project-mcp scope
         config = ServerConfig(
-            command="npx",
-            args=["-y", "@modelcontextprotocol/server-filesystem"]
+            command="npx", args=["-y", "@modelcontextprotocol/server-filesystem"]
         )
 
         result = manager.add_server(
             server_id="filesystem",
             config=config,
             scope="project-mcp",
-            client_name="claude-code"
+            client_name="claude-code",
         )
 
         # Verify: Add operation succeeded
@@ -105,9 +104,9 @@ class TestProjectMCPApprovalIntegration:
         # Verify: Server appears in .mcp.json
         mcp_json_data = harness.read_scope_file("project-mcp")
         assert mcp_json_data is not None, ".mcp.json not created"
-        assert "filesystem" in mcp_json_data.get("mcpServers", {}), (
-            "Server not in .mcp.json"
-        )
+        assert "filesystem" in mcp_json_data.get(
+            "mcpServers", {}
+        ), "Server not in .mcp.json"
 
         # CRITICAL: Verify server shows as DISABLED (not approved)
         servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
@@ -129,9 +128,9 @@ class TestProjectMCPApprovalIntegration:
         settings_local = harness.read_scope_file("project-local")
         if settings_local is not None:
             enabled = settings_local.get("enabledMcpjsonServers", [])
-            assert "filesystem" not in enabled, (
-                "Server should NOT be in enabledMcpjsonServers after add"
-            )
+            assert (
+                "filesystem" not in enabled
+            ), "Server should NOT be in enabledMcpjsonServers after add"
 
     def test_enable_server_adds_to_approval_array(self, manager_and_harness):
         """Enable server → Adds to enabledMcpjsonServers → Shows ENABLED.
@@ -146,29 +145,34 @@ class TestProjectMCPApprovalIntegration:
         manager, harness = manager_and_harness
 
         # Setup: Add server to .mcp.json (without approval)
-        harness.prepopulate_file("project-mcp", {
-            "mcpServers": {
-                "filesystem": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                    "type": "stdio"
+        harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "filesystem": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                        "type": "stdio",
+                    }
                 }
-            }
-        })
+            },
+        )
 
         # Verify: Server initially DISABLED (not approved)
-        servers_before = manager.list_servers(scope="project-mcp", client_name="claude-code")
-        fs_before = next((s for s in servers_before.values() if s.id == "filesystem"), None)
-        assert fs_before is not None, "Server not found"
-        assert fs_before.state == ServerState.DISABLED, (
-            "Server should start DISABLED (not approved)"
+        servers_before = manager.list_servers(
+            scope="project-mcp", client_name="claude-code"
         )
+        fs_before = next(
+            (s for s in servers_before.values() if s.id == "filesystem"), None
+        )
+        assert fs_before is not None, "Server not found"
+        assert (
+            fs_before.state == ServerState.DISABLED
+        ), "Server should start DISABLED (not approved)"
 
         # Execute: Enable server (approve)
         result = manager.enable_server(
-            server_id="filesystem",
-            scope="project-mcp",
-            client_name="claude-code"
+            server_id="filesystem", scope="project-mcp", client_name="claude-code"
         )
 
         # Verify: Enable operation succeeded
@@ -177,20 +181,24 @@ class TestProjectMCPApprovalIntegration:
         # Verify: Server added to enabledMcpjsonServers
         settings_local = harness.read_scope_file("project-local")
         assert settings_local is not None, "Settings file not created"
-        assert "enabledMcpjsonServers" in settings_local, (
-            "enabledMcpjsonServers array missing"
-        )
-        assert "filesystem" in settings_local["enabledMcpjsonServers"], (
-            "Server not added to enabledMcpjsonServers"
-        )
+        assert (
+            "enabledMcpjsonServers" in settings_local
+        ), "enabledMcpjsonServers array missing"
+        assert (
+            "filesystem" in settings_local["enabledMcpjsonServers"]
+        ), "Server not added to enabledMcpjsonServers"
 
         # CRITICAL: Verify server now shows as ENABLED
-        servers_after = manager.list_servers(scope="project-mcp", client_name="claude-code")
-        fs_after = next((s for s in servers_after.values() if s.id == "filesystem"), None)
-        assert fs_after is not None, "Server not found after enable"
-        assert fs_after.state == ServerState.ENABLED, (
-            f"Server should be ENABLED after approval, got {fs_after.state}"
+        servers_after = manager.list_servers(
+            scope="project-mcp", client_name="claude-code"
         )
+        fs_after = next(
+            (s for s in servers_after.values() if s.id == "filesystem"), None
+        )
+        assert fs_after is not None, "Server not found after enable"
+        assert (
+            fs_after.state == ServerState.ENABLED
+        ), f"Server should be ENABLED after approval, got {fs_after.state}"
 
     def test_disable_server_adds_to_disabled_array(self, manager_and_harness):
         """Disable server → Adds to disabledMcpjsonServers → Shows DISABLED.
@@ -205,35 +213,40 @@ class TestProjectMCPApprovalIntegration:
         manager, harness = manager_and_harness
 
         # Setup: Add server to .mcp.json
-        harness.prepopulate_file("project-mcp", {
-            "mcpServers": {
-                "filesystem": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                    "type": "stdio"
+        harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "filesystem": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                        "type": "stdio",
+                    }
                 }
-            }
-        })
+            },
+        )
 
         # Setup: Approve server (add to enabledMcpjsonServers)
-        harness.prepopulate_file("project-local", {
-            "enabledMcpjsonServers": ["filesystem"],
-            "disabledMcpjsonServers": []
-        })
+        harness.prepopulate_file(
+            "project-local",
+            {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+        )
 
         # Verify: Server initially ENABLED (approved)
-        servers_before = manager.list_servers(scope="project-mcp", client_name="claude-code")
-        fs_before = next((s for s in servers_before.values() if s.id == "filesystem"), None)
-        assert fs_before is not None, "Server not found"
-        assert fs_before.state == ServerState.ENABLED, (
-            "Server should start ENABLED (approved)"
+        servers_before = manager.list_servers(
+            scope="project-mcp", client_name="claude-code"
         )
+        fs_before = next(
+            (s for s in servers_before.values() if s.id == "filesystem"), None
+        )
+        assert fs_before is not None, "Server not found"
+        assert (
+            fs_before.state == ServerState.ENABLED
+        ), "Server should start ENABLED (approved)"
 
         # Execute: Disable server
         result = manager.disable_server(
-            server_id="filesystem",
-            scope="project-mcp",
-            client_name="claude-code"
+            server_id="filesystem", scope="project-mcp", client_name="claude-code"
         )
 
         # Verify: Disable operation succeeded
@@ -242,22 +255,28 @@ class TestProjectMCPApprovalIntegration:
         # Verify: Server moved to disabledMcpjsonServers
         settings_local = harness.read_scope_file("project-local")
         assert settings_local is not None, "Settings file missing"
-        assert "filesystem" in settings_local.get("disabledMcpjsonServers", []), (
-            "Server not added to disabledMcpjsonServers"
-        )
-        assert "filesystem" not in settings_local.get("enabledMcpjsonServers", []), (
-            "Server should be removed from enabledMcpjsonServers"
-        )
+        assert "filesystem" in settings_local.get(
+            "disabledMcpjsonServers", []
+        ), "Server not added to disabledMcpjsonServers"
+        assert "filesystem" not in settings_local.get(
+            "enabledMcpjsonServers", []
+        ), "Server should be removed from enabledMcpjsonServers"
 
         # CRITICAL: Verify server now shows as DISABLED
-        servers_after = manager.list_servers(scope="project-mcp", client_name="claude-code")
-        fs_after = next((s for s in servers_after.values() if s.id == "filesystem"), None)
-        assert fs_after is not None, "Server not found after disable"
-        assert fs_after.state == ServerState.DISABLED, (
-            f"Server should be DISABLED after disable, got {fs_after.state}"
+        servers_after = manager.list_servers(
+            scope="project-mcp", client_name="claude-code"
         )
+        fs_after = next(
+            (s for s in servers_after.values() if s.id == "filesystem"), None
+        )
+        assert fs_after is not None, "Server not found after disable"
+        assert (
+            fs_after.state == ServerState.DISABLED
+        ), f"Server should be DISABLED after disable, got {fs_after.state}"
 
-    def test_list_servers_shows_correct_state_for_all_combinations(self, manager_and_harness):
+    def test_list_servers_shows_correct_state_for_all_combinations(
+        self, manager_and_harness
+    ):
         """List servers shows correct state for various approval combinations.
 
         This test verifies multiple servers in different states all show correctly.
@@ -271,39 +290,45 @@ class TestProjectMCPApprovalIntegration:
         manager, harness = manager_and_harness
 
         # Setup: Multiple servers in .mcp.json
-        harness.prepopulate_file("project-mcp", {
-            "mcpServers": {
-                "approved-server": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                    "type": "stdio"
-                },
-                "unapproved-server": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-github"],
-                    "type": "stdio"
-                },
-                "explicitly-disabled": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-slack"],
-                    "type": "stdio"
-                },
-                "inline-disabled": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-git"],
-                    "type": "stdio",
-                    "disabled": True  # Inline disabled field
+        harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "approved-server": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                        "type": "stdio",
+                    },
+                    "unapproved-server": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-github"],
+                        "type": "stdio",
+                    },
+                    "explicitly-disabled": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-slack"],
+                        "type": "stdio",
+                    },
+                    "inline-disabled": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-git"],
+                        "type": "stdio",
+                        "disabled": True,  # Inline disabled field
+                    },
                 }
-            }
-        })
+            },
+        )
 
         # Setup: Approval file with mixed states
-        harness.prepopulate_file("project-local", {
-            "enabledMcpjsonServers": ["approved-server"],
-            "disabledMcpjsonServers": ["explicitly-disabled"]
-            # Note: unapproved-server in NEITHER array
-            # Note: inline-disabled has inline field (should override approval)
-        })
+        harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": ["approved-server"],
+                "disabledMcpjsonServers": ["explicitly-disabled"],
+                # Note: unapproved-server in NEITHER array
+                # Note: inline-disabled has inline field (should override approval)
+            },
+        )
 
         # Execute: List servers
         servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
@@ -316,21 +341,21 @@ class TestProjectMCPApprovalIntegration:
         }
 
         # Verify: Each server has correct state
-        assert server_states.get("approved-server") == ServerState.ENABLED, (
-            "approved-server should be ENABLED (in enabledMcpjsonServers)"
-        )
+        assert (
+            server_states.get("approved-server") == ServerState.ENABLED
+        ), "approved-server should be ENABLED (in enabledMcpjsonServers)"
 
-        assert server_states.get("unapproved-server") == ServerState.DISABLED, (
-            "unapproved-server should be DISABLED (not in any array = not approved)"
-        )
+        assert (
+            server_states.get("unapproved-server") == ServerState.DISABLED
+        ), "unapproved-server should be DISABLED (not in any array = not approved)"
 
-        assert server_states.get("explicitly-disabled") == ServerState.DISABLED, (
-            "explicitly-disabled should be DISABLED (in disabledMcpjsonServers)"
-        )
+        assert (
+            server_states.get("explicitly-disabled") == ServerState.DISABLED
+        ), "explicitly-disabled should be DISABLED (in disabledMcpjsonServers)"
 
-        assert server_states.get("inline-disabled") == ServerState.DISABLED, (
-            "inline-disabled should be DISABLED (inline disabled=true field)"
-        )
+        assert (
+            server_states.get("inline-disabled") == ServerState.DISABLED
+        ), "inline-disabled should be DISABLED (inline disabled=true field)"
 
     def test_inline_disabled_field_still_works(self, manager_and_harness):
         """Inline 'disabled': true field still works (backward compatibility).
@@ -347,22 +372,25 @@ class TestProjectMCPApprovalIntegration:
         manager, harness = manager_and_harness
 
         # Setup: Server with inline disabled field
-        harness.prepopulate_file("project-mcp", {
-            "mcpServers": {
-                "filesystem": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                    "type": "stdio",
-                    "disabled": True  # Inline disabled field
+        harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "filesystem": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                        "type": "stdio",
+                        "disabled": True,  # Inline disabled field
+                    }
                 }
-            }
-        })
+            },
+        )
 
         # Setup: Server also in enabledMcpjsonServers (should be overridden)
-        harness.prepopulate_file("project-local", {
-            "enabledMcpjsonServers": ["filesystem"],
-            "disabledMcpjsonServers": []
-        })
+        harness.prepopulate_file(
+            "project-local",
+            {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+        )
 
         # Execute: List servers
         servers = manager.list_servers(scope="project-mcp", client_name="claude-code")

@@ -107,17 +107,17 @@ class TestTemplateStructure:
         """All templates must have descriptions."""
         for template in all_templates:
             assert template.description, f"Template {template.name} missing description"
-            assert len(template.description) > 10, (
-                f"Template {template.name} description too short"
-            )
+            assert (
+                len(template.description) > 10
+            ), f"Template {template.name} description too short"
 
     def test_all_templates_have_valid_priority(self, all_templates):
         """All templates must have valid priority values."""
         valid_priorities = {"high", "medium", "low"}
         for template in all_templates:
-            assert template.priority in valid_priorities, (
-                f"Template {template.name} has invalid priority: {template.priority}"
-            )
+            assert (
+                template.priority in valid_priorities
+            ), f"Template {template.name} has invalid priority: {template.priority}"
 
     def test_all_templates_have_valid_scopes(self, all_templates):
         """All templates must have valid scope values."""
@@ -128,22 +128,20 @@ class TestTemplateStructure:
             "user-internal",
         }
         for template in all_templates:
-            assert template.scope in valid_scopes, (
-                f"Template {template.name} has invalid scope: {template.scope}"
-            )
+            assert (
+                template.scope in valid_scopes
+            ), f"Template {template.name} has invalid scope: {template.scope}"
 
     def test_all_templates_have_command_and_args(self, all_templates):
         """All templates must have command and args in config."""
         for template in all_templates:
-            assert "command" in template.config, (
-                f"Template {template.name} missing command"
-            )
-            assert "args" in template.config, (
-                f"Template {template.name} missing args"
-            )
-            assert isinstance(template.config["args"], list), (
-                f"Template {template.name} args must be a list"
-            )
+            assert (
+                "command" in template.config
+            ), f"Template {template.name} missing command"
+            assert "args" in template.config, f"Template {template.name} missing args"
+            assert isinstance(
+                template.config["args"], list
+            ), f"Template {template.name} args must be a list"
 
     def test_secrets_are_marked_correctly(self, all_templates):
         """Prompts for sensitive data should be marked as 'secret' type."""
@@ -206,7 +204,10 @@ class TestTemplateApplication:
 
         assert config.command == "npx"
         assert config.args == ["-y", "@modelcontextprotocol/server-github"]
-        assert config.env["GITHUB_PERSONAL_ACCESS_TOKEN"] == user_values["GITHUB_PERSONAL_ACCESS_TOKEN"]
+        assert (
+            config.env["GITHUB_PERSONAL_ACCESS_TOKEN"]
+            == user_values["GITHUB_PERSONAL_ACCESS_TOKEN"]
+        )
 
     def test_filesystem_project_files_template(self):
         """Apply filesystem project-files template with mock values."""
@@ -455,9 +456,9 @@ class TestServerSpecificValidation:
 
             # Should have POSTGRES_DATABASE prompt
             prompt_names = {p.name for p in template.prompts}
-            assert "POSTGRES_DATABASE" in prompt_names, (
-                f"Template {template_name} missing POSTGRES_DATABASE prompt"
-            )
+            assert (
+                "POSTGRES_DATABASE" in prompt_names
+            ), f"Template {template_name} missing POSTGRES_DATABASE prompt"
 
     def test_github_token_format_validation(self):
         """GitHub templates should validate token format."""
@@ -466,9 +467,7 @@ class TestServerSpecificValidation:
         assert template is not None
 
         # Find token prompt
-        token_prompt = next(
-            p for p in template.prompts if "TOKEN" in p.name
-        )
+        token_prompt = next(p for p in template.prompts if "TOKEN" in p.name)
 
         # Valid GitHub tokens (exact format from template regex)
         # Pattern: ^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$
@@ -502,9 +501,9 @@ class TestServerSpecificValidation:
 
             # Should have at least one path prompt
             path_prompts = [p for p in template.prompts if p.type == "path"]
-            assert len(path_prompts) > 0, (
-                f"Template {template_name} should have path prompts"
-            )
+            assert (
+                len(path_prompts) > 0
+            ), f"Template {template_name} should have path prompts"
 
     def test_slack_token_and_team_id_format(self):
         """Slack templates should validate token and team ID format."""
@@ -551,9 +550,7 @@ class TestServerSpecificValidation:
         assert template is not None
 
         # Find API key prompt
-        api_key_prompt = next(
-            p for p in template.prompts if "API_KEY" in p.name
-        )
+        api_key_prompt = next(p for p in template.prompts if "API_KEY" in p.name)
 
         # Should be marked as secret
         assert api_key_prompt.type == "secret", "API key should be secret type"
@@ -602,21 +599,21 @@ class TestTemplateConsistency:
         """All npx-based templates should use -y flag."""
         for template in all_templates:
             if template.config["command"] == "npx":
-                assert "-y" in template.config["args"], (
-                    f"Template {template.name} uses npx but missing -y flag"
-                )
+                assert (
+                    "-y" in template.config["args"]
+                ), f"Template {template.name} uses npx but missing -y flag"
 
     def test_template_names_follow_convention(self, all_templates):
         """Template names should follow kebab-case convention."""
         for template in all_templates:
             # Should be lowercase with hyphens
-            assert template.name.islower() or "-" in template.name, (
-                f"Template name {template.name} should be lowercase/kebab-case"
-            )
+            assert (
+                template.name.islower() or "-" in template.name
+            ), f"Template name {template.name} should be lowercase/kebab-case"
             # Should not have spaces
-            assert " " not in template.name, (
-                f"Template name {template.name} should not have spaces"
-            )
+            assert (
+                " " not in template.name
+            ), f"Template name {template.name} should not have spaces"
 
     def test_high_priority_templates_are_simplest(self, all_templates):
         """High priority templates should generally be simpler (fewer prompts)."""
@@ -636,8 +633,12 @@ class TestTemplateConsistency:
             other_priority = [t for t in templates if t.priority != "high"]
 
             if high_priority and other_priority:
-                avg_high_prompts = sum(len(t.prompts) for t in high_priority) / len(high_priority)
-                avg_other_prompts = sum(len(t.prompts) for t in other_priority) / len(other_priority)
+                avg_high_prompts = sum(len(t.prompts) for t in high_priority) / len(
+                    high_priority
+                )
+                avg_other_prompts = sum(len(t.prompts) for t in other_priority) / len(
+                    other_priority
+                )
 
                 # High priority templates should generally be simpler
                 # Allow some tolerance (within 2 prompts)
@@ -651,6 +652,6 @@ class TestTemplateConsistency:
         for template in all_templates:
             # Notes can be empty for very simple templates, but most should have them
             if template.prompts:  # If has prompts, should have notes
-                assert template.notes, (
-                    f"Template {template.name} has prompts but no notes"
-                )
+                assert (
+                    template.notes
+                ), f"Template {template.name} has prompts but no notes"

@@ -93,17 +93,17 @@ class TestUserGlobalDisableMechanismUnit:
 
         # Verify: Server removed from active file
         active_data = json.loads(active_file.read_text())
-        assert "test-server" not in active_data["mcpServers"], (
-            "Server should be REMOVED from active file"
-        )
+        assert (
+            "test-server" not in active_data["mcpServers"]
+        ), "Server should be REMOVED from active file"
 
         # Verify: Server added to disabled file
         assert disabled_file.exists(), "Disabled file should be created"
         disabled_data = json.loads(disabled_file.read_text())
         assert "mcpServers" in disabled_data
-        assert "test-server" in disabled_data["mcpServers"], (
-            "Server should be ADDED to disabled file"
-        )
+        assert (
+            "test-server" in disabled_data["mcpServers"]
+        ), "Server should be ADDED to disabled file"
 
         # Verify: Config is identical in disabled file
         expected_config = {
@@ -160,15 +160,15 @@ class TestUserGlobalDisableMechanismUnit:
 
         # Verify: Server added to active file
         active_data = json.loads(active_file.read_text())
-        assert "test-server" in active_data["mcpServers"], (
-            "Server should be ADDED to active file"
-        )
+        assert (
+            "test-server" in active_data["mcpServers"]
+        ), "Server should be ADDED to active file"
 
         # Verify: Server removed from disabled file
         disabled_data = json.loads(disabled_file.read_text())
-        assert "test-server" not in disabled_data["mcpServers"], (
-            "Server should be REMOVED from disabled file"
-        )
+        assert (
+            "test-server" not in disabled_data["mcpServers"]
+        ), "Server should be REMOVED from disabled file"
 
         # Verify: Config is identical in active file
         expected_config = {
@@ -695,9 +695,7 @@ class TestUserGlobalDisableMechanismE2E:
         assert server_states["enabled-server"] == ServerState.ENABLED
         assert server_states["disabled-server"] == ServerState.DISABLED
 
-    def test_complete_workflow_add_disable_enable_remove(
-        self, plugin, mcp_harness
-    ):
+    def test_complete_workflow_add_disable_enable_remove(self, plugin, mcp_harness):
         """Test complete workflow: add → disable → enable → remove.
 
         This is the full user journey.

@@ -81,7 +81,7 @@ class TestFreshInstall:
 
     def test_fresh_install_creates_local_catalog(self, isolated_home: Path):
         """Fresh install creates official + local catalogs."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with pytest.raises(NotImplementedError):
                 # Simulate fresh install - no catalogs exist yet
                 manager = create_default_catalog_manager()
@@ -90,7 +90,9 @@ class TestFreshInstall:
                 assert manager is not None
 
                 # Local catalog should be auto-created
-                expected_local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                expected_local_path = (
+                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                )
                 assert expected_local_path.exists()
 
                 # Should be valid JSON
@@ -100,7 +102,7 @@ class TestFreshInstall:
 
     def test_local_catalog_auto_initialization(self, isolated_home: Path):
         """Local catalog auto-created if missing."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with pytest.raises(NotImplementedError):
                 # Create manager
                 manager = create_default_catalog_manager()
@@ -110,12 +112,14 @@ class TestFreshInstall:
                 assert local is not None
 
                 # Verify file exists
-                local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                local_path = (
+                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                )
                 assert local_path.exists()
 
     def test_local_catalog_empty_on_first_run(self, isolated_home: Path):
         """Local catalog is empty on first run."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with pytest.raises(NotImplementedError):
                 manager = create_default_catalog_manager()
                 local = manager.get_catalog("local")
@@ -126,7 +130,7 @@ class TestFreshInstall:
 
     def test_official_catalog_always_available(self, isolated_home: Path):
         """Official catalog always available, even if local init fails."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with pytest.raises(NotImplementedError):
                 # Create manager
                 manager = create_default_catalog_manager()
@@ -145,7 +149,7 @@ class TestLocalCatalogPersistence:
 
     def test_local_catalog_persistence(self, isolated_home: Path):
         """Add custom server to local, verify it persists."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
 
             # Session 1: Create manager, add server to local catalog
@@ -159,7 +163,7 @@ class TestLocalCatalogPersistence:
                         "description": "My custom tool",
                         "command": "python",
                         "args": ["-m", "my_tool"],
-                        "categories": ["custom"]
+                        "categories": ["custom"],
                     }
                 }
 
@@ -179,24 +183,42 @@ class TestLocalCatalogPersistence:
 
     def test_multiple_sessions_accumulate(self, isolated_home: Path):
         """Multiple sessions can add to local catalog."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
 
             with pytest.raises(NotImplementedError):
                 # Session 1: Add first server
-                create_test_catalog_file(local_path, {
-                    "server1": {"description": "Server 1", "command": "node", "args": []}
-                })
+                create_test_catalog_file(
+                    local_path,
+                    {
+                        "server1": {
+                            "description": "Server 1",
+                            "command": "node",
+                            "args": [],
+                        }
+                    },
+                )
 
                 manager1 = create_default_catalog_manager()
                 local1 = manager1.get_catalog("local")
                 assert len(local1.list_servers()) == 1
 
                 # Session 2: Add second server (simulating user editing file)
-                create_test_catalog_file(local_path, {
-                    "server1": {"description": "Server 1", "command": "node", "args": []},
-                    "server2": {"description": "Server 2", "command": "python", "args": []}
-                })
+                create_test_catalog_file(
+                    local_path,
+                    {
+                        "server1": {
+                            "description": "Server 1",
+                            "command": "node",
+                            "args": [],
+                        },
+                        "server2": {
+                            "description": "Server 2",
+                            "command": "python",
+                            "args": [],
+                        },
+                    },
+                )
 
                 manager2 = create_default_catalog_manager()
                 local2 = manager2.get_catalog("local")
@@ -208,7 +230,7 @@ class TestCompleteWorkflows:
 
     def test_search_and_add_from_official(self, cli_runner, isolated_home: Path):
         """Complete workflow: search official, find server, add it."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             # Search for a server
             result = cli_runner.invoke(cli, ["search", "filesystem"])
             # May succeed or fail depending on implementation status
@@ -222,17 +244,20 @@ class TestCompleteWorkflows:
 
     def test_search_all_catalogs_workflow(self, cli_runner, isolated_home: Path):
         """Search finds servers in both catalogs."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             # Add custom server to local catalog
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
-            create_test_catalog_file(local_path, {
-                "custom-tool": {
-                    "description": "Custom tool",
-                    "command": "python",
-                    "args": ["-m", "custom"],
-                    "categories": ["custom"]
-                }
-            })
+            create_test_catalog_file(
+                local_path,
+                {
+                    "custom-tool": {
+                        "description": "Custom tool",
+                        "command": "python",
+                        "args": ["-m", "custom"],
+                        "categories": ["custom"],
+                    }
+                },
+            )
 
             # Search all catalogs
             result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
@@ -244,18 +269,22 @@ class TestCompleteWorkflows:
 
     def test_catalog_list_shows_both(self, cli_runner, isolated_home: Path):
         """mcpi catalog list shows both catalogs."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             # Add a server to local so it's non-empty
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
-            create_test_catalog_file(local_path, {
-                "test": {"description": "Test", "command": "test", "args": []}
-            })
+            create_test_catalog_file(
+                local_path,
+                {"test": {"description": "Test", "command": "test", "args": []}},
+            )
 
             result = cli_runner.invoke(cli, ["catalog", "list"])
             # May not be implemented yet
             if result.exit_code == 0:
                 # Should show both catalogs when implemented
-                assert "official" in result.output.lower() or "local" in result.output.lower()
+                assert (
+                    "official" in result.output.lower()
+                    or "local" in result.output.lower()
+                )
 
 
 class TestBackwardCompatibility:
@@ -263,7 +292,7 @@ class TestBackwardCompatibility:
 
     def test_old_factory_function_still_works(self, isolated_home: Path):
         """create_default_catalog() still works (deprecated but functional)."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
 
@@ -279,7 +308,7 @@ class TestBackwardCompatibility:
 
     def test_old_cli_patterns_work(self, cli_runner, isolated_home: Path):
         """Old CLI commands work unchanged."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             # Old search pattern (no --catalog flag)
             result = cli_runner.invoke(cli, ["search", "filesystem"])
             assert result.exit_code in [0, 1, 2]
@@ -290,7 +319,7 @@ class TestBackwardCompatibility:
 
     def test_no_breaking_changes_to_cli(self, cli_runner, isolated_home: Path):
         """All existing CLI commands work with same behavior."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             # These commands should work exactly as before
             commands = [
                 ["search", "test"],
@@ -309,7 +338,7 @@ class TestDeprecationWarnings:
 
     def test_create_default_catalog_shows_warning(self, isolated_home: Path):
         """create_default_catalog() shows deprecation warning."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
 
@@ -318,25 +347,30 @@ class TestDeprecationWarnings:
                 # Should have a deprecation warning
                 assert len(w) > 0
                 deprecation_warnings = [
-                    warning for warning in w
+                    warning
+                    for warning in w
                     if issubclass(warning.category, DeprecationWarning)
                 ]
                 assert len(deprecation_warnings) > 0
 
                 # Warning should mention the new function
                 warning_message = str(deprecation_warnings[0].message).lower()
-                assert "catalog_manager" in warning_message or "deprecated" in warning_message
+                assert (
+                    "catalog_manager" in warning_message
+                    or "deprecated" in warning_message
+                )
 
     def test_deprecation_warning_clear_and_helpful(self, isolated_home: Path):
         """Warning message is clear and points to new function."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
 
                 catalog = create_default_catalog()
 
                 deprecation_warnings = [
-                    warning for warning in w
+                    warning
+                    for warning in w
                     if issubclass(warning.category, DeprecationWarning)
                 ]
                 assert len(deprecation_warnings) > 0
@@ -348,7 +382,10 @@ class TestDeprecationWarnings:
                 assert "create_default_catalog" in message
 
                 # 2. What to use instead
-                assert "create_default_catalog_manager" in message or "CatalogManager" in message
+                assert (
+                    "create_default_catalog_manager" in message
+                    or "CatalogManager" in message
+                )
 
 
 class TestErrorHandling:
@@ -371,7 +408,7 @@ class TestErrorHandling:
         mcpi_dir.chmod(0o444)
 
         try:
-            with patch.object(Path, 'home', return_value=isolated_home):
+            with patch.object(Path, "home", return_value=isolated_home):
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter("always")
 
@@ -389,8 +426,11 @@ class TestErrorHandling:
                         # Should have warning about local catalog
                         assert len(w) > 0
                         runtime_warnings = [
-                            warning for warning in w
-                            if issubclass(warning.category, (RuntimeWarning, UserWarning))
+                            warning
+                            for warning in w
+                            if issubclass(
+                                warning.category, (RuntimeWarning, UserWarning)
+                            )
                         ]
                         # May or may not have warning depending on implementation
         finally:
@@ -409,9 +449,11 @@ class TestErrorHandling:
         isolated_home.mkdir(parents=True, exist_ok=True)
 
         try:
-            with patch.object(Path, 'home', return_value=isolated_home):
+            with patch.object(Path, "home", return_value=isolated_home):
                 # Create corrupted local catalog
-                local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                local_path = (
+                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                )
                 local_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(local_path, "w") as f:
                     f.write("{invalid json")
@@ -435,7 +477,7 @@ class TestCatalogInfoDetails:
 
     def test_catalog_info_shows_server_samples(self, cli_runner, isolated_home: Path):
         """catalog info shows sample servers from catalog."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             result = cli_runner.invoke(cli, ["catalog", "info", "official"])
 
             # May not be implemented yet
@@ -445,7 +487,7 @@ class TestCatalogInfoDetails:
 
     def test_catalog_info_shows_categories(self, cli_runner, isolated_home: Path):
         """catalog info shows category statistics."""
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             result = cli_runner.invoke(cli, ["catalog", "info", "official"])
 
             # May not be implemented yet
@@ -468,13 +510,26 @@ class TestSearchOrdering:
         isolated_home.mkdir(parents=True, exist_ok=True)
 
         try:
-            with patch.object(Path, 'home', return_value=isolated_home):
+            with patch.object(Path, "home", return_value=isolated_home):
                 # Add servers to local catalog with names that would come first alphabetically
-                local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
-                create_test_catalog_file(local_path, {
-                    "aaa-tool": {"description": "First alphabetically", "command": "test", "args": []},
-                    "zzz-tool": {"description": "Last alphabetically", "command": "test", "args": []}
-                })
+                local_path = (
+                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+                )
+                create_test_catalog_file(
+                    local_path,
+                    {
+                        "aaa-tool": {
+                            "description": "First alphabetically",
+                            "command": "test",
+                            "args": [],
+                        },
+                        "zzz-tool": {
+                            "description": "Last alphabetically",
+                            "command": "test",
+                            "args": [],
+                        },
+                    },
+                )
 
                 result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
 
@@ -486,7 +541,10 @@ class TestSearchOrdering:
 
                     # Find positions of catalog sections (this is implementation-dependent)
                     # Basic check: both catalogs mentioned
-                    assert "official" in result.output.lower() or "local" in result.output.lower()
+                    assert (
+                        "official" in result.output.lower()
+                        or "local" in result.output.lower()
+                    )
         finally:
             # Cleanup
             shutil.rmtree(isolated_home, ignore_errors=True)
@@ -497,13 +555,19 @@ class TestCLIUsability:
 
     def test_helpful_error_for_unknown_catalog(self, cli_runner, isolated_home: Path):
         """Clear error message when using unknown catalog name."""
-        with patch.object(Path, 'home', return_value=isolated_home):
-            result = cli_runner.invoke(cli, ["search", "test", "--catalog", "nonexistent"])
+        with patch.object(Path, "home", return_value=isolated_home):
+            result = cli_runner.invoke(
+                cli, ["search", "test", "--catalog", "nonexistent"]
+            )
 
             # May not be implemented yet
             if result.exit_code != 0:
                 # Should have helpful error
-                assert "unknown" in result.output.lower() or "not found" in result.output.lower() or "catalog" in result.output.lower()
+                assert (
+                    "unknown" in result.output.lower()
+                    or "not found" in result.output.lower()
+                    or "catalog" in result.output.lower()
+                )
 
     def test_help_text_includes_examples(self, cli_runner):
         """Help text includes usage examples."""
@@ -517,7 +581,7 @@ class TestCLIUsability:
         """Catalog commands execute quickly (< 1 second)."""
         import time
 
-        with patch.object(Path, 'home', return_value=isolated_home):
+        with patch.object(Path, "home", return_value=isolated_home):
             start = time.time()
             result = cli_runner.invoke(cli, ["catalog", "list"])
             duration = time.time() - start
@@ -533,19 +597,24 @@ class TestClaudeCLIIntegration:
     This addresses ISSUE-BLOCKING-4.
     """
 
-    @pytest.mark.skipif(shutil.which("claude") is None, reason="claude CLI not installed")
+    @pytest.mark.skipif(
+        shutil.which("claude") is None, reason="claude CLI not installed"
+    )
     def test_claude_cli_available(self):
         """Verify claude CLI is installed and accessible."""
         result = subprocess.run(
-            ["claude", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["claude", "--version"], capture_output=True, text=True, timeout=5
         )
         # Should succeed or show version
-        assert result.returncode == 0 or "version" in result.stdout.lower() or "claude" in result.stdout.lower()
+        assert (
+            result.returncode == 0
+            or "version" in result.stdout.lower()
+            or "claude" in result.stdout.lower()
+        )
 
-    @pytest.mark.skipif(shutil.which("claude") is None, reason="claude CLI not installed")
+    @pytest.mark.skipif(
+        shutil.which("claude") is None, reason="claude CLI not installed"
+    )
     def test_catalog_operations_visible_to_claude_cli(self, cli_runner, tmp_path: Path):
         """Operations via MCPI should be visible to `claude mcp list`.
 
@@ -562,12 +631,14 @@ class TestClaudeCLIIntegration:
         mcp_json.write_text(json.dumps({"mcpServers": {}}, indent=2))
 
         try:
-            with patch.object(Path, 'home', return_value=test_home):
+            with patch.object(Path, "home", return_value=test_home):
                 # NOTE: This test will fail until mcpi add command is implemented
                 # and properly integrated with the catalog manager.
 
                 # Add server via mcpi (will fail with NotImplementedError initially)
-                result = cli_runner.invoke(cli, ["add", "filesystem", "--scope", "user-global"])
+                result = cli_runner.invoke(
+                    cli, ["add", "filesystem", "--scope", "user-global"]
+                )
 
                 # Once implemented, verify with real claude CLI
                 if result.exit_code == 0:
@@ -577,14 +648,16 @@ class TestClaudeCLIIntegration:
                         capture_output=True,
                         text=True,
                         timeout=10,
-                        cwd=str(tmp_path)
+                        cwd=str(tmp_path),
                     )
 
                     # Server should be visible to Claude CLI
                     assert "filesystem" in claude_result.stdout.lower()
 
                     # Remove server via mcpi
-                    result = cli_runner.invoke(cli, ["remove", "filesystem", "--scope", "user-global"])
+                    result = cli_runner.invoke(
+                        cli, ["remove", "filesystem", "--scope", "user-global"]
+                    )
 
                     # Verify removed from claude mcp list
                     claude_result = subprocess.run(
@@ -592,7 +665,7 @@ class TestClaudeCLIIntegration:
                         capture_output=True,
                         text=True,
                         timeout=10,
-                        cwd=str(tmp_path)
+                        cwd=str(tmp_path),
                     )
 
                     # Server should NOT be visible anymore
@@ -642,7 +715,7 @@ class TestWithRealProductionCatalog:
         isolated_home.mkdir(parents=True, exist_ok=True)
 
         try:
-            with patch.object(Path, 'home', return_value=isolated_home):
+            with patch.object(Path, "home", return_value=isolated_home):
                 # Search should work with real catalog
                 result = cli_runner.invoke(cli, ["search", "filesystem"])
 

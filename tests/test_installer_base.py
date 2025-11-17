@@ -104,7 +104,9 @@ class ConcreteInstaller(BaseInstaller):
         super().__init__(*args, **kwargs)
         self.supports_method_result = supports_method_result
 
-    def install(self, server: MCPServer, server_id: str, config_params=None) -> InstallationResult:
+    def install(
+        self, server: MCPServer, server_id: str, config_params=None
+    ) -> InstallationResult:
         return self._create_success_result(server_id, "Installed")
 
     def uninstall(self, server_id: str) -> InstallationResult:
@@ -165,7 +167,9 @@ class TestBaseInstaller:
 
         return mock_server
 
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_validate_installation_no_errors(self):
         """Test validation with no errors."""
         server = self.create_mock_server()
@@ -174,7 +178,9 @@ class TestBaseInstaller:
 
         assert errors == []
 
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_validate_installation_missing_system_dependency(self):
         """Test validation with missing system dependency."""
         server = self.create_mock_server(sys_deps=["nonexistent_command"])
@@ -187,7 +193,9 @@ class TestBaseInstaller:
         assert len(errors) == 1
         assert "Missing system dependency: nonexistent_command" in errors[0]
 
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_validate_installation_unsupported_method(self):
         """Test validation with unsupported installation method."""
         server = self.create_mock_server(method="unsupported")
@@ -198,7 +206,9 @@ class TestBaseInstaller:
         assert len(errors) == 1
         assert "Installation method not supported: unsupported" in errors[0]
 
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_validate_installation_multiple_errors(self):
         """Test validation with multiple errors."""
         server = self.create_mock_server(method="unsupported", sys_deps=["missing_cmd"])
@@ -212,7 +222,9 @@ class TestBaseInstaller:
         assert any("Installation method not supported" in error for error in errors)
 
     @patch("shutil.which")
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_check_system_dependency_available(self, mock_which):
         """Test system dependency check when dependency is available."""
         mock_which.return_value = "/usr/bin/dependency"
@@ -223,7 +235,9 @@ class TestBaseInstaller:
         mock_which.assert_called_once_with("dependency")
 
     @patch("shutil.which")
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_check_system_dependency_missing(self, mock_which):
         """Test system dependency check when dependency is missing."""
         mock_which.return_value = None
@@ -432,7 +446,9 @@ class TestBaseInstaller:
 class TestBaseInstallerIntegration:
     """Integration tests for BaseInstaller functionality."""
 
-    @pytest.mark.skip("Validation simplified - system dependency checking removed with simplified schema")
+    @pytest.mark.skip(
+        "Validation simplified - system dependency checking removed with simplified schema"
+    )
     def test_full_validation_workflow(self):
         """Test complete validation workflow with real-like scenario."""
         installer = ConcreteInstaller()

@@ -113,22 +113,23 @@ class TestFileMoveEnableDisableHandlerUnit:
         # Verify: Server removed from active file
         with active_file.open("r") as f:
             active_after = json.load(f)
-        assert "frida-mcp" not in active_after.get("mcpServers", {}), (
-            "Server still in active file after disable - file-move didn't happen!"
-        )
+        assert "frida-mcp" not in active_after.get(
+            "mcpServers", {}
+        ), "Server still in active file after disable - file-move didn't happen!"
 
         # Verify: Server added to disabled file
         assert disabled_file.exists(), "Disabled file not created"
         with disabled_file.open("r") as f:
             disabled_after = json.load(f)
-        assert "frida-mcp" in disabled_after.get("mcpServers", {}), (
-            "Server not in disabled file after disable"
-        )
+        assert "frida-mcp" in disabled_after.get(
+            "mcpServers", {}
+        ), "Server not in disabled file after disable"
 
         # Verify: Server config preserved correctly
-        assert disabled_after["mcpServers"]["frida-mcp"] == active_data["mcpServers"]["frida-mcp"], (
-            "Server config corrupted during move"
-        )
+        assert (
+            disabled_after["mcpServers"]["frida-mcp"]
+            == active_data["mcpServers"]["frida-mcp"]
+        ), "Server config corrupted during move"
 
     def test_enable_moves_server_from_disabled_to_active_file(
         self, handler, setup_files
@@ -169,21 +170,22 @@ class TestFileMoveEnableDisableHandlerUnit:
         # Verify: Server added to active file
         with active_file.open("r") as f:
             active_after = json.load(f)
-        assert "frida-mcp" in active_after.get("mcpServers", {}), (
-            "Server not in active file after enable - file-move didn't happen!"
-        )
+        assert "frida-mcp" in active_after.get(
+            "mcpServers", {}
+        ), "Server not in active file after enable - file-move didn't happen!"
 
         # Verify: Server removed from disabled file
         with disabled_file.open("r") as f:
             disabled_after = json.load(f)
-        assert "frida-mcp" not in disabled_after.get("mcpServers", {}), (
-            "Server still in disabled file after enable"
-        )
+        assert "frida-mcp" not in disabled_after.get(
+            "mcpServers", {}
+        ), "Server still in disabled file after enable"
 
         # Verify: Server config preserved correctly
-        assert active_after["mcpServers"]["frida-mcp"] == disabled_data["mcpServers"]["frida-mcp"], (
-            "Server config corrupted during move"
-        )
+        assert (
+            active_after["mcpServers"]["frida-mcp"]
+            == disabled_data["mcpServers"]["frida-mcp"]
+        ), "Server config corrupted during move"
 
     def test_is_disabled_returns_correct_status(self, handler, setup_files):
         """Test that is_disabled() returns correct status based on file location.
@@ -209,25 +211,25 @@ class TestFileMoveEnableDisableHandlerUnit:
             json.dump(active_data, f)
 
         # Verify: Initially not disabled (in active file)
-        assert handler.is_disabled("frida-mcp") is False, (
-            "is_disabled() returns True when server is in active file"
-        )
+        assert (
+            handler.is_disabled("frida-mcp") is False
+        ), "is_disabled() returns True when server is in active file"
 
         # Move to disabled file
         handler.disable_server("frida-mcp")
 
         # Verify: Now disabled (in disabled file)
-        assert handler.is_disabled("frida-mcp") is True, (
-            "is_disabled() returns False when server is in disabled file"
-        )
+        assert (
+            handler.is_disabled("frida-mcp") is True
+        ), "is_disabled() returns False when server is in disabled file"
 
         # Move back to active file
         handler.enable_server("frida-mcp")
 
         # Verify: No longer disabled (back in active file)
-        assert handler.is_disabled("frida-mcp") is False, (
-            "is_disabled() returns True after server moved back to active file"
-        )
+        assert (
+            handler.is_disabled("frida-mcp") is False
+        ), "is_disabled() returns True after server moved back to active file"
 
     def test_disable_nonexistent_server_returns_false(self, handler, setup_files):
         """Test that disabling a server not in active file returns False.
@@ -250,7 +252,9 @@ class TestFileMoveEnableDisableHandlerUnit:
         assert result is False, "disable_server() returned True for non-existent server"
 
         # Verify: No disabled file created
-        assert not disabled_file.exists(), "Disabled file created for non-existent server"
+        assert (
+            not disabled_file.exists()
+        ), "Disabled file created for non-existent server"
 
     def test_enable_nonexistent_server_returns_false(self, handler, setup_files):
         """Test that enabling a server not in disabled file returns False.
@@ -284,8 +288,16 @@ class TestFileMoveEnableDisableHandlerUnit:
         # Setup: Create disabled file with servers
         disabled_data = {
             "mcpServers": {
-                "server-1": {"command": "npx", "args": ["-y", "server-1"], "type": "stdio"},
-                "server-2": {"command": "npx", "args": ["-y", "server-2"], "type": "stdio"},
+                "server-1": {
+                    "command": "npx",
+                    "args": ["-y", "server-1"],
+                    "type": "stdio",
+                },
+                "server-2": {
+                    "command": "npx",
+                    "args": ["-y", "server-2"],
+                    "type": "stdio",
+                },
             }
         }
         with disabled_file.open("w") as f:
@@ -467,17 +479,17 @@ class TestUserInternalDisableEnableIntegration:
 
         # Verify: Disabled file was created
         disabled_path = mcp_harness.path_overrides.get("user-internal-disabled")
-        assert disabled_path is not None, (
-            "Test harness needs updating to support user-internal-disabled path override"
-        )
+        assert (
+            disabled_path is not None
+        ), "Test harness needs updating to support user-internal-disabled path override"
         assert disabled_path.exists(), "Disabled file not created"
 
         # Verify: Server is in disabled file
         with disabled_path.open("r") as f:
             disabled_data = json.load(f)
-        assert "frida-mcp" in disabled_data.get("mcpServers", {}), (
-            "Server not in disabled file"
-        )
+        assert "frida-mcp" in disabled_data.get(
+            "mcpServers", {}
+        ), "Server not in disabled file"
 
     def test_enable_moves_server_back_to_active_file(self, plugin, mcp_harness):
         """Test that mcpi enable moves server back to ~/.claude.json.
@@ -518,18 +530,18 @@ class TestUserInternalDisableEnableIntegration:
 
         # Verify: Server back in active file
         active_after_enable = mcp_harness.read_scope_file("user-internal")
-        assert "frida-mcp" in active_after_enable.get("mcpServers", {}), (
-            "Server not restored to active file after enable"
-        )
+        assert "frida-mcp" in active_after_enable.get(
+            "mcpServers", {}
+        ), "Server not restored to active file after enable"
 
         # Verify: Server removed from disabled file
         disabled_path = mcp_harness.path_overrides.get("user-internal-disabled")
         if disabled_path and disabled_path.exists():
             with disabled_path.open("r") as f:
                 disabled_data = json.load(f)
-            assert "frida-mcp" not in disabled_data.get("mcpServers", {}), (
-                "Server still in disabled file after enable"
-            )
+            assert "frida-mcp" not in disabled_data.get(
+                "mcpServers", {}
+            ), "Server still in disabled file after enable"
 
     def test_list_servers_shows_correct_state(self, plugin, mcp_harness):
         """Test that list_servers() shows correct ENABLED/DISABLED state.
@@ -557,9 +569,9 @@ class TestUserInternalDisableEnableIntegration:
         servers = plugin.list_servers(scope="user-internal")
         qualified_id = "claude-code:user-internal:frida-mcp"
         assert qualified_id in servers, "Server not found in list"
-        assert servers[qualified_id].state == ServerState.ENABLED, (
-            f"Expected ENABLED initially, got {servers[qualified_id].state}"
-        )
+        assert (
+            servers[qualified_id].state == ServerState.ENABLED
+        ), f"Expected ENABLED initially, got {servers[qualified_id].state}"
 
         # Disable the server
         result = plugin.disable_server("frida-mcp", scope="user-internal")
@@ -568,9 +580,9 @@ class TestUserInternalDisableEnableIntegration:
         # Verify: Now shows as DISABLED
         servers = plugin.list_servers(scope="user-internal")
         assert qualified_id in servers, "Server disappeared after disable"
-        assert servers[qualified_id].state == ServerState.DISABLED, (
-            f"Expected DISABLED after disable, got {servers[qualified_id].state}"
-        )
+        assert (
+            servers[qualified_id].state == ServerState.DISABLED
+        ), f"Expected DISABLED after disable, got {servers[qualified_id].state}"
 
         # Enable the server
         result = plugin.enable_server("frida-mcp", scope="user-internal")
@@ -579,9 +591,9 @@ class TestUserInternalDisableEnableIntegration:
         # Verify: Back to ENABLED
         servers = plugin.list_servers(scope="user-internal")
         assert qualified_id in servers, "Server disappeared after enable"
-        assert servers[qualified_id].state == ServerState.ENABLED, (
-            f"Expected ENABLED after enable, got {servers[qualified_id].state}"
-        )
+        assert (
+            servers[qualified_id].state == ServerState.ENABLED
+        ), f"Expected ENABLED after enable, got {servers[qualified_id].state}"
 
 
 # =============================================================================
@@ -627,7 +639,9 @@ class TestUserInternalDisableEnableE2E:
         )
         return json.loads(result.stdout)
 
-    def _server_in_claude_output(self, server_id: str, claude_output: Dict[str, Any]) -> bool:
+    def _server_in_claude_output(
+        self, server_id: str, claude_output: Dict[str, Any]
+    ) -> bool:
         """Check if a server appears in Claude's output.
 
         Args:

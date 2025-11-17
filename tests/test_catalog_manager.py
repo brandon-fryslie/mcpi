@@ -64,10 +64,7 @@ class TestCatalogManagerInit:
         create_test_catalog_file(local_path, {})
 
         # Create manager - will fail with NotImplementedError (expected)
-        manager = CatalogManager(
-            official_path=official_path,
-            local_path=local_path
-        )
+        manager = CatalogManager(official_path=official_path, local_path=local_path)
 
     def test_init_does_not_load_catalogs(self, tmp_path: Path):
         """Constructor does not load catalogs (lazy loading).
@@ -75,7 +72,7 @@ class TestCatalogManagerInit:
         FIXED: Instead of checking private attributes (_official, _local),
         this test will verify lazy loading behavior once implementation exists.
         For now, just verifies NotImplementedError is raised.
-        
+
         When implemented, should verify ServerCatalog is not instantiated during
         __init__, only when get_catalog() is called.
         """
@@ -83,15 +80,23 @@ class TestCatalogManagerInit:
         local_path = tmp_path / "local" / "catalog.json"
 
         # Create minimal catalogs
-        create_test_catalog_file(official_path, {"server1": {"description": "Test", "command": "test", "args": [], "repository": None, "categories": []}})
+        create_test_catalog_file(
+            official_path,
+            {
+                "server1": {
+                    "description": "Test",
+                    "command": "test",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
         create_test_catalog_file(local_path, {})
 
         # Create manager - will fail with NotImplementedError (expected)
         # Once implemented, use mocking to verify no ServerCatalog instantiation during __init__
-        manager = CatalogManager(
-            official_path=official_path,
-            local_path=local_path
-        )
+        manager = CatalogManager(official_path=official_path, local_path=local_path)
 
 
 class TestCatalogManagerGetCatalog:
@@ -102,9 +107,18 @@ class TestCatalogManagerGetCatalog:
         official_path = tmp_path / "official" / "catalog.json"
         local_path = tmp_path / "local" / "catalog.json"
 
-        create_test_catalog_file(official_path, {
-            "server1": {"description": "Official server", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "server1": {
+                    "description": "Official server",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
         create_test_catalog_file(local_path, {})
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
@@ -119,9 +133,18 @@ class TestCatalogManagerGetCatalog:
         local_path = tmp_path / "local" / "catalog.json"
 
         create_test_catalog_file(official_path, {})
-        create_test_catalog_file(local_path, {
-            "custom": {"description": "Custom server", "command": "python", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            local_path,
+            {
+                "custom": {
+                    "description": "Custom server",
+                    "command": "python",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
         catalog = manager.get_catalog("local")
@@ -168,7 +191,7 @@ class TestCatalogManagerGetCatalog:
 
         FIXED: This test will verify lazy loading behavior once implementation exists.
         For now, just verifies NotImplementedError is raised.
-        
+
         When implemented, should verify:
         1. No ServerCatalog instantiation during __init__
         2. ServerCatalog instantiated only when get_catalog() is called
@@ -183,7 +206,7 @@ class TestCatalogManagerGetCatalog:
         # Will fail with NotImplementedError until implementation exists
         # Once implemented, use mocking to verify lazy loading behavior
         manager = CatalogManager(official_path=official_path, local_path=local_path)
-            
+
         # These assertions won't run until NotImplementedError is removed:
         # - Verify no catalogs loaded during __init__
         # - Verify catalog loaded on first get_catalog() call
@@ -263,7 +286,10 @@ class TestCatalogManagerListCatalogs:
         assert local_info.name == "local"
         assert local_info.type == "local"
         assert local_info.path == local_path
-        assert "custom" in local_info.description.lower() or "local" in local_info.description.lower()
+        assert (
+            "custom" in local_info.description.lower()
+            or "local" in local_info.description.lower()
+        )
 
     def test_list_catalogs_server_count(self, tmp_path: Path):
         """Shows accurate server counts."""
@@ -271,15 +297,39 @@ class TestCatalogManagerListCatalogs:
         local_path = tmp_path / "local" / "catalog.json"
 
         # Official has 2 servers
-        create_test_catalog_file(official_path, {
-            "server1": {"description": "Test1", "command": "npx", "args": [], "repository": None, "categories": []},
-            "server2": {"description": "Test2", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "server1": {
+                    "description": "Test1",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+                "server2": {
+                    "description": "Test2",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+            },
+        )
 
         # Local has 1 server
-        create_test_catalog_file(local_path, {
-            "custom": {"description": "Custom", "command": "python", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            local_path,
+            {
+                "custom": {
+                    "description": "Custom",
+                    "command": "python",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
         catalogs = manager.list_catalogs()
@@ -299,9 +349,18 @@ class TestCatalogManagerSearchAll:
         official_path = tmp_path / "official" / "catalog.json"
         local_path = tmp_path / "local" / "catalog.json"
 
-        create_test_catalog_file(official_path, {
-            "filesystem": {"description": "File system access", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "filesystem": {
+                    "description": "File system access",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
         create_test_catalog_file(local_path, {})
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
@@ -318,9 +377,18 @@ class TestCatalogManagerSearchAll:
         local_path = tmp_path / "local" / "catalog.json"
 
         create_test_catalog_file(official_path, {})
-        create_test_catalog_file(local_path, {
-            "custom-tool": {"description": "My custom tool", "command": "python", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            local_path,
+            {
+                "custom-tool": {
+                    "description": "My custom tool",
+                    "command": "python",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
         results = manager.search_all("custom")
@@ -335,14 +403,44 @@ class TestCatalogManagerSearchAll:
         official_path = tmp_path / "official" / "catalog.json"
         local_path = tmp_path / "local" / "catalog.json"
 
-        create_test_catalog_file(official_path, {
-            "filesystem": {"description": "File system access", "command": "npx", "args": [], "repository": None, "categories": []},
-            "github": {"description": "GitHub integration", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
-        create_test_catalog_file(local_path, {
-            "database": {"description": "Database tool", "command": "python", "args": [], "repository": None, "categories": []},
-            "api": {"description": "API server", "command": "node", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "filesystem": {
+                    "description": "File system access",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+                "github": {
+                    "description": "GitHub integration",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+            },
+        )
+        create_test_catalog_file(
+            local_path,
+            {
+                "database": {
+                    "description": "Database tool",
+                    "command": "python",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+                "api": {
+                    "description": "API server",
+                    "command": "node",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                },
+            },
+        )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
         results = manager.search_all("")  # Match all
@@ -368,12 +466,30 @@ class TestCatalogManagerSearchAll:
         local_path = tmp_path / "local" / "catalog.json"
 
         # Same server_id in both catalogs
-        create_test_catalog_file(official_path, {
-            "filesystem": {"description": "Official filesystem", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
-        create_test_catalog_file(local_path, {
-            "filesystem": {"description": "Custom filesystem", "command": "python", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "filesystem": {
+                    "description": "Official filesystem",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
+        create_test_catalog_file(
+            local_path,
+            {
+                "filesystem": {
+                    "description": "Custom filesystem",
+                    "command": "python",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
         results = manager.search_all("filesystem")
@@ -390,9 +506,18 @@ class TestCatalogManagerSearchAll:
         official_path = tmp_path / "official" / "catalog.json"
         local_path = tmp_path / "local" / "catalog.json"
 
-        create_test_catalog_file(official_path, {
-            "server1": {"description": "Test server", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "server1": {
+                    "description": "Test server",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
         create_test_catalog_file(local_path, {})
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
@@ -445,7 +570,7 @@ class TestCatalogManagerFactories:
 
         try:
             # Patch Path.home() to return our test directory
-            with patch.object(Path, 'home', return_value=test_dir):
+            with patch.object(Path, "home", return_value=test_dir):
                 # Should warn but not crash
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter("always")
@@ -457,7 +582,9 @@ class TestCatalogManagerFactories:
 
                     # Should have warning about local catalog
                     assert len(w) > 0
-                    assert any("local catalog" in str(warning.message).lower() for warning in w)
+                    assert any(
+                        "local catalog" in str(warning.message).lower() for warning in w
+                    )
         finally:
             # Cleanup: restore permissions for deletion
             mcpi_catalogs.chmod(0o755)
@@ -472,8 +599,7 @@ class TestCatalogManagerFactories:
         create_test_catalog_file(local_path, {})
 
         manager = create_test_catalog_manager(
-            official_path=official_path,
-            local_path=local_path
+            official_path=official_path, local_path=local_path
         )
 
         assert manager is not None
@@ -489,9 +615,18 @@ class TestCatalogManagerErrorHandling:
         official_path = tmp_path / "official" / "catalog.json"
         local_path = tmp_path / "local" / "catalog.json"  # Does not exist
 
-        create_test_catalog_file(official_path, {
-            "server1": {"description": "Test", "command": "npx", "args": [], "repository": None, "categories": []}
-        })
+        create_test_catalog_file(
+            official_path,
+            {
+                "server1": {
+                    "description": "Test",
+                    "command": "npx",
+                    "args": [],
+                    "repository": None,
+                    "categories": [],
+                }
+            },
+        )
         # Don't create local catalog file
 
         # Should not crash when creating manager
@@ -576,10 +711,7 @@ class TestWithRealProductionCatalog:
         create_test_catalog_file(local_path, {})
 
         # Create manager with real official catalog
-        manager = CatalogManager(
-            official_path=real_catalog_path,
-            local_path=local_path
-        )
+        manager = CatalogManager(official_path=real_catalog_path, local_path=local_path)
 
         # Should be able to load official catalog
         official = manager.get_catalog("official")

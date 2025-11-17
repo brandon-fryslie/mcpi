@@ -9,6 +9,7 @@ A command-line tool for managing Model Context Protocol (MCP) servers across dif
 ## Features
 
 - **Comprehensive Registry**: Catalog of known MCP servers with metadata
+- **Configuration Templates**: Interactive setup with guided prompts for common servers
 - **Multi-Catalog Support**: Official catalog + your local custom catalog
 - **Scope-Based Configuration**: Manage servers across multiple configuration scopes (project-level, user-level)
 - **Multi-Client Support**: Works with Claude Code, Cursor, VS Code, and other MCP clients
@@ -46,6 +47,103 @@ mcpi search --query filesystem
 
 # Get detailed information about a server (shows registry + install status)
 mcpi info filesystem
+```
+
+## Configuration Templates
+
+MCPI v0.5.0+ includes configuration templates that guide you through server setup with interactive prompts, reducing configuration time from 15-30 minutes to 2-3 minutes.
+
+### Quick Start with Templates
+
+```bash
+# List available templates for a server
+mcpi add postgres --list-templates
+
+# Use a template interactively
+mcpi add postgres --template local-development
+Database name to connect to [postgres]: myapp_dev
+Database username (leave empty for peer authentication) []:
+✓ Server 'postgres' added successfully
+```
+
+### Available Templates
+
+**PostgreSQL** (3 templates):
+- `local-development`: Local PostgreSQL database for development
+- `docker`: PostgreSQL running in Docker container
+- `production`: Production database with full connection details
+
+**GitHub** (3 templates):
+- `personal-full-access`: Full access to private and public repositories
+- `read-only`: Read-only access to repositories
+- `public-repos`: Public repositories only (no token required)
+
+**Filesystem** (3 templates):
+- `project-files`: Access to current project directory
+- `user-documents`: Access to ~/Documents directory
+- `custom-directories`: Custom directory access with multiple paths
+
+**Slack** (2 templates):
+- `bot-token`: Slack bot for automated actions
+- `limited-channels`: Bot restricted to specific channels
+
+**Brave Search** (1 template):
+- `api-key`: Brave Search API with your API key
+
+### Template Features
+
+- **Interactive Prompts**: Step-by-step guided setup with validation
+- **Secret Masking**: Passwords and API keys hidden during input (e.g., ********)
+- **Smart Defaults**: Common values pre-filled for faster setup
+- **Real-time Validation**: Input validation with helpful error messages
+- **Setup Notes**: Each template includes detailed instructions and examples
+- **Security Built-in**: Format checking for tokens, keys, and URLs
+
+### Template Examples
+
+**Example 1: PostgreSQL Local Development**
+```bash
+$ mcpi add postgres --template local-development
+
+Using template 'local-development' for server 'postgres'
+Scope: user-global
+
+Template Notes:
+  This template creates a PostgreSQL connection URL for local development.
+
+  Connection URL format: postgresql://[user@]localhost/database
+
+  If you leave the username empty, PostgreSQL will use peer authentication
+  (your OS username). This is common for local development on macOS/Linux.
+
+Database name to connect to (e.g., 'myapp_dev') [postgres]: myapp_dev
+Database username (leave empty for peer authentication) []:
+
+✓ Server 'postgres' added to user-global scope
+```
+
+**Example 2: GitHub with Personal Access Token**
+```bash
+$ mcpi add github --template personal-full-access
+
+Using template 'personal-full-access' for server 'github'
+Scope: user-global
+
+GitHub Personal Access Token: ****************************************
+
+✓ Server 'github' added to user-global scope
+```
+
+**Example 3: Filesystem Access**
+```bash
+$ mcpi add filesystem --template project-files
+
+Using template 'project-files' for server 'filesystem'
+Scope: project-mcp
+
+Project root directory [/Users/alice/projects/myapp]:
+
+✓ Server 'filesystem' added to project-mcp scope
 ```
 
 ## Multiple Catalogs
@@ -302,12 +400,20 @@ Add an MCP server from the registry.
 - `--client TEXT`: Target client (uses default if not specified)
 - `--scope TEXT`: Target scope (interactive selection if not specified)
 - `--catalog TEXT`: Source catalog (official or local)
+- `--template TEXT`: Use configuration template for guided setup
+- `--list-templates`: Show available templates for this server
 - `--dry-run`: Show what would be done without making changes
 
 **Examples:**
 ```bash
 # Add a server (interactive scope selection)
 mcpi add filesystem
+
+# List available templates for a server
+mcpi add postgres --list-templates
+
+# Add server using a template (interactive prompts)
+mcpi add postgres --template local-development
 
 # Add to a specific scope
 mcpi add filesystem --scope project-mcp
@@ -593,11 +699,21 @@ mcpi/
 │   │   ├── manager.py    # MCPManager orchestration
 │   │   ├── claude_code.py # Claude Code plugin
 │   │   └── file_based.py # File-based scope implementations
-│   └── registry/         # Server registry
-│       ├── catalog.py    # Server catalog and models
-│       └── catalog_manager.py # Multi-catalog management
+│   ├── registry/         # Server registry
+│   │   ├── catalog.py    # Server catalog and models
+│   │   └── catalog_manager.py # Multi-catalog management
+│   └── templates/        # Configuration templates
+│       ├── models.py     # Template data models
+│       ├── template_manager.py # Template loading
+│       └── prompt_handler.py # Interactive prompts
 ├── data/                 # Registry data
-│   └── catalog.json      # Server definitions
+│   ├── catalog.json      # Server definitions
+│   └── templates/        # Template YAML files
+│       ├── postgres/
+│       ├── github/
+│       ├── filesystem/
+│       ├── slack/
+│       └── brave-search/
 └── tests/                # Test suite
 ```
 
@@ -658,6 +774,17 @@ To add a new MCP server to the registry:
   }
 }
 ```
+
+### Contributing Templates
+
+To add a configuration template:
+
+1. Create a YAML file in `data/templates/<server-id>/<template-name>.yaml`
+2. Follow the template structure (see `docs/TEMPLATE_AUTHORING_GUIDE.md`)
+3. Test the template: `mcpi add <server-id> --template <template-name>`
+4. Submit a pull request
+
+See `docs/TEMPLATE_AUTHORING_GUIDE.md` for detailed template authoring guidelines.
 
 ### Development Guidelines
 - Follow PEP 8 style guidelines

@@ -86,7 +86,7 @@ def get_claude_mcp_list(project_dir: Path) -> List[str]:
             cwd=project_dir,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         if result.returncode != 0:
@@ -114,7 +114,9 @@ def get_claude_mcp_list(project_dir: Path) -> List[str]:
         raise RuntimeError(f"Failed to run claude mcp list: {e}")
 
 
-def create_test_project(tmp_path: Path, mcp_config: dict, settings_config: Optional[dict] = None) -> Path:
+def create_test_project(
+    tmp_path: Path, mcp_config: dict, settings_config: Optional[dict] = None
+) -> Path:
     """Create a test project directory with .mcp.json and settings files.
 
     Args:
@@ -183,14 +185,14 @@ class TestProjectMCPClaudeValidation:
                     "filesystem": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+                        "type": "stdio",
                     }
                 }
             },
             settings_config={
                 "enabledMcpjsonServers": [],  # Empty - server not approved
-                "disabledMcpjsonServers": []
-            }
+                "disabledMcpjsonServers": [],
+            },
         )
 
         # Execute: Get Claude's view of servers
@@ -205,7 +207,7 @@ class TestProjectMCPClaudeValidation:
         # Setup: Create MCPI manager for this project
         path_overrides = {
             "project-mcp": project_dir / ".mcp.json",
-            "project-local": project_dir / ".claude" / "settings.local.json"
+            "project-local": project_dir / ".claude" / "settings.local.json",
         }
 
         plugin = ClaudeCodePlugin(path_overrides=path_overrides)
@@ -224,7 +226,9 @@ class TestProjectMCPClaudeValidation:
             f"This means MCPI state doesn't match Claude Code behavior!"
         )
 
-        print("\n✓ VALIDATION PASSED: Unapproved server correctly hidden from Claude Code")
+        print(
+            "\n✓ VALIDATION PASSED: Unapproved server correctly hidden from Claude Code"
+        )
         print(f"  - claude mcp list: Server NOT present (correct)")
         print(f"  - mcpi list: Server shows DISABLED (correct)")
 
@@ -250,14 +254,14 @@ class TestProjectMCPClaudeValidation:
                     "filesystem": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+                        "type": "stdio",
                     }
                 }
             },
             settings_config={
                 "enabledMcpjsonServers": ["filesystem"],  # Server approved
-                "disabledMcpjsonServers": []
-            }
+                "disabledMcpjsonServers": [],
+            },
         )
 
         # Execute: Get Claude's view of servers
@@ -272,7 +276,7 @@ class TestProjectMCPClaudeValidation:
         # Setup: Create MCPI manager for this project
         path_overrides = {
             "project-mcp": project_dir / ".mcp.json",
-            "project-local": project_dir / ".claude" / "settings.local.json"
+            "project-local": project_dir / ".claude" / "settings.local.json",
         }
 
         plugin = ClaudeCodePlugin(path_overrides=path_overrides)
@@ -316,28 +320,28 @@ class TestProjectMCPClaudeValidation:
                     "filesystem": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+                        "type": "stdio",
                     }
                 }
             },
             settings_config={
                 "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": ["filesystem"]  # Explicitly disabled
-            }
+                "disabledMcpjsonServers": ["filesystem"],  # Explicitly disabled
+            },
         )
 
         # Execute: Get Claude's view of servers
         claude_servers = get_claude_mcp_list(project_dir)
 
         # CRITICAL: Verify server NOT in claude mcp list (disabled)
-        assert "filesystem" not in claude_servers, (
-            "Disabled server should NOT appear in `claude mcp list` output."
-        )
+        assert (
+            "filesystem" not in claude_servers
+        ), "Disabled server should NOT appear in `claude mcp list` output."
 
         # Setup: Create MCPI manager for this project
         path_overrides = {
             "project-mcp": project_dir / ".mcp.json",
-            "project-local": project_dir / ".claude" / "settings.local.json"
+            "project-local": project_dir / ".claude" / "settings.local.json",
         }
 
         plugin = ClaudeCodePlugin(path_overrides=path_overrides)
@@ -351,11 +355,13 @@ class TestProjectMCPClaudeValidation:
 
         # CRITICAL: Verify MCPI shows server as DISABLED (matching Claude's behavior)
         assert fs is not None, "Server should appear in MCPI list"
-        assert fs.state == ServerState.DISABLED, (
-            f"MCPI should show disabled server as DISABLED, got {fs.state}"
-        )
+        assert (
+            fs.state == ServerState.DISABLED
+        ), f"MCPI should show disabled server as DISABLED, got {fs.state}"
 
-        print("\n✓ VALIDATION PASSED: Disabled server correctly hidden from Claude Code")
+        print(
+            "\n✓ VALIDATION PASSED: Disabled server correctly hidden from Claude Code"
+        )
         print(f"  - claude mcp list: Server NOT present (correct)")
         print(f"  - mcpi list: Server shows DISABLED (correct)")
 
@@ -383,31 +389,31 @@ class TestProjectMCPClaudeValidation:
                     "approved-server": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+                        "type": "stdio",
                     },
                     "unapproved-server": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-github"],
-                        "type": "stdio"
+                        "type": "stdio",
                     },
                     "disabled-server": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-slack"],
-                        "type": "stdio"
+                        "type": "stdio",
                     },
                     "inline-disabled-server": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-git"],
                         "type": "stdio",
-                        "disabled": True  # Inline disabled
-                    }
+                        "disabled": True,  # Inline disabled
+                    },
                 }
             },
             settings_config={
                 "enabledMcpjsonServers": ["approved-server"],
-                "disabledMcpjsonServers": ["disabled-server"]
+                "disabledMcpjsonServers": ["disabled-server"],
                 # unapproved-server not in either array
-            }
+            },
         )
 
         # Execute: Get Claude's view of servers
@@ -416,7 +422,7 @@ class TestProjectMCPClaudeValidation:
         # Setup: Create MCPI manager for this project
         path_overrides = {
             "project-mcp": project_dir / ".mcp.json",
-            "project-local": project_dir / ".claude" / "settings.local.json"
+            "project-local": project_dir / ".claude" / "settings.local.json",
         }
 
         plugin = ClaudeCodePlugin(path_overrides=path_overrides)
@@ -436,16 +442,22 @@ class TestProjectMCPClaudeValidation:
 
         # Expected states
         expected_states = {
-            "approved-server": (ServerState.ENABLED, True),  # (mcpi_state, in_claude_list)
+            "approved-server": (
+                ServerState.ENABLED,
+                True,
+            ),  # (mcpi_state, in_claude_list)
             "unapproved-server": (ServerState.DISABLED, False),
             "disabled-server": (ServerState.DISABLED, False),
-            "inline-disabled-server": (ServerState.DISABLED, False)
+            "inline-disabled-server": (ServerState.DISABLED, False),
         }
 
         # Verify: All servers have correct state in both MCPI and Claude
         validation_results = []
 
-        for server_name, (expected_mcpi_state, expected_in_claude) in expected_states.items():
+        for server_name, (
+            expected_mcpi_state,
+            expected_in_claude,
+        ) in expected_states.items():
             # Check MCPI state
             mcpi_state = mcpi_states.get(server_name)
             assert mcpi_state is not None, f"Server '{server_name}' not in MCPI list"
@@ -468,9 +480,8 @@ class TestProjectMCPClaudeValidation:
             # Check consistency
             # ENABLED in MCPI → Should be in Claude list
             # DISABLED in MCPI → Should NOT be in Claude list
-            consistent = (
-                (mcpi_state == ServerState.ENABLED and in_claude) or
-                (mcpi_state == ServerState.DISABLED and not in_claude)
+            consistent = (mcpi_state == ServerState.ENABLED and in_claude) or (
+                mcpi_state == ServerState.DISABLED and not in_claude
             )
 
             if consistent and mcpi_correct and claude_correct:
@@ -494,8 +505,8 @@ class TestProjectMCPClaudeValidation:
         failures = [r for r in validation_results if r.startswith("✗")]
         if failures:
             pytest.fail(
-                f"State validation failed for {len(failures)} server(s):\n" +
-                "\n".join(failures)
+                f"State validation failed for {len(failures)} server(s):\n"
+                + "\n".join(failures)
             )
 
 

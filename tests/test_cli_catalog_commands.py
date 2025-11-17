@@ -70,46 +70,51 @@ def test_catalogs(tmp_path: Path):
     local_path = tmp_path / "local" / "catalog.json"
 
     # Create official catalog with sample servers
-    create_test_catalog_file(official_path, {
-        "filesystem": {
-            "description": "File system access for MCP",
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-            "categories": ["filesystem", "tools"],
-            "repository": "https://github.com/modelcontextprotocol/servers"
+    create_test_catalog_file(
+        official_path,
+        {
+            "filesystem": {
+                "description": "File system access for MCP",
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                "categories": ["filesystem", "tools"],
+                "repository": "https://github.com/modelcontextprotocol/servers",
+            },
+            "github": {
+                "description": "GitHub API integration",
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-github"],
+                "categories": ["api", "github"],
+                "repository": "https://github.com/modelcontextprotocol/servers",
+            },
+            "database": {
+                "description": "Database query tool",
+                "command": "python",
+                "args": ["-m", "mcp_database"],
+                "categories": ["database", "sql"],
+                "repository": None,
+            },
         },
-        "github": {
-            "description": "GitHub API integration",
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"],
-            "categories": ["api", "github"],
-            "repository": "https://github.com/modelcontextprotocol/servers"
-        },
-        "database": {
-            "description": "Database query tool",
-            "command": "python",
-            "args": ["-m", "mcp_database"],
-            "categories": ["database", "sql"],
-            "repository": None
-        }
-    })
+    )
 
     # Create local catalog with custom server
-    create_test_catalog_file(local_path, {
-        "custom-tool": {
-            "description": "My custom MCP tool",
-            "command": "python",
-            "args": ["-m", "my_tool"],
-            "categories": ["custom"],
-            "repository": None
-        }
-    })
+    create_test_catalog_file(
+        local_path,
+        {
+            "custom-tool": {
+                "description": "My custom MCP tool",
+                "command": "python",
+                "args": ["-m", "my_tool"],
+                "categories": ["custom"],
+                "repository": None,
+            }
+        },
+    )
 
     # Create test manager (will raise NotImplementedError until implemented)
     try:
         manager = create_test_catalog_manager(
-            official_path=official_path,
-            local_path=local_path
+            official_path=official_path, local_path=local_path
         )
     except NotImplementedError:
         # Expected until implementation exists
@@ -129,6 +134,7 @@ def inject_catalog_manager_into_cli(manager: CatalogManager, monkeypatch):
         manager: Test CatalogManager instance
         monkeypatch: pytest monkeypatch fixture
     """
+
     def mock_get_catalog_manager(ctx):
         return manager
 
@@ -212,7 +218,9 @@ class TestCatalogInfoCommand:
             assert "local" in result.output.lower()
             assert "1" in result.output or "server" in result.output.lower()
 
-    def test_catalog_info_case_insensitive(self, cli_runner, test_catalogs, monkeypatch):
+    def test_catalog_info_case_insensitive(
+        self, cli_runner, test_catalogs, monkeypatch
+    ):
         """Works with OFFICIAL, Official, etc."""
         manager, _, _ = test_catalogs
         if manager is None:
@@ -238,7 +246,11 @@ class TestCatalogInfoCommand:
         result = cli_runner.invoke(cli, ["catalog", "info", "nonexistent"])
 
         # Should show error for unknown catalog
-        assert result.exit_code != 0 or "not found" in result.output.lower() or "unknown" in result.output.lower()
+        assert (
+            result.exit_code != 0
+            or "not found" in result.output.lower()
+            or "unknown" in result.output.lower()
+        )
 
 
 class TestSearchWithCatalog:
@@ -265,7 +277,9 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "--query", "filesystem", "--catalog", "official"])
+        result = cli_runner.invoke(
+            cli, ["search", "--query", "filesystem", "--catalog", "official"]
+        )
 
         if result.exit_code == 0:
             assert "filesystem" in result.output.lower()
@@ -277,14 +291,18 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "--query", "custom", "--catalog", "local"])
+        result = cli_runner.invoke(
+            cli, ["search", "--query", "custom", "--catalog", "local"]
+        )
 
         if result.exit_code == 0:
             assert "custom" in result.output.lower()
             # Should NOT find official catalog servers
             assert "filesystem" not in result.output.lower()
 
-    def test_search_with_catalog_case_insensitive(self, cli_runner, test_catalogs, monkeypatch):
+    def test_search_with_catalog_case_insensitive(
+        self, cli_runner, test_catalogs, monkeypatch
+    ):
         """--catalog OFFICIAL works (case-insensitive)."""
         manager, _, _ = test_catalogs
         if manager is None:
@@ -292,10 +310,14 @@ class TestSearchWithCatalog:
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
 
-        result = cli_runner.invoke(cli, ["search", "--query", "filesystem", "--catalog", "OFFICIAL"])
+        result = cli_runner.invoke(
+            cli, ["search", "--query", "filesystem", "--catalog", "OFFICIAL"]
+        )
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
-        result = cli_runner.invoke(cli, ["search", "--query", "custom", "--catalog", "LOCAL"])
+        result = cli_runner.invoke(
+            cli, ["search", "--query", "custom", "--catalog", "LOCAL"]
+        )
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
     def test_search_unknown_catalog(self, cli_runner, test_catalogs, monkeypatch):
@@ -305,10 +327,16 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "--query", "test", "--catalog", "nonexistent"])
+        result = cli_runner.invoke(
+            cli, ["search", "--query", "test", "--catalog", "nonexistent"]
+        )
 
         # Should error for unknown catalog
-        assert result.exit_code != 0 or "unknown" in result.output.lower() or "not found" in result.output.lower()
+        assert (
+            result.exit_code != 0
+            or "unknown" in result.output.lower()
+            or "not found" in result.output.lower()
+        )
 
 
 class TestInfoWithCatalog:
@@ -366,7 +394,9 @@ class TestInfoWithCatalog:
 class TestAddWithCatalog:
     """Test mcpi add with --catalog flag."""
 
-    def test_add_default_catalog(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
+    def test_add_default_catalog(
+        self, cli_runner, mcp_harness, test_catalogs, monkeypatch
+    ):
         """mcpi add <server> uses official by default (backward compat)."""
         catalog_manager, _, _ = test_catalogs
         if catalog_manager is None:
@@ -397,9 +427,15 @@ class TestAddWithCatalog:
 
         # Exit code depends on whether it's in a valid project context
         # At minimum, it should recognize the server exists
-        assert "filesystem" in result.output.lower() or result.exit_code == 0 or "not found" in result.output.lower()
+        assert (
+            "filesystem" in result.output.lower()
+            or result.exit_code == 0
+            or "not found" in result.output.lower()
+        )
 
-    def test_add_with_catalog_local(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
+    def test_add_with_catalog_local(
+        self, cli_runner, mcp_harness, test_catalogs, monkeypatch
+    ):
         """mcpi add <server> --catalog local works."""
         catalog_manager, _, _ = test_catalogs
         if catalog_manager is None:
@@ -426,14 +462,16 @@ class TestAddWithCatalog:
         monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
 
         # Test: Run add command
-        result = cli_runner.invoke(cli, [
-            "add", "custom-tool",
-            "--catalog", "local",
-            "--scope", "user-global"
-        ])
+        result = cli_runner.invoke(
+            cli, ["add", "custom-tool", "--catalog", "local", "--scope", "user-global"]
+        )
 
         # Should recognize the server from local catalog
-        assert "custom" in result.output.lower() or result.exit_code == 0 or "not found" in result.output.lower()
+        assert (
+            "custom" in result.output.lower()
+            or result.exit_code == 0
+            or "not found" in result.output.lower()
+        )
 
 
 class TestCatalogHelpText:
@@ -495,9 +533,15 @@ class TestBackwardCompatibility:
         result = cli_runner.invoke(cli, ["info", "github"])
 
         # Should work with or without new features
-        assert result.exit_code == 0 or "not implemented" in result.output.lower() or "not found" in result.output.lower()
+        assert (
+            result.exit_code == 0
+            or "not implemented" in result.output.lower()
+            or "not found" in result.output.lower()
+        )
 
-    def test_add_without_flags(self, cli_runner, mcp_harness, test_catalogs, monkeypatch):
+    def test_add_without_flags(
+        self, cli_runner, mcp_harness, test_catalogs, monkeypatch
+    ):
         """Old: mcpi add <server> still works (uses official)."""
         catalog_manager, _, _ = test_catalogs
         if catalog_manager is None:
@@ -528,4 +572,8 @@ class TestBackwardCompatibility:
 
         # Should recognize server from official catalog
         # Exit code may vary based on project context
-        assert "database" in result.output.lower() or result.exit_code == 0 or "not found" in result.output.lower()
+        assert (
+            "database" in result.output.lower()
+            or result.exit_code == 0
+            or "not found" in result.output.lower()
+        )

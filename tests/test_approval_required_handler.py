@@ -37,11 +37,16 @@ import pytest
 # IMPORTANT: Import will fail until handler is implemented
 # This is EXPECTED - tests should fail until implementation exists
 try:
-    from mcpi.clients.enable_disable_handlers import ApprovalRequiredEnableDisableHandler
+    from mcpi.clients.enable_disable_handlers import (
+        ApprovalRequiredEnableDisableHandler,
+    )
+
     HANDLER_IMPLEMENTED = True
 except ImportError:
     HANDLER_IMPLEMENTED = False
-    pytestmark = pytest.mark.skip(reason="ApprovalRequiredEnableDisableHandler not implemented yet")
+    pytestmark = pytest.mark.skip(
+        reason="ApprovalRequiredEnableDisableHandler not implemented yet"
+    )
 
 from mcpi.clients.file_based import JSONFileReader, JSONFileWriter
 
@@ -110,28 +115,28 @@ class TestStateDetection:
         # Setup: Server exists in .mcp.json
         mcp_json.parent.mkdir(parents=True, exist_ok=True)
         with mcp_json.open("w") as f:
-            json.dump({
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+            json.dump(
+                {
+                    "mcpServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                            "type": "stdio",
+                        }
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Setup: Settings file exists with empty approval arrays
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump({"enabledMcpjsonServers": [], "disabledMcpjsonServers": []}, f)
 
         # Verify: Server is disabled (not approved)
-        assert handler.is_disabled("filesystem") is True, (
-            "Server NOT in approval arrays should be DISABLED (not approved)"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Server NOT in approval arrays should be DISABLED (not approved)"
 
     def test_server_in_enabled_array_is_enabled(self, handler, tmp_files):
         """Server in enabledMcpjsonServers array → ENABLED.
@@ -146,15 +151,15 @@ class TestStateDetection:
         # Setup: Server approved in enabledMcpjsonServers
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+                f,
+            )
 
         # Verify: Server is enabled (approved)
-        assert handler.is_disabled("filesystem") is False, (
-            "Server in enabledMcpjsonServers should be ENABLED"
-        )
+        assert (
+            handler.is_disabled("filesystem") is False
+        ), "Server in enabledMcpjsonServers should be ENABLED"
 
     def test_server_in_disabled_array_is_disabled(self, handler, tmp_files):
         """Server in disabledMcpjsonServers array → DISABLED.
@@ -169,15 +174,15 @@ class TestStateDetection:
         # Setup: Server explicitly disabled
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": ["filesystem"]
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": [], "disabledMcpjsonServers": ["filesystem"]},
+                f,
+            )
 
         # Verify: Server is disabled
-        assert handler.is_disabled("filesystem") is True, (
-            "Server in disabledMcpjsonServers should be DISABLED"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Server in disabledMcpjsonServers should be DISABLED"
 
     def test_server_in_both_arrays_is_disabled(self, handler, tmp_files):
         """Server in BOTH arrays → DISABLED (disabled takes precedence).
@@ -195,15 +200,18 @@ class TestStateDetection:
         # Setup: Server in BOTH enabled and disabled arrays (contradictory)
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": ["filesystem"]
-            }, f)
+            json.dump(
+                {
+                    "enabledMcpjsonServers": ["filesystem"],
+                    "disabledMcpjsonServers": ["filesystem"],
+                },
+                f,
+            )
 
         # Verify: Disabled takes precedence (defensive behavior)
-        assert handler.is_disabled("filesystem") is True, (
-            "Server in BOTH arrays should be DISABLED (defensive)"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Server in BOTH arrays should be DISABLED (defensive)"
 
     def test_inline_disabled_overrides_enabled_array(self, handler, tmp_files):
         """Server with inline disabled=true overrides enabledMcpjsonServers.
@@ -222,29 +230,32 @@ class TestStateDetection:
         # Setup: Server has inline disabled field
         mcp_json.parent.mkdir(parents=True, exist_ok=True)
         with mcp_json.open("w") as f:
-            json.dump({
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio",
-                        "disabled": True  # Inline disabled field
+            json.dump(
+                {
+                    "mcpServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                            "type": "stdio",
+                            "disabled": True,  # Inline disabled field
+                        }
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Setup: Server in enabledMcpjsonServers (should be overridden)
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+                f,
+            )
 
         # Verify: Inline disabled field takes precedence
-        assert handler.is_disabled("filesystem") is True, (
-            "Inline 'disabled': true should override enabledMcpjsonServers"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Inline 'disabled': true should override enabledMcpjsonServers"
 
     def test_inline_disabled_false_with_approval_is_enabled(self, handler, tmp_files):
         """Server with inline disabled=false AND in enabledMcpjsonServers → ENABLED.
@@ -259,31 +270,36 @@ class TestStateDetection:
         # Setup: Server has inline disabled=false
         mcp_json.parent.mkdir(parents=True, exist_ok=True)
         with mcp_json.open("w") as f:
-            json.dump({
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio",
-                        "disabled": False  # Explicitly not disabled
+            json.dump(
+                {
+                    "mcpServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                            "type": "stdio",
+                            "disabled": False,  # Explicitly not disabled
+                        }
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Setup: Server approved
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+                f,
+            )
 
         # Verify: Server is enabled
-        assert handler.is_disabled("filesystem") is False, (
-            "Server with disabled=false AND approved should be ENABLED"
-        )
+        assert (
+            handler.is_disabled("filesystem") is False
+        ), "Server with disabled=false AND approved should be ENABLED"
 
-    def test_inline_disabled_true_without_approval_is_disabled(self, handler, tmp_files):
+    def test_inline_disabled_true_without_approval_is_disabled(
+        self, handler, tmp_files
+    ):
         """Server with inline disabled=true and NOT approved → DISABLED.
 
         Why un-gameable:
@@ -296,29 +312,29 @@ class TestStateDetection:
         # Setup: Server has inline disabled field
         mcp_json.parent.mkdir(parents=True, exist_ok=True)
         with mcp_json.open("w") as f:
-            json.dump({
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio",
-                        "disabled": True
+            json.dump(
+                {
+                    "mcpServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                            "type": "stdio",
+                            "disabled": True,
+                        }
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Setup: Settings file with empty arrays
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump({"enabledMcpjsonServers": [], "disabledMcpjsonServers": []}, f)
 
         # Verify: Server is disabled (both reasons)
-        assert handler.is_disabled("filesystem") is True, (
-            "Server with disabled=true AND not approved should be DISABLED"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Server with disabled=true AND not approved should be DISABLED"
 
 
 # =============================================================================
@@ -347,25 +363,28 @@ class TestEdgeCases:
         # Setup: Only .mcp.json exists (no approval file)
         mcp_json.parent.mkdir(parents=True, exist_ok=True)
         with mcp_json.open("w") as f:
-            json.dump({
-                "mcpServers": {
-                    "filesystem": {
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
-                        "type": "stdio"
+            json.dump(
+                {
+                    "mcpServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                            "type": "stdio",
+                        }
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Verify: No approval file means not approved (disabled)
-        assert handler.is_disabled("filesystem") is True, (
-            "Server without approval file should be DISABLED (security default)"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Server without approval file should be DISABLED (security default)"
 
         # Verify: Settings file was NOT created
-        assert not settings_local.exists(), (
-            "is_disabled() should not create settings file"
-        )
+        assert (
+            not settings_local.exists()
+        ), "is_disabled() should not create settings file"
 
     def test_empty_approval_arrays_treats_all_as_disabled(self, handler, tmp_files):
         """Empty approval arrays → All servers DISABLED.
@@ -380,15 +399,12 @@ class TestEdgeCases:
         # Setup: Settings file with empty arrays
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump({"enabledMcpjsonServers": [], "disabledMcpjsonServers": []}, f)
 
         # Verify: Empty arrays means not approved
-        assert handler.is_disabled("filesystem") is True, (
-            "Empty approval arrays should mean DISABLED (not approved)"
-        )
+        assert (
+            handler.is_disabled("filesystem") is True
+        ), "Empty approval arrays should mean DISABLED (not approved)"
 
     def test_invalid_json_in_approval_file_handled_gracefully(self, handler, tmp_files):
         """Invalid JSON in settings file → Treat as disabled (fail safe).
@@ -409,13 +425,15 @@ class TestEdgeCases:
         # Verify: Handler doesn't crash and treats as disabled (fail-safe)
         try:
             result = handler.is_disabled("filesystem")
-            assert result is True, (
-                "Invalid JSON should be treated as disabled (fail-safe)"
-            )
+            assert (
+                result is True
+            ), "Invalid JSON should be treated as disabled (fail-safe)"
         except Exception as e:
             pytest.fail(f"Handler should not raise exception on invalid JSON: {e}")
 
-    def test_approval_file_permissions_error_handled_gracefully(self, handler, tmp_files):
+    def test_approval_file_permissions_error_handled_gracefully(
+        self, handler, tmp_files
+    ):
         """Approval file exists but can't be read → Treat as disabled.
 
         Why un-gameable:
@@ -430,13 +448,14 @@ class TestEdgeCases:
         # Setup: Create settings file with no read permissions
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+                f,
+            )
 
         # Remove read permissions (Unix-only)
         import sys
+
         if sys.platform == "win32":
             pytest.skip("Permission test not applicable on Windows")
 
@@ -445,9 +464,9 @@ class TestEdgeCases:
         try:
             # Verify: Handler doesn't crash and treats as disabled (fail-safe)
             result = handler.is_disabled("filesystem")
-            assert result is True, (
-                "Unreadable file should be treated as disabled (fail-safe)"
-            )
+            assert (
+                result is True
+            ), "Unreadable file should be treated as disabled (fail-safe)"
         except Exception as e:
             pytest.fail(f"Handler should not raise exception on permission error: {e}")
         finally:
@@ -480,10 +499,7 @@ class TestOperations:
         # Setup: Create empty settings file
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump({"enabledMcpjsonServers": [], "disabledMcpjsonServers": []}, f)
 
         # Execute: Enable server
         result = handler.enable_server("filesystem")
@@ -495,12 +511,12 @@ class TestOperations:
         with settings_local.open("r") as f:
             data = json.load(f)
 
-        assert "filesystem" in data["enabledMcpjsonServers"], (
-            "Server not added to enabledMcpjsonServers"
-        )
-        assert "filesystem" not in data["disabledMcpjsonServers"], (
-            "Server should not be in disabledMcpjsonServers"
-        )
+        assert (
+            "filesystem" in data["enabledMcpjsonServers"]
+        ), "Server not added to enabledMcpjsonServers"
+        assert (
+            "filesystem" not in data["disabledMcpjsonServers"]
+        ), "Server should not be in disabledMcpjsonServers"
 
     def test_enable_server_removes_from_disabled_array(self, handler, tmp_files):
         """enable_server() removes server from disabledMcpjsonServers if present.
@@ -516,10 +532,10 @@ class TestOperations:
         # Setup: Server in disabled array
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": ["filesystem"]
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": [], "disabledMcpjsonServers": ["filesystem"]},
+                f,
+            )
 
         # Execute: Enable server
         result = handler.enable_server("filesystem")
@@ -531,12 +547,12 @@ class TestOperations:
         with settings_local.open("r") as f:
             data = json.load(f)
 
-        assert "filesystem" in data["enabledMcpjsonServers"], (
-            "Server not added to enabledMcpjsonServers"
-        )
-        assert "filesystem" not in data["disabledMcpjsonServers"], (
-            "Server should be removed from disabledMcpjsonServers"
-        )
+        assert (
+            "filesystem" in data["enabledMcpjsonServers"]
+        ), "Server not added to enabledMcpjsonServers"
+        assert (
+            "filesystem" not in data["disabledMcpjsonServers"]
+        ), "Server should be removed from disabledMcpjsonServers"
 
     def test_disable_server_adds_to_disabled_array(self, handler, tmp_files):
         """disable_server() adds server to disabledMcpjsonServers array.
@@ -552,10 +568,7 @@ class TestOperations:
         # Setup: Create empty settings file
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": [],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump({"enabledMcpjsonServers": [], "disabledMcpjsonServers": []}, f)
 
         # Execute: Disable server
         result = handler.disable_server("filesystem")
@@ -567,12 +580,12 @@ class TestOperations:
         with settings_local.open("r") as f:
             data = json.load(f)
 
-        assert "filesystem" in data["disabledMcpjsonServers"], (
-            "Server not added to disabledMcpjsonServers"
-        )
-        assert "filesystem" not in data["enabledMcpjsonServers"], (
-            "Server should not be in enabledMcpjsonServers"
-        )
+        assert (
+            "filesystem" in data["disabledMcpjsonServers"]
+        ), "Server not added to disabledMcpjsonServers"
+        assert (
+            "filesystem" not in data["enabledMcpjsonServers"]
+        ), "Server should not be in enabledMcpjsonServers"
 
     def test_disable_server_removes_from_enabled_array(self, handler, tmp_files):
         """disable_server() removes server from enabledMcpjsonServers if present.
@@ -588,10 +601,10 @@ class TestOperations:
         # Setup: Server in enabled array
         settings_local.parent.mkdir(parents=True, exist_ok=True)
         with settings_local.open("w") as f:
-            json.dump({
-                "enabledMcpjsonServers": ["filesystem"],
-                "disabledMcpjsonServers": []
-            }, f)
+            json.dump(
+                {"enabledMcpjsonServers": ["filesystem"], "disabledMcpjsonServers": []},
+                f,
+            )
 
         # Execute: Disable server
         result = handler.disable_server("filesystem")
@@ -603,12 +616,12 @@ class TestOperations:
         with settings_local.open("r") as f:
             data = json.load(f)
 
-        assert "filesystem" in data["disabledMcpjsonServers"], (
-            "Server not added to disabledMcpjsonServers"
-        )
-        assert "filesystem" not in data["enabledMcpjsonServers"], (
-            "Server should be removed from enabledMcpjsonServers"
-        )
+        assert (
+            "filesystem" in data["disabledMcpjsonServers"]
+        ), "Server not added to disabledMcpjsonServers"
+        assert (
+            "filesystem" not in data["enabledMcpjsonServers"]
+        ), "Server should be removed from enabledMcpjsonServers"
 
     def test_enable_server_creates_settings_file_if_missing(self, handler, tmp_files):
         """enable_server() creates settings file if it doesn't exist.
@@ -639,9 +652,9 @@ class TestOperations:
 
         assert "enabledMcpjsonServers" in data, "Missing enabledMcpjsonServers array"
         assert "disabledMcpjsonServers" in data, "Missing disabledMcpjsonServers array"
-        assert "filesystem" in data["enabledMcpjsonServers"], (
-            "Server not in enabledMcpjsonServers"
-        )
+        assert (
+            "filesystem" in data["enabledMcpjsonServers"]
+        ), "Server not in enabledMcpjsonServers"
 
 
 # =============================================================================
