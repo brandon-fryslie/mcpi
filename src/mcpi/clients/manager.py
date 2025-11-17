@@ -249,12 +249,16 @@ class MCPManager:
         return self.registry.remove_server(client_name, server_id, scope)
 
     def enable_server(
-        self, server_id: str, client_name: Optional[str] = None
+        self,
+        server_id: str,
+        scope: Optional[str] = None,
+        client_name: Optional[str] = None,
     ) -> OperationResult:
         """Enable a disabled server.
 
         Args:
             server_id: Server identifier
+            scope: Optional scope name (if not provided, auto-detects from server location)
             client_name: Optional client name (uses default if not specified)
 
         Returns:
@@ -264,15 +268,31 @@ class MCPManager:
         if client_name is None:
             client_name = self._default_client
 
-        return self.registry.enable_server(server_id, client_name)
+        if not client_name:
+            return OperationResult.failure_result(
+                "No client specified and no default client available"
+            )
+
+        # Get the client
+        if not self.registry.has_client(client_name):
+            return OperationResult.failure_result(f"Unknown client: {client_name}")
+
+        client = self.registry.get_client(client_name)
+
+        # Call enable_server with optional scope parameter
+        return client.enable_server(server_id, scope)
 
     def disable_server(
-        self, server_id: str, client_name: Optional[str] = None
+        self,
+        server_id: str,
+        scope: Optional[str] = None,
+        client_name: Optional[str] = None,
     ) -> OperationResult:
         """Disable an enabled server.
 
         Args:
             server_id: Server identifier
+            scope: Optional scope name (if not provided, auto-detects from server location)
             client_name: Optional client name (uses default if not specified)
 
         Returns:
@@ -282,7 +302,19 @@ class MCPManager:
         if client_name is None:
             client_name = self._default_client
 
-        return self.registry.disable_server(server_id, client_name)
+        if not client_name:
+            return OperationResult.failure_result(
+                "No client specified and no default client available"
+            )
+
+        # Get the client
+        if not self.registry.has_client(client_name):
+            return OperationResult.failure_result(f"Unknown client: {client_name}")
+
+        client = self.registry.get_client(client_name)
+
+        # Call disable_server with optional scope parameter
+        return client.disable_server(server_id, scope)
 
     def get_server_state(
         self, server_id: str, client_name: Optional[str] = None

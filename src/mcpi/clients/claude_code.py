@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .base import MCPClientPlugin, ScopeHandler
 from .enable_disable_handlers import (
+    ApprovalRequiredEnableDisableHandler,
     ArrayBasedEnableDisableHandler,
     InlineEnableDisableHandler,
 )
@@ -72,8 +73,14 @@ class ClaudeCodePlugin(MCPClientPlugin):
         json_writer = JSONFileWriter()
 
         # Project-level MCP configuration (.mcp.json)
-        # This scope DOES support enable/disable via inline 'disabled' field
+        # This scope requires APPROVAL via .claude/settings.local.json
+        # Uses ApprovalRequiredEnableDisableHandler to check both:
+        # - Inline disabled field in .mcp.json
+        # - Approval arrays in .claude/settings.local.json
         project_mcp_path = self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json")
+        project_local_path = self._get_scope_path(
+            "project-local", Path.cwd() / ".claude" / "settings.local.json"
+        )
         scopes["project-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-mcp",
@@ -86,16 +93,16 @@ class ClaudeCodePlugin(MCPClientPlugin):
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
-            enable_disable_handler=InlineEnableDisableHandler(
-                project_mcp_path, json_reader, json_writer
+            enable_disable_handler=ApprovalRequiredEnableDisableHandler(
+                mcp_json_path=project_mcp_path,
+                settings_local_path=project_local_path,
+                reader=json_reader,
+                writer=json_writer,
             ),
         )
 
         # Project-local Claude settings (.claude/settings.local.json)
         # This scope DOES support enable/disable via arrays
-        project_local_path = self._get_scope_path(
-            "project-local", Path.cwd() / ".claude" / "settings.local.json"
-        )
         scopes["project-local"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-local",
@@ -232,7 +239,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
 
         Uses the scope's enable/disable handler to determine state. Different scopes
         have different mechanisms:
-        - project-mcp: Use inline 'disabled' field in server config
+        - project-mcp: Use ApprovalRequiredEnableDisableHandler (checks inline + approval)
         - project-local, user-local: Use enabledMcpjsonServers/disabledMcpjsonServers arrays
         - user-global: Use file-move mechanism (disabled-mcp.json file)
         - user-internal: Use file-move mechanism (.disabled-servers.json file)

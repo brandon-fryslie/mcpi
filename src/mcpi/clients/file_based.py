@@ -9,6 +9,7 @@ import yaml
 from jsonschema import ValidationError, validate
 
 from .base import ScopeHandler
+from .file_move_enable_disable_handler import FileMoveEnableDisableHandler
 from .protocols import (
     CommandExecutor,
     ConfigReader,
@@ -208,11 +209,9 @@ class FileBasedScope(ScopeHandler):
             servers = data.get("mcpServers", {})
 
             # If using FileMoveEnableDisableHandler, also include disabled servers
-            # Check if handler has get_disabled_servers method (duck typing)
-            if (
-                self.enable_disable_handler
-                and hasattr(self.enable_disable_handler, "get_disabled_servers")
-            ):
+            # Only FileMoveEnableDisableHandler stores server configs in separate files
+            # (ApprovalRequiredEnableDisableHandler stores IDs in arrays, not configs)
+            if isinstance(self.enable_disable_handler, FileMoveEnableDisableHandler):
                 disabled_servers = self.enable_disable_handler.get_disabled_servers()
                 # Merge disabled servers into the result
                 # Note: We preserve the configuration from disabled file
