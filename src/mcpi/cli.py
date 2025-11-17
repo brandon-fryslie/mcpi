@@ -1699,11 +1699,6 @@ def info(
     type=click.Choice(["official", "local"], case_sensitive=False),
     help="Search in specific catalog (default: official)",
 )
-@click.option(
-    "--all-catalogs",
-    is_flag=True,
-    help="Search across all catalogs",
-)
 @click.option("--limit", default=20, help="Maximum number of results to show")
 @click.option("--json", "output_json", is_flag=True, help="Output in JSON format")
 @click.pass_context
@@ -1711,7 +1706,6 @@ def search(
     ctx: click.Context,
     query: str,
     catalog: Optional[str],
-    all_catalogs: bool,
     limit: int,
     output_json: bool,
 ) -> None:
@@ -1720,132 +1714,73 @@ def search(
     Examples:
         mcpi search --query filesystem
         mcpi search -q database --catalog local
-        mcpi search --query git --all-catalogs
+        mcpi search --query git --catalog official
     """
     try:
-        # Validate mutually exclusive flags
-        if catalog and all_catalogs:
-            raise click.UsageError("Cannot use both --catalog and --all-catalogs")
+        # Search single catalog (default: official)
+        cat = get_catalog(ctx, catalog)
 
-        if all_catalogs:
-            # Search all catalogs
-            manager = get_catalog_manager(ctx)
-            results = manager.search_all(query)
+        # Search servers (returns list of (server_id, MCPServer) tuples)
+        servers = cat.search_servers(query)
 
-            # Limit results
-            results = results[:limit]
+        # Limit results
+        servers = servers[:limit]
 
-            if not results:
-                if output_json:
-                    import json
-                    print(json.dumps([]))
-                else:
-                    console.print(f"[yellow]No servers found matching '{query}'[/yellow]")
-                return
-
-            # Output JSON if requested
-            if output_json:
-                import json
-                json_results = []
-                for catalog_name, server_id, server in results:
-                    result = server.model_dump()
-                    result["catalog"] = catalog_name
-                    result["server_id"] = server_id
-                    json_results.append(result)
-                print(json.dumps(json_results, indent=2, default=str))
-                return
-
-            # Group by catalog for display
-            by_catalog = defaultdict(list)
-            for catalog_name, server_id, server in results:
-                by_catalog[catalog_name].append((server_id, server))
-
-            # Display grouped results
-            for catalog_name in ["official", "local"]:
-                if catalog_name in by_catalog:
-                    table = Table(title=f"{catalog_name.upper()} CATALOG ({len(by_catalog[catalog_name])} servers)")
-                    table.add_column("ID", style="cyan", no_wrap=True)
-                    table.add_column("Command", style="magenta")
-                    table.add_column("Description", style="white")
-
-                    for server_id, server in by_catalog[catalog_name]:
-                        table.add_row(
-                            server_id,
-                            server.command,
-                            (
-                                server.description[:80] + "..."
-                                if len(server.description) > 80
-                                else server.description
-                            ),
-                        )
-
-                    console.print(table)
-                    console.print()  # Add spacing between tables
-        else:
-            # Search single catalog (default: official)
-            cat = get_catalog(ctx, catalog)
-
-            # Search servers (returns list of (server_id, MCPServer) tuples)
-            servers = cat.search_servers(query)
-
-            # Limit results
-            servers = servers[:limit]
-
-            if not servers:
-                if output_json:
-                    import json
-
-                    print(json.dumps([]))
-                else:
-                    console.print("[yellow]No servers found matching criteria[/yellow]")
-                return
-
-            # Output JSON if requested
+        if not servers:
             if output_json:
                 import json
 
-                # Build JSON output - handle both tuple and plain server results
-                json_results = []
-                for item in servers:
-                    # Check if it's a tuple (server, score, matches) or just (server_id, server)
-                    if isinstance(item, tuple):
-                        if len(item) == 3:
-                            # Tuple result with score and matches
-                            server, score, matches = item
-                            result = server.model_dump()
-                            result["score"] = score
-                            result["matches"] = matches
-                            json_results.append(result)
-                        elif len(item) == 2:
-                            # Plain (server_id, server) tuple
-                            server_id, server = item
-                            json_results.append(server.model_dump())
-                    else:
-                        # Single server object
-                        json_results.append(item.model_dump())
+                print(json.dumps([]))
+            else:
+                console.print("[yellow]No servers found matching criteria[/yellow]")
+            return
 
-                print(json.dumps(json_results, indent=2, default=str))
-                return
+        # Output JSON if requested
+        if output_json:
+            import json
 
-            # Table output
-            catalog_name = catalog or "official"
-            table = Table(title=f"{catalog_name.upper()} CATALOG ({len(servers)} found)")
-            table.add_column("ID", style="cyan", no_wrap=True)
-            table.add_column("Command", style="magenta")
-            table.add_column("Description", style="white")
+            # Build JSON output - handle both tuple and plain server results
+            json_results = []
+            for item in servers:
+                # Check if it's a tuple (server, score, matches) or just (server_id, server)
+                if isinstance(item, tuple):
+                    if len(item) == 3:
+                        # Tuple result with score and matches
+                        server, score, matches = item
+                        result = server.model_dump()
+                        result["score"] = score
+                        result["matches"] = matches
+                        json_results.append(result)
+                    elif len(item) == 2:
+                        # Plain (server_id, server) tuple
+                        server_id, server = item
+                        json_results.append(server.model_dump())
+                else:
+                    # Single server object
+                    json_results.append(item.model_dump())
 
-            for server_id, server in servers:
-                table.add_row(
-                    server_id,
-                    server.command,
-                    (
-                        server.description[:80] + "..."
-                        if len(server.description) > 80
-                        else server.description
-                    ),
-                )
+            print(json.dumps(json_results, indent=2, default=str))
+            return
 
-            console.print(table)
+        # Table output
+        catalog_name = catalog or "official"
+        table = Table(title=f"{catalog_name.upper()} CATALOG ({len(servers)} found)")
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Command", style="magenta")
+        table.add_column("Description", style="white")
+
+        for server_id, server in servers:
+            table.add_row(
+                server_id,
+                server.command,
+                (
+                    server.description[:80] + "..."
+                    if len(server.description) > 80
+                    else server.description
+                ),
+            )
+
+        console.print(table)
 
     except Exception as e:
         console.print(f"[red]Error searching registry: {e}[/red]")

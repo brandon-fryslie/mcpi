@@ -6,7 +6,6 @@ Tests cover:
 - catalog list command
 - catalog info command
 - search --catalog flag
-- search --all-catalogs flag
 - info --catalog flag
 - add --catalog flag
 - Error handling and help text
@@ -15,7 +14,6 @@ Requirements from BACKLOG-CATALOG-PHASE1-2025-11-17-023825.md:
 - mcpi catalog list: shows both catalogs in Rich table
 - mcpi catalog info <name>: shows catalog details
 - mcpi search --catalog <name>: searches specific catalog
-- mcpi search --all-catalogs: searches both, groups results
 - Default behavior unchanged (backward compat)
 
 Test Status: These tests will FAIL until CLI commands are implemented.
@@ -300,52 +298,6 @@ class TestSearchWithCatalog:
         result = cli_runner.invoke(cli, ["search", "--query", "custom", "--catalog", "LOCAL"])
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
-    def test_search_all_catalogs(self, cli_runner, test_catalogs, monkeypatch):
-        """mcpi search <query> --all-catalogs searches both."""
-        manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
-
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-
-        # Search for a term that matches nothing specific but shows all
-        result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
-
-        if result.exit_code == 0:
-            # Should find servers from both catalogs
-            assert "filesystem" in result.output.lower() or "github" in result.output.lower()
-            assert "custom" in result.output.lower()
-
-    def test_search_all_catalogs_groups_results(self, cli_runner, test_catalogs, monkeypatch):
-        """Results grouped by catalog name."""
-        manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
-
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
-
-        if result.exit_code == 0:
-            # Should show catalog names as groupings
-            assert "official" in result.output.lower()
-            assert "local" in result.output.lower()
-
-    def test_search_catalog_mutually_exclusive(self, cli_runner, test_catalogs, monkeypatch):
-        """Error if both --catalog and --all-catalogs used."""
-        manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
-
-        inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, [
-            "search", "test",
-            "--catalog", "official",
-            "--all-catalogs"
-        ])
-
-        # Should error
-        assert result.exit_code != 0 or "mutually exclusive" in result.output.lower() or "cannot use both" in result.output.lower()
-
     def test_search_unknown_catalog(self, cli_runner, test_catalogs, monkeypatch):
         """Unknown catalog name shows clear error."""
         manager, _, _ = test_catalogs
@@ -498,15 +450,14 @@ class TestCatalogHelpText:
             assert "list" in result.output.lower() or "Commands:" in result.output
 
     def test_search_help_shows_catalog_flags(self, cli_runner):
-        """mcpi search --help shows --catalog and --all-catalogs."""
+        """mcpi search --help shows --catalog flag."""
         result = cli_runner.invoke(cli, ["search", "--help"])
 
-        # May not have flags yet, but help should work
+        # Help should work
         assert result.exit_code == 0
 
-        # When implemented, should show flags
+        # When implemented, should show flag
         # assert "--catalog" in result.output
-        # assert "--all-catalogs" in result.output
 
     def test_info_help_shows_catalog_flag(self, cli_runner):
         """mcpi info --help shows --catalog flag."""

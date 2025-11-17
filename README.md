@@ -72,8 +72,8 @@ mcpi search --query filesystem
 # Search local catalog
 mcpi search --query myserver --catalog local
 
-# Search all catalogs
-mcpi search --query database --all-catalogs
+# Search specific catalog explicitly
+mcpi search --query database --catalog official
 ```
 
 ### Use Your Local Catalog
@@ -215,13 +215,12 @@ Search for servers by name or description in the registry.
 
 **Options:**
 - `--query, -q TEXT`: Search query (required)
-- `--catalog TEXT`: Search specific catalog (official or local)
-- `--all-catalogs`: Search all catalogs
+- `--catalog TEXT`: Search specific catalog (official or local, default: official)
 
 ```bash
 mcpi search --query filesystem
 mcpi search -q database --catalog local
-mcpi search --query git --all-catalogs
+mcpi search --query git --catalog official
 ```
 
 **Note**: v0.4.0 changed search syntax from positional to --query flag for compatibility with multi-catalog features.

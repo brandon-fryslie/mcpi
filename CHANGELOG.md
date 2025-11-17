@@ -18,22 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `mcpi catalog info <name>` - Display catalog details
 - **New Flags**:
   - `--catalog <name>` - Search/use specific catalog (search, info, add commands)
-  - `--all-catalogs` - Search across all catalogs (search command)
 - **CatalogManager API**: New `catalog_manager.py` module for programmatic access
 
 ### Changed
 - **Breaking**: `mcpi search` now requires `--query` or `-q` flag (was positional argument)
   - Old: `mcpi search filesystem`
   - New: `mcpi search --query filesystem`
-  - Reason: Fixes Click parser issue with --all-catalogs flag
+  - Reason: Improves compatibility with multi-catalog features
 
 ### Deprecated
 - `create_default_catalog()` - Use `create_default_catalog_manager()` instead
   - Still works with deprecation warning
   - Will be removed in v1.0.0
-
-### Fixed
-- Click argument parser confusion with --all-catalogs flag
 
 ### Migration Guide: v0.3.0 → v0.4.0
 

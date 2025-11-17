@@ -255,8 +255,8 @@ mcpi catalog info local
 # Search specific catalog
 mcpi search --query filesystem --catalog local
 
-# Search all catalogs
-mcpi search --query database --all-catalogs
+# Search official catalog explicitly
+mcpi search --query database --catalog official
 ```
 
 **Factory Functions**:
