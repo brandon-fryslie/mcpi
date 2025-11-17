@@ -253,7 +253,7 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "filesystem"])
+        result = cli_runner.invoke(cli, ["search", "--query", "filesystem"])
 
         if result.exit_code == 0:
             assert "filesystem" in result.output.lower()
@@ -267,7 +267,7 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "filesystem", "--catalog", "official"])
+        result = cli_runner.invoke(cli, ["search", "--query", "filesystem", "--catalog", "official"])
 
         if result.exit_code == 0:
             assert "filesystem" in result.output.lower()
@@ -279,7 +279,7 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "custom", "--catalog", "local"])
+        result = cli_runner.invoke(cli, ["search", "--query", "custom", "--catalog", "local"])
 
         if result.exit_code == 0:
             assert "custom" in result.output.lower()
@@ -294,10 +294,10 @@ class TestSearchWithCatalog:
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
 
-        result = cli_runner.invoke(cli, ["search", "filesystem", "--catalog", "OFFICIAL"])
+        result = cli_runner.invoke(cli, ["search", "--query", "filesystem", "--catalog", "OFFICIAL"])
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
-        result = cli_runner.invoke(cli, ["search", "custom", "--catalog", "LOCAL"])
+        result = cli_runner.invoke(cli, ["search", "--query", "custom", "--catalog", "LOCAL"])
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
     def test_search_all_catalogs(self, cli_runner, test_catalogs, monkeypatch):
@@ -309,7 +309,7 @@ class TestSearchWithCatalog:
         inject_catalog_manager_into_cli(manager, monkeypatch)
 
         # Search for a term that matches nothing specific but shows all
-        result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
+        result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
 
         if result.exit_code == 0:
             # Should find servers from both catalogs
@@ -323,7 +323,7 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
+        result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
 
         if result.exit_code == 0:
             # Should show catalog names as groupings
@@ -353,7 +353,7 @@ class TestSearchWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "test", "--catalog", "nonexistent"])
+        result = cli_runner.invoke(cli, ["search", "--query", "test", "--catalog", "nonexistent"])
 
         # Should error for unknown catalog
         assert result.exit_code != 0 or "unknown" in result.output.lower() or "not found" in result.output.lower()
@@ -529,7 +529,7 @@ class TestBackwardCompatibility:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["search", "filesystem"])
+        result = cli_runner.invoke(cli, ["search", "--query", "filesystem"])
 
         # Should work with or without new features
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
