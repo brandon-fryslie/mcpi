@@ -6,7 +6,6 @@ from mcpi.registry.catalog import (
     ServerCatalog,
     ServerRegistry,
 )
-from mcpi.registry.discovery import ServerDiscovery
 from mcpi.registry.validation import RegistryValidator
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "ServerCatalog",
     "InstallationMethod",
     "RegistryValidator",
-    "ServerDiscovery",
 ]

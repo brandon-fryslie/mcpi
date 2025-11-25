@@ -640,12 +640,12 @@ class TestCLIIntegrationWithFactories:
         USER WORKFLOW:
         1. CLI command is executed
         2. CLI calls get_catalog() to get ServerCatalog instance
-        3. get_catalog() uses create_default_catalog() factory
+        3. get_catalog() uses get_catalog_manager() which uses factory functions
         4. CLI operates on production registry
 
         VALIDATION:
         - CLI doesn't directly instantiate ServerCatalog
-        - CLI uses factory function
+        - CLI uses factory function via catalog manager
         - Reduces coupling and improves testability
 
         GAMING RESISTANCE:
@@ -656,21 +656,22 @@ class TestCLIIntegrationWithFactories:
         from mcpi.cli import get_catalog
         from unittest.mock import Mock, patch
 
-        # Mock the factory to verify it's called
+        # Mock the catalog manager to verify it's called
         mock_catalog = Mock(spec=ServerCatalog)
-        mock_factory = Mock(return_value=mock_catalog)
+        mock_manager = Mock()
+        mock_manager.get_default_catalog.return_value = mock_catalog
 
         # Create mock context
         ctx = Mock()
         ctx.obj = {}
 
-        # Call get_catalog with mocked factory
-        with patch("mcpi.cli.create_default_catalog", mock_factory):
+        # Call get_catalog with mocked catalog manager
+        with patch("mcpi.cli.get_catalog_manager", return_value=mock_manager):
             result = get_catalog(ctx)
 
-        # Verify factory was called
-        mock_factory.assert_called_once()
-        assert result is mock_catalog, "get_catalog() must return factory result"
+        # Verify catalog manager was used
+        mock_manager.get_default_catalog.assert_called_once()
+        assert result is mock_catalog, "get_catalog() must return catalog from manager"
 
     @pytest.mark.skip(reason="CLI factory injection not yet implemented - part of P0-1")
     def test_cli_can_inject_test_catalog_factory(self, test_registry_file):

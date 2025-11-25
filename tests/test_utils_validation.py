@@ -123,65 +123,85 @@ class TestValidationUtils:
 
         assert result is False
 
-    def test_validate_server_id_valid_single_char(self):
-        """Test validate_server_id with valid single character."""
-        result = validate_server_id("a")
-        assert result is True
+    # === Namespaced Server ID Tests (New Format) ===
+    # All server IDs must be namespaced with exactly one '/'
+    # Optional '@' prefix for verified accounts
 
-    def test_validate_server_id_valid_alphanumeric(self):
-        """Test validate_server_id with valid alphanumeric."""
-        result = validate_server_id("filesystem")
-        assert result is True
+    def test_validate_server_id_valid_namespaced(self):
+        """Test validate_server_id with valid namespaced format."""
+        assert validate_server_id("anthropic/filesystem") is True
+        assert validate_server_id("modelcontextprotocol/github") is True
+        assert validate_server_id("r-huijts/xcode") is True
 
-    def test_validate_server_id_valid_with_hyphen(self):
-        """Test validate_server_id with valid ID containing hyphen."""
-        result = validate_server_id("mcp-server")
-        assert result is True
+    def test_validate_server_id_valid_verified(self):
+        """Test validate_server_id with verified account prefix."""
+        assert validate_server_id("@anthropic/filesystem") is True
+        assert validate_server_id("@modelcontextprotocol/github") is True
 
-    def test_validate_server_id_valid_with_underscore(self):
-        """Test validate_server_id with valid ID containing underscore."""
-        result = validate_server_id("mcp_server")
-        assert result is True
+    def test_validate_server_id_valid_single_char_parts(self):
+        """Test validate_server_id with single character owner/server."""
+        assert validate_server_id("a/b") is True
+        assert validate_server_id("@a/b") is True
 
-    def test_validate_server_id_valid_mixed(self):
-        """Test validate_server_id with valid mixed characters."""
-        result = validate_server_id("server-123_test")
-        assert result is True
+    def test_validate_server_id_valid_with_hyphens(self):
+        """Test validate_server_id with hyphens in namespace and server."""
+        assert validate_server_id("my-org/my-server") is True
+        assert validate_server_id("@my-org/my-server") is True
+
+    def test_validate_server_id_valid_with_numbers(self):
+        """Test validate_server_id with numbers."""
+        assert validate_server_id("org123/server456") is True
+        assert validate_server_id("@org-2024/server-v2") is True
+
+    def test_validate_server_id_invalid_no_namespace(self):
+        """Test validate_server_id without namespace (missing '/')."""
+        assert validate_server_id("filesystem") is False
+        assert validate_server_id("my-server") is False
+        assert validate_server_id("@filesystem") is False  # @ without /
+
+    def test_validate_server_id_invalid_too_many_slashes(self):
+        """Test validate_server_id with too many slashes."""
+        assert validate_server_id("owner/repo/server") is False
+        assert validate_server_id("@owner/repo/server") is False
 
     def test_validate_server_id_invalid_empty(self):
         """Test validate_server_id with empty string."""
-        result = validate_server_id("")
-        assert result is False
+        assert validate_server_id("") is False
 
     def test_validate_server_id_invalid_none(self):
         """Test validate_server_id with None."""
-        result = validate_server_id(None)
-        assert result is False
+        assert validate_server_id(None) is False
 
     def test_validate_server_id_invalid_not_string(self):
         """Test validate_server_id with non-string input."""
-        result = validate_server_id(123)
-        assert result is False
+        assert validate_server_id(123) is False
 
     def test_validate_server_id_invalid_uppercase(self):
         """Test validate_server_id with uppercase characters."""
-        result = validate_server_id("ServerName")
-        assert result is False
+        assert validate_server_id("Owner/Server") is False
+        assert validate_server_id("@Owner/Server") is False
 
     def test_validate_server_id_invalid_starts_with_hyphen(self):
         """Test validate_server_id starting with hyphen."""
-        result = validate_server_id("-server")
-        assert result is False
+        assert validate_server_id("-owner/server") is False
+        assert validate_server_id("owner/-server") is False
 
     def test_validate_server_id_invalid_ends_with_hyphen(self):
         """Test validate_server_id ending with hyphen."""
-        result = validate_server_id("server-")
-        assert result is False
+        assert validate_server_id("owner-/server") is False
+        assert validate_server_id("owner/server-") is False
 
     def test_validate_server_id_invalid_special_chars(self):
         """Test validate_server_id with invalid special characters."""
-        result = validate_server_id("server@test")
-        assert result is False
+        assert validate_server_id("owner/server@test") is False
+        assert validate_server_id("owner_test/server") is False  # underscore not allowed
+        assert validate_server_id("owner.test/server") is False  # dot not allowed
+
+    def test_validate_server_id_invalid_empty_parts(self):
+        """Test validate_server_id with empty owner or server."""
+        assert validate_server_id("/server") is False
+        assert validate_server_id("owner/") is False
+        assert validate_server_id("/") is False
 
     def test_validate_package_name_npm_valid_unscoped(self):
         """Test validate_package_name for valid unscoped npm package."""

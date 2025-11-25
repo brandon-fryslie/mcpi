@@ -32,7 +32,7 @@ def mock_template_manager():
         name="production",
         description="Production PostgreSQL setup with TLS",
         server_id="postgres",
-        scope="user-global",
+        scope="user-mcp",
         priority="high",
         config={
             "command": "npx",
@@ -88,7 +88,7 @@ def mock_template_manager():
         name="full-access",
         description="Full access to GitHub",
         server_id="github",
-        scope="user-global",
+        scope="user-mcp",
         priority="high",
         config={
             "command": "npx",
@@ -195,7 +195,7 @@ def mock_manager():
                 "path": "./.mcp.json",
             },
             {
-                "name": "user-global",
+                "name": "user-mcp",
                 "description": "User global scope",
                 "is_user_level": True,
                 "priority": 50,

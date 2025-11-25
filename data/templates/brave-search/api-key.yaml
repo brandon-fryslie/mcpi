@@ -1,7 +1,7 @@
 name: api-key
 description: "Brave Search API for web searching"
 server_id: brave-search
-scope: user-global
+scope: user-mcp
 priority: high
 
 config:

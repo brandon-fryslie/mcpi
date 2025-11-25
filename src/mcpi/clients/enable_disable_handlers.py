@@ -471,3 +471,43 @@ class ApprovalRequiredEnableDisableHandler:
             return data.get("disabledMcpjsonServers", [])
         except Exception:
             return []
+
+    def is_unapproved(self, server_id: str) -> bool:
+        """Check if a server is unapproved (not in either enabled or disabled array).
+
+        This is distinct from is_disabled() which returns True for both
+        explicitly disabled AND unapproved servers.
+
+        Args:
+            server_id: Server identifier
+
+        Returns:
+            True if server is not in either enabledMcpjsonServers or disabledMcpjsonServers
+        """
+        # Check inline disabled field first - if disabled inline, it's not "unapproved"
+        if self.mcp_json_path.exists():
+            try:
+                mcp_data = self.reader.read(self.mcp_json_path)
+                servers = mcp_data.get("mcpServers", {})
+                server_config = servers.get(server_id, {})
+                if server_config.get("disabled") is True:
+                    return False  # Explicitly disabled, not unapproved
+            except Exception:
+                pass
+
+        # Check approval arrays
+        if not self.settings_local_path.exists():
+            # No approval file = unapproved
+            return True
+
+        try:
+            settings_data = self.reader.read(self.settings_local_path)
+            enabled_servers = settings_data.get("enabledMcpjsonServers", [])
+            disabled_servers = settings_data.get("disabledMcpjsonServers", [])
+
+            # Unapproved = not in either array
+            return server_id not in enabled_servers and server_id not in disabled_servers
+
+        except Exception:
+            # Can't read file = assume unapproved
+            return True

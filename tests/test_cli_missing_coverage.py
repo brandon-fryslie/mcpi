@@ -32,11 +32,10 @@ class TestCLIMissingCoverage:
     def test_registry_info_with_json_output(self):
         """Test info command with --json flag.
 
-        Targets lines 134-135: JSON output for server info.
+        Targets JSON output for server info.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
             self.mock_catalog.get_server.return_value = self.mock_server
 
             result = self.runner.invoke(main, ["info", "test-server", "--json"])
@@ -53,32 +52,31 @@ class TestCLIMissingCoverage:
     def test_registry_search_with_json_output_tuple_result(self):
         """Test search command with --json and tuple results.
 
-        Targets line 187: Tuple unpacking for search results with scores.
+        Targets tuple unpacking for search results with scores.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
 
-            # Mock search results as tuples (server, score, matches)
-            mock_result = (self.mock_server, 0.95, ["test", "server"])
-            self.mock_catalog.search_servers.return_value = [mock_result]
+            # Mock search results as tuples (server_id, server)
+            self.mock_catalog.search_servers.return_value = [
+                ("test-server", self.mock_server)
+            ]
 
-            result = self.runner.invoke(main, ["search", "test", "--json"])
+            result = self.runner.invoke(main, ["search", "-q", "test", "--json"])
 
             assert result.exit_code == 0
-            # Verify JSON output includes score and matches
+            # Verify JSON output
             try:
                 json_data = json.loads(result.output.strip())
                 assert len(json_data) == 1
-                assert json_data[0]["score"] == 0.95
-                assert json_data[0]["matches"] == ["test", "server"]
+                assert json_data[0]["id"] == "test-server"
             except json.JSONDecodeError:
                 pytest.fail("Output should be valid JSON")
 
     def test_status_command_with_json_output(self):
         """Test status command with --json flag.
 
-        Targets JSON output paths in status command around lines 588-591.
+        Targets JSON output paths in status command.
         """
         with patch("mcpi.cli.create_default_manager") as mock_manager_fn:
             mock_manager_fn.return_value = self.mock_manager
@@ -99,7 +97,6 @@ class TestCLIMissingCoverage:
                 assert isinstance(json_data, (dict, list))
                 assert "default_client" in json_data
             except json.JSONDecodeError:
-                # If not JSON, verify it's still valid output
                 pytest.fail("Output should be valid JSON")
 
     def test_registry_info_server_not_found(self):
@@ -107,15 +104,14 @@ class TestCLIMissingCoverage:
 
         Targets error handling paths.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
             self.mock_catalog.get_server.return_value = None
 
             result = self.runner.invoke(main, ["info", "nonexistent-server"])
 
             assert result.exit_code == 1
-            assert "not found in registry" in result.output
+            assert "not found" in result.output
 
     def test_status_command_no_servers_configured(self):
         """Test status command when no servers are configured.
@@ -143,12 +139,11 @@ class TestCLIMissingCoverage:
 
         Targets empty search results handling.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
             self.mock_catalog.search_servers.return_value = []
 
-            result = self.runner.invoke(main, ["search", "nonexistent"])
+            result = self.runner.invoke(main, ["search", "-q", "nonexistent"])
 
             assert result.exit_code == 0
             # Should handle empty results gracefully

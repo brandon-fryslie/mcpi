@@ -3,7 +3,7 @@
 These tests verify critical bugs in the enable/disable functionality:
 
 1. **BUG-1: Cross-Scope State Pollution**
-   - Server in user-global scope shows DISABLED when it's in user-local's disabledMcpjsonServers
+   - Server in user-mcp scope shows DISABLED when it's in user-local's disabledMcpjsonServers
    - Should only check the server's OWN scope for state
 
 2. **BUG-3: Wrong Scope Modification**
@@ -46,9 +46,9 @@ class TestCrossScopeStatePollution:
     def test_user_global_server_state_not_polluted_by_user_local_disabled_array(
         self, plugin, mcp_harness
     ):
-        """Test that user-global server state is not affected by user-local's disabled array.
+        """Test that user-mcp server state is not affected by user-local's disabled array.
 
-        This is the CRITICAL BUG: A server installed in user-global (~/.claude/settings.json)
+        This is the CRITICAL BUG: A server installed in user-mcp (~/.claude/settings.json)
         should show as ENABLED even if it appears in user-local's (~/.claude/settings.local.json)
         disabledMcpjsonServers array.
 
@@ -59,9 +59,9 @@ class TestCrossScopeStatePollution:
         - Asserts on actual ServerState enum values
         - Cannot be faked with stubs or mocks
         """
-        # Setup: Install server in user-global
+        # Setup: Install server in user-mcp
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -75,7 +75,7 @@ class TestCrossScopeStatePollution:
         )
 
         # Setup: Add server to user-local's disabled array
-        # (This is what causes the bug - user-local shouldn't affect user-global state)
+        # (This is what causes the bug - user-local shouldn't affect user-mcp state)
         mcp_harness.prepopulate_file(
             "user-local",
             {
@@ -86,7 +86,7 @@ class TestCrossScopeStatePollution:
         )
 
         # Verify setup: Confirm files were created correctly
-        user_global_data = mcp_harness.read_scope_file("user-global")
+        user_global_data = mcp_harness.read_scope_file("user-mcp")
         assert user_global_data is not None
         assert "@scope/package-name" in user_global_data["mcpServers"]
 
@@ -94,20 +94,20 @@ class TestCrossScopeStatePollution:
         assert user_local_data is not None
         assert "@scope/package-name" in user_local_data["disabledMcpjsonServers"]
 
-        # Execute: List servers in user-global scope
-        servers = plugin.list_servers(scope="user-global")
+        # Execute: List servers in user-mcp scope
+        servers = plugin.list_servers(scope="user-mcp")
 
-        # Verify: Server should be ENABLED in user-global (not polluted by user-local)
-        qualified_id = "claude-code:user-global:@scope/package-name"
+        # Verify: Server should be ENABLED in user-mcp (not polluted by user-local)
+        qualified_id = "claude-code:user-mcp:@scope/package-name"
         assert qualified_id in servers, f"Server not found in list: {servers.keys()}"
 
         server_info = servers[qualified_id]
 
         # THIS IS THE BUG: Currently shows DISABLED (wrong!), should show ENABLED
         assert server_info.state == ServerState.ENABLED, (
-            f"BUG-1: Server in user-global shows as {server_info.state.name} "
+            f"BUG-1: Server in user-mcp shows as {server_info.state.name} "
             f"because user-local's disabledMcpjsonServers contains it. "
-            f"It should be ENABLED because user-global has no disable arrays."
+            f"It should be ENABLED because user-mcp has no disable arrays."
         )
 
     def test_user_local_server_state_correctly_reflects_own_disabled_array(
@@ -160,19 +160,19 @@ class TestCrossScopeStatePollution:
     def test_user_global_server_with_no_disable_arrays_shows_enabled(
         self, plugin, mcp_harness
     ):
-        """Test that user-global servers show ENABLED when no disable arrays exist anywhere.
+        """Test that user-mcp servers show ENABLED when no disable arrays exist anywhere.
 
-        This is the baseline test: user-global servers should be ENABLED by default
-        since user-global scope doesn't have enable/disable arrays.
+        This is the baseline test: user-mcp servers should be ENABLED by default
+        since user-mcp scope doesn't have enable/disable arrays.
 
         Why this test is un-gameable:
-        - Tests real file format (user-global has no enable/disable arrays)
+        - Tests real file format (user-mcp has no enable/disable arrays)
         - Verifies actual schema behavior
         - Cannot pass with incorrect implementation
         """
-        # Setup: Install server in user-global (no enable/disable arrays in this scope)
+        # Setup: Install server in user-mcp (no enable/disable arrays in this scope)
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -195,11 +195,11 @@ class TestCrossScopeStatePollution:
             },
         )
 
-        # Execute: List servers in user-global scope
-        servers = plugin.list_servers(scope="user-global")
+        # Execute: List servers in user-mcp scope
+        servers = plugin.list_servers(scope="user-mcp")
 
-        # Verify: Server should be ENABLED (default state for user-global)
-        qualified_id = "claude-code:user-global:test-server"
+        # Verify: Server should be ENABLED (default state for user-mcp)
+        qualified_id = "claude-code:user-mcp:test-server"
         assert qualified_id in servers
         assert servers[qualified_id].state == ServerState.ENABLED
 
@@ -219,9 +219,9 @@ class TestCrossScopeStatePollution:
         """
         # Setup: Install "test-server" in three different scopes with different states
 
-        # user-global: should be ENABLED (no disable arrays)
+        # user-mcp: should be ENABLED (no disable arrays)
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -270,7 +270,7 @@ class TestCrossScopeStatePollution:
         servers = plugin.list_servers()
 
         # Verify: Each scope shows correct independent state
-        user_global_id = "claude-code:user-global:test-server"
+        user_global_id = "claude-code:user-mcp:test-server"
         user_local_id = "claude-code:user-local:test-server"
         project_local_id = "claude-code:project-local:test-server"
 
@@ -278,7 +278,7 @@ class TestCrossScopeStatePollution:
         assert user_global_id in servers
         assert (
             servers[user_global_id].state == ServerState.ENABLED
-        ), "BUG-1: user-global server polluted by user-local's disabled array"
+        ), "BUG-1: user-mcp server polluted by user-local's disabled array"
 
         # User-local should be DISABLED (correctly reflects its own state)
         assert user_local_id in servers
@@ -307,9 +307,9 @@ class TestWrongScopeModification:
         return ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
 
     def test_disable_server_in_user_global_returns_error(self, plugin, mcp_harness):
-        """Test that disabling a user-global server returns appropriate error.
+        """Test that disabling a user-mcp server returns appropriate error.
 
-        user-global scope (~/.claude/settings.json) does NOT have enable/disable arrays.
+        user-mcp scope (~/.claude/settings.json) does NOT have enable/disable arrays.
         Attempting to disable a server there should either:
         - Return error saying it's not supported, OR
         - Not modify any other scope (especially not user-local)
@@ -320,9 +320,9 @@ class TestWrongScopeModification:
         - Tests error handling path
         - Cannot pass if implementation takes shortcuts
         """
-        # Setup: Install server in user-global only
+        # Setup: Install server in user-mcp only
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -346,10 +346,10 @@ class TestWrongScopeModification:
         )
 
         # Verify setup: Both files exist as expected
-        assert mcp_harness.read_scope_file("user-global") is not None
+        assert mcp_harness.read_scope_file("user-mcp") is not None
         assert mcp_harness.read_scope_file("user-local") is not None
 
-        # Execute: Attempt to disable the user-global server
+        # Execute: Attempt to disable the user-mcp server
         result = plugin.disable_server("test-server")
 
         # Verify: Operation should either succeed or fail clearly
@@ -357,7 +357,7 @@ class TestWrongScopeModification:
         # If it fails, error message should be clear about lack of support
 
         # Read both files to check for modifications
-        user_global_after = mcp_harness.read_scope_file("user-global")
+        user_global_after = mcp_harness.read_scope_file("user-mcp")
         user_local_after = mcp_harness.read_scope_file("user-local")
 
         if result.success:
@@ -365,7 +365,7 @@ class TestWrongScopeModification:
             assert "test-server" not in user_local_after.get(
                 "disabledMcpjsonServers", []
             ), (
-                "BUG-3: Disabling user-global server modified user-local scope! "
+                "BUG-3: Disabling user-mcp server modified user-local scope! "
                 "This is wrong - should only modify the server's own scope."
             )
         else:
@@ -375,13 +375,13 @@ class TestWrongScopeModification:
                 for keyword in ["not supported", "cannot disable", "unsupported"]
             ), (
                 f"BUG-3: Error message unclear: '{result.message}'. "
-                f"Should clearly state that user-global doesn't support enable/disable."
+                f"Should clearly state that user-mcp doesn't support enable/disable."
             )
 
         # CRITICAL: Verify user-local was not modified regardless of result
         assert user_local_after["disabledMcpjsonServers"] == [], (
             "BUG-3: user-local's disabledMcpjsonServers was modified when trying to "
-            "disable a user-global server. This is the core bug!"
+            "disable a user-mcp server. This is the core bug!"
         )
 
     def test_disable_server_in_user_local_modifies_correct_scope(
@@ -413,9 +413,9 @@ class TestWrongScopeModification:
             },
         )
 
-        # Setup: Create user-global to verify it doesn't get modified
+        # Setup: Create user-mcp to verify it doesn't get modified
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -434,11 +434,11 @@ class TestWrongScopeModification:
             "test-server" in user_local_after["disabledMcpjsonServers"]
         ), "Server was not added to disabledMcpjsonServers"
 
-        # Verify: user-global was NOT modified
-        user_global_after = mcp_harness.read_scope_file("user-global")
+        # Verify: user-mcp was NOT modified
+        user_global_after = mcp_harness.read_scope_file("user-mcp")
         assert (
             "disabledMcpjsonServers" not in user_global_after
-        ), "user-global should not have disabledMcpjsonServers array"
+        ), "user-mcp should not have disabledMcpjsonServers array"
 
     def test_enable_server_in_user_local_modifies_correct_scope(
         self, plugin, mcp_harness
@@ -466,9 +466,9 @@ class TestWrongScopeModification:
             },
         )
 
-        # Setup: Create user-global to verify it doesn't get modified
+        # Setup: Create user-mcp to verify it doesn't get modified
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -490,8 +490,8 @@ class TestWrongScopeModification:
             "enabledMcpjsonServers", []
         ), "Server was not added to enabledMcpjsonServers"
 
-        # Verify: user-global was NOT modified
-        user_global_after = mcp_harness.read_scope_file("user-global")
+        # Verify: user-mcp was NOT modified
+        user_global_after = mcp_harness.read_scope_file("user-mcp")
         assert "disabledMcpjsonServers" not in user_global_after
         assert "enabledMcpjsonServers" not in user_global_after
 
@@ -576,9 +576,9 @@ class TestListServersWithCorrectState:
         """
         # Setup: Create complex multi-scope scenario
 
-        # user-global: two servers, both should show ENABLED
+        # user-mcp: two servers, both should show ENABLED
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -603,7 +603,7 @@ class TestListServersWithCorrectState:
                 "enabledMcpjsonServers": [],
                 "disabledMcpjsonServers": [
                     "server-a"
-                ],  # Should NOT affect user-global!
+                ],  # Should NOT affect user-mcp!
                 "mcpServers": {
                     "server-c": {
                         "command": "npx",
@@ -617,14 +617,14 @@ class TestListServersWithCorrectState:
         # Execute: List all servers
         servers = plugin.list_servers()
 
-        # Verify: user-global servers show correct state
-        assert "claude-code:user-global:server-a" in servers
+        # Verify: user-mcp servers show correct state
+        assert "claude-code:user-mcp:server-a" in servers
         assert (
-            servers["claude-code:user-global:server-a"].state == ServerState.ENABLED
-        ), "BUG-1: user-global:server-a shows wrong state (polluted by user-local)"
+            servers["claude-code:user-mcp:server-a"].state == ServerState.ENABLED
+        ), "BUG-1: user-mcp:server-a shows wrong state (polluted by user-local)"
 
-        assert "claude-code:user-global:server-b" in servers
-        assert servers["claude-code:user-global:server-b"].state == ServerState.ENABLED
+        assert "claude-code:user-mcp:server-b" in servers
+        assert servers["claude-code:user-mcp:server-b"].state == ServerState.ENABLED
 
         # Verify: user-local server shows correct state
         assert "claude-code:user-local:server-c" in servers
@@ -639,7 +639,7 @@ class TestListServersWithCorrectState:
         """
         # Setup: Install same server ID in multiple scopes
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -667,17 +667,17 @@ class TestListServersWithCorrectState:
             },
         )
 
-        # Execute: List only user-global servers
-        servers = plugin.list_servers(scope="user-global")
+        # Execute: List only user-mcp servers
+        servers = plugin.list_servers(scope="user-mcp")
 
-        # Verify: Only user-global server appears
+        # Verify: Only user-mcp server appears
         assert len(servers) == 1
-        assert "claude-code:user-global:test-server" in servers
+        assert "claude-code:user-mcp:test-server" in servers
         assert "claude-code:user-local:test-server" not in servers
 
-        # Verify: user-global server has correct state
+        # Verify: user-mcp server has correct state
         assert (
-            servers["claude-code:user-global:test-server"].state == ServerState.ENABLED
+            servers["claude-code:user-mcp:test-server"].state == ServerState.ENABLED
         )
 
 

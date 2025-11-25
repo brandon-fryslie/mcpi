@@ -207,20 +207,20 @@ class TestEnvVarsInConfigFiles:
             env={"API_KEY": "my-secret-key", "DEBUG": "true", "TIMEOUT": "30"},
         )
 
-        # EXECUTE: Add server to user-global scope
-        result = plugin.add_server("test-server", server_config, "user-global")
+        # EXECUTE: Add server to user-mcp scope
+        result = plugin.add_server("test-server", server_config, "user-mcp")
 
         # VERIFY: Operation succeeded
         assert result.success, f"Add server failed: {result.message}"
 
         # VERIFY: File exists on disk
-        mcp_harness.assert_valid_json("user-global")
+        mcp_harness.assert_valid_json("user-mcp")
 
         # VERIFY: Server exists in file
-        mcp_harness.assert_server_exists("user-global", "test-server")
+        mcp_harness.assert_server_exists("user-mcp", "test-server")
 
         # VERIFY: Server config in file has env vars
-        config = mcp_harness.get_server_config("user-global", "test-server")
+        config = mcp_harness.get_server_config("user-mcp", "test-server")
         assert config is not None, "Server config missing from file"
 
         # Critical assertions: env vars in file
@@ -268,42 +268,42 @@ class TestEnvVarsInConfigFiles:
         server3_config = ServerConfig(command="npx", args=["package3"], type="stdio")
 
         # EXECUTE: Add all servers
-        result1 = plugin.add_server("server1", server1_config, "user-global")
-        result2 = plugin.add_server("server2", server2_config, "user-global")
-        result3 = plugin.add_server("server3", server3_config, "user-global")
+        result1 = plugin.add_server("server1", server1_config, "user-mcp")
+        result2 = plugin.add_server("server2", server2_config, "user-mcp")
+        result3 = plugin.add_server("server3", server3_config, "user-mcp")
 
         # VERIFY: All succeeded
         assert result1.success and result2.success and result3.success
 
         # VERIFY: File valid
-        mcp_harness.assert_valid_json("user-global")
+        mcp_harness.assert_valid_json("user-mcp")
 
         # VERIFY: All servers exist
-        mcp_harness.assert_server_exists("user-global", "server1")
-        mcp_harness.assert_server_exists("user-global", "server2")
-        mcp_harness.assert_server_exists("user-global", "server3")
+        mcp_harness.assert_server_exists("user-mcp", "server1")
+        mcp_harness.assert_server_exists("user-mcp", "server2")
+        mcp_harness.assert_server_exists("user-mcp", "server3")
 
         # VERIFY: Server 1 has correct env (isolated from server2)
-        config1 = mcp_harness.get_server_config("user-global", "server1")
+        config1 = mcp_harness.get_server_config("user-mcp", "server1")
         assert config1["env"]["KEY1"] == "value1"
         assert config1["env"]["SHARED"] == "server1-val"
         assert "KEY2" not in config1["env"], "Server1 shouldn't have server2's KEY2"
 
         # VERIFY: Server 2 has correct env (isolated from server1)
-        config2 = mcp_harness.get_server_config("user-global", "server2")
+        config2 = mcp_harness.get_server_config("user-mcp", "server2")
         assert config2["env"]["KEY2"] == "value2"
         assert config2["env"]["SHARED"] == "server2-val"
         assert "KEY1" not in config2["env"], "Server2 shouldn't have server1's KEY1"
 
         # VERIFY: Server 3 has no env or empty env (backward compat)
-        config3 = mcp_harness.get_server_config("user-global", "server3")
+        config3 = mcp_harness.get_server_config("user-mcp", "server3")
         assert config3["env"] == {}, "Server without env should have empty env dict"
 
     def test_env_vars_work_across_all_scopes(self, tmp_path, mcp_harness):
         """Test env vars persist correctly across all Claude Code scopes.
 
         GAMING RESISTANCE:
-        - Tests all scope types (project-mcp, user-global, user-internal)
+        - Tests all scope types (project-mcp, user-mcp, user-internal)
         - Validates env vars preserved in different files
         - Cannot pass if any scope breaks env handling
         - Uses real file paths for each scope
@@ -322,7 +322,7 @@ class TestEnvVarsInConfigFiles:
         )
 
         # Test scopes that support server installation
-        test_scopes = ["project-mcp", "user-global", "user-internal"]
+        test_scopes = ["project-mcp", "user-mcp", "user-internal"]
 
         for scope in test_scopes:
             # EXECUTE: Add server to scope
@@ -381,16 +381,16 @@ class TestEnvVarFilePersistence:
             env={"KEY": "original-value", "DEBUG": "false"},
         )
 
-        result = plugin.add_server("test-server", original_config, "user-global")
+        result = plugin.add_server("test-server", original_config, "user-mcp")
         assert result.success
 
         # VERIFY: Original env written
-        config1 = mcp_harness.get_server_config("user-global", "test-server")
+        config1 = mcp_harness.get_server_config("user-mcp", "test-server")
         assert config1["env"]["KEY"] == "original-value"
         assert config1["env"]["DEBUG"] == "false"
 
         # EXECUTE: Simulate user manually editing env in file
-        scope_file = mcp_harness.path_overrides["user-global"]
+        scope_file = mcp_harness.path_overrides["user-mcp"]
         with open(scope_file) as f:
             file_data = json.load(f)
 
@@ -402,7 +402,7 @@ class TestEnvVarFilePersistence:
             json.dump(file_data, f, indent=2)
 
         # VERIFY: MCPI reads modified file correctly
-        config2 = mcp_harness.get_server_config("user-global", "test-server")
+        config2 = mcp_harness.get_server_config("user-mcp", "test-server")
         assert config2["env"]["KEY"] == "user-edited-value", "User edit not read back"
         assert config2["env"]["NEW_KEY"] == "user-added", "User addition not read back"
         assert config2["env"]["DEBUG"] == "false", "Original env var lost on read"

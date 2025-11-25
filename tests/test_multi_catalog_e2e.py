@@ -637,7 +637,7 @@ class TestClaudeCLIIntegration:
 
                 # Add server via mcpi (will fail with NotImplementedError initially)
                 result = cli_runner.invoke(
-                    cli, ["add", "filesystem", "--scope", "user-global"]
+                    cli, ["add", "filesystem", "--scope", "user-mcp"]
                 )
 
                 # Once implemented, verify with real claude CLI
@@ -656,7 +656,7 @@ class TestClaudeCLIIntegration:
 
                     # Remove server via mcpi
                     result = cli_runner.invoke(
-                        cli, ["remove", "filesystem", "--scope", "user-global"]
+                        cli, ["remove", "filesystem", "--scope", "user-mcp"]
                     )
 
                     # Verify removed from claude mcp list

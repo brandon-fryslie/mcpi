@@ -132,6 +132,20 @@ class ServerTemplate(BaseModel):
         default="", description="Additional notes and setup instructions"
     )
 
+    # Metadata fields for template discovery and recommendation
+    best_for: list[str] = Field(
+        default_factory=list,
+        description="Tags describing what this template is best suited for (e.g., 'docker', 'local-development', 'production')"
+    )
+    keywords: list[str] = Field(
+        default_factory=list,
+        description="Keywords for matching against project context (e.g., 'compose', 'containers', 'postgresql')"
+    )
+    recommendations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Recommendation hints (e.g., minimum scores, required context)"
+    )
+
     @field_validator("config")
     @classmethod
     def validate_config(cls, v: dict[str, Any]) -> dict[str, Any]:

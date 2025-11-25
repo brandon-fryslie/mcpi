@@ -1,7 +1,7 @@
 name: public-repos
 description: "Access to public repositories only (minimal permissions)"
 server_id: github
-scope: user-global
+scope: user-mcp
 priority: low
 
 config:

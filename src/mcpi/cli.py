@@ -56,6 +56,49 @@ def shorten_path(path: Optional[str]) -> str:
             return str(path)
 
 
+def get_user_config(ctx: click.Context):
+    """Lazy initialization of user configuration."""
+    if "user_config" not in ctx.obj:
+        from mcpi.user_config import create_default_config
+
+        ctx.obj["user_config"] = create_default_config()
+    return ctx.obj["user_config"]
+
+
+def get_default_scope(ctx: click.Context, provided_scope: Optional[str]) -> Optional[str]:
+    """Get scope with fallback to config default.
+
+    Args:
+        ctx: Click context
+        provided_scope: Scope explicitly provided by user (or None)
+
+    Returns:
+        Provided scope, or default from config, or None
+    """
+    if provided_scope:
+        return provided_scope
+
+    config = get_user_config(ctx)
+    return config.default_scope
+
+
+def get_default_client(ctx: click.Context, provided_client: Optional[str]) -> Optional[str]:
+    """Get client with fallback to config default.
+
+    Args:
+        ctx: Click context
+        provided_client: Client explicitly provided by user (or None)
+
+    Returns:
+        Provided client, or default from config, or None
+    """
+    if provided_client:
+        return provided_client
+
+    config = get_user_config(ctx)
+    return config.default_client
+
+
 def get_mcp_manager(ctx: click.Context):
     """Lazy initialization of MCPManager using factory function."""
     if "mcp_manager" not in ctx.obj:
@@ -165,11 +208,6 @@ def get_template_manager(ctx: click.Context):
                 console.print(f"[red]Failed to initialize template manager: {e}[/red]")
             sys.exit(1)
     return ctx.obj["template_manager"]
-
-
-def get_registry_manager(ctx: click.Context) -> ServerCatalog:
-    """Get the server catalog (backward compat alias)."""
-    return get_catalog(ctx)
 
 
 def get_available_scopes(
@@ -517,17 +555,25 @@ def complete_server_ids(
             for qualified_id, info in servers.items():
                 if info.id.startswith(incomplete):
                     # Use qualified ID format to ensure uniqueness
-                    # Format: server-name in client:scope (enabled/disabled)
+                    # Format: server-name in client:scope (enabled/disabled/unapproved)
                     # Add colors for better readability:
                     # - Dim gray for server name (to de-emphasize since it's already in the completion)
                     # - Cyan for scope (most important for user to see)
-                    # - Green for enabled, Yellow for disabled
-                    state_label = (
-                        "enabled" if info.state == ServerState.ENABLED else "disabled"
-                    )
-                    state_color = (
-                        "\033[32m" if info.state == ServerState.ENABLED else "\033[33m"
-                    )  # green : yellow
+                    # - Green for enabled, Yellow for disabled, Cyan for unapproved
+                    state_labels = {
+                        ServerState.ENABLED: "enabled",
+                        ServerState.DISABLED: "disabled",
+                        ServerState.UNAPPROVED: "unapproved",
+                        ServerState.NOT_INSTALLED: "not installed",
+                    }
+                    state_colors = {
+                        ServerState.ENABLED: "\033[32m",    # green
+                        ServerState.DISABLED: "\033[33m",   # yellow
+                        ServerState.UNAPPROVED: "\033[36m", # cyan
+                        ServerState.NOT_INSTALLED: "\033[31m",  # red
+                    }
+                    state_label = state_labels.get(info.state, info.state.name.lower())
+                    state_color = state_colors.get(info.state, "\033[37m")  # default white
                     reset = "\033[0m"
                     dim = "\033[2m"
                     cyan = "\033[36m"
@@ -886,6 +932,102 @@ def list_scopes(ctx: click.Context, client: Optional[str]) -> None:
         console.print(f"[red]Error listing scopes: {e}[/red]")
 
 
+# CONFIG MANAGEMENT COMMANDS
+
+
+@main.group()
+@click.pass_context
+def config(ctx: click.Context) -> None:
+    """Manage MCPI configuration."""
+    pass
+
+
+@config.command("show")
+@click.pass_context
+def config_show(ctx: click.Context) -> None:
+    """Show current configuration."""
+    from mcpi.user_config import create_default_config
+
+    console = Console()
+    cfg = create_default_config()
+
+    if not cfg.is_loaded:
+        console.print(f"[yellow]No configuration file found at {cfg.config_path}[/yellow]")
+        console.print("\n[dim]Use 'mcpi config set' to create configuration.[/dim]")
+        return
+
+    console.print(f"[bold]Configuration:[/bold] {cfg.config_path}\n")
+
+    config_dict = cfg.to_dict()
+    if not config_dict:
+        console.print("[dim]Configuration file is empty[/dim]")
+        return
+
+    for section, values in config_dict.items():
+        console.print(f"[cyan][{section}][/cyan]")
+        for key, value in values.items():
+            console.print(f"  {key} = {value}")
+        console.print()
+
+
+@config.command("get")
+@click.argument("key")
+@click.pass_context
+def config_get(ctx: click.Context, key: str) -> None:
+    """Get a configuration value.
+
+    KEY format: section.key (e.g., defaults.scope)
+    """
+    from mcpi.user_config import create_default_config
+
+    console = Console()
+    cfg = create_default_config()
+
+    try:
+        section, key_name = key.split(".", 1)
+    except ValueError:
+        console.print(f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]")
+        sys.exit(1)
+
+    value = cfg.get(section, key_name)
+    if value is None:
+        console.print(f"[yellow]No value set for '{key}'[/yellow]")
+        sys.exit(1)
+
+    console.print(value)
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+@click.pass_context
+def config_set(ctx: click.Context, key: str, value: str) -> None:
+    """Set a configuration value.
+
+    KEY format: section.key (e.g., defaults.scope)
+
+    Examples:
+        mcpi config set defaults.scope user-global
+        mcpi config set defaults.client claude-code
+    """
+    from mcpi.user_config import create_default_config
+
+    console = Console()
+    cfg = create_default_config()
+
+    try:
+        section, key_name = key.split(".", 1)
+    except ValueError:
+        console.print(f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]")
+        sys.exit(1)
+
+    cfg.set(section, key_name, value)
+    cfg.save()
+
+    console.print(f"[green]✓[/green] Set {key} = {value}")
+    console.print(f"[dim]Config saved to {cfg.config_path}[/dim]")
+
+
 # SERVER MANAGEMENT COMMANDS
 
 
@@ -898,11 +1040,11 @@ def list_scopes(ctx: click.Context, client: Optional[str]) -> None:
 @click.option(
     "--scope",
     type=DynamicScopeType(),
-    help="Filter by scope (available scopes depend on client)",
+    help="Filter by specific scope (default: show all scopes)",
 )
 @click.option(
     "--state",
-    type=click.Choice(["enabled", "disabled", "not_installed"]),
+    type=click.Choice(["enabled", "disabled", "unapproved", "not_installed"]),
     help="Filter by state",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
@@ -914,9 +1056,17 @@ def list(
     state: Optional[str],
     verbose: bool,
 ) -> None:
-    """List MCP servers with optional filtering."""
+    """List MCP servers with optional filtering.
+
+    By default, shows servers from all scopes. Use --scope to filter to a specific scope.
+    """
     try:
         manager = get_mcp_manager(ctx)
+
+        # Apply config defaults if not explicitly provided
+        client = get_default_client(ctx, client)
+        # Note: Don't apply scope default - show all scopes by default
+        # Users can explicitly pass --scope to filter
 
         # Convert state string to enum
         state_filter = None
@@ -960,6 +1110,7 @@ def list(
                 state_color = {
                     ServerState.ENABLED: "green",
                     ServerState.DISABLED: "yellow",
+                    ServerState.UNAPPROVED: "cyan",
                     ServerState.NOT_INSTALLED: "red",
                 }.get(info.state, "white")
 
@@ -1970,32 +2121,89 @@ def catalog(ctx: click.Context) -> None:
 
 
 @catalog.command("list")
+@click.option(
+    "--catalog",
+    "-c",
+    type=click.Choice(["official", "local", "all"], case_sensitive=False),
+    default="all",
+    help="Which catalog to list servers from (default: all)",
+)
+@click.option(
+    "--summary",
+    is_flag=True,
+    help="Show catalog summary instead of servers",
+)
 @click.pass_context
-def catalog_list(ctx: click.Context) -> None:
-    """List all available catalogs.
+def catalog_list(ctx: click.Context, catalog: str, summary: bool) -> None:
+    """List all MCP servers from catalogs.
 
-    Example:
-        mcpi catalog list
+    Examples:
+        mcpi catalog list              # List all servers from all catalogs
+        mcpi catalog list -c official  # List servers from official catalog only
+        mcpi catalog list --summary    # Show catalog summary
     """
     try:
         manager = get_catalog_manager(ctx)
-        catalogs = manager.list_catalogs()
 
-        if not catalogs:
-            console.print("[yellow]No catalogs available[/yellow]")
+        if summary:
+            # Show catalog summary (old behavior)
+            catalogs = manager.list_catalogs()
+            if not catalogs:
+                console.print("[yellow]No catalogs available[/yellow]")
+                return
+
+            table = Table(title="Available Catalogs", show_header=True)
+            table.add_column("Name", style="cyan", no_wrap=True)
+            table.add_column("Type", style="magenta")
+            table.add_column("Servers", justify="right", style="green")
+            table.add_column("Description", style="white")
+
+            for cat in catalogs:
+                table.add_row(cat.name, cat.type, str(cat.server_count), cat.description)
+
+            console.print(table)
+            console.print(f"\nUse [cyan]mcpi catalog info <name>[/cyan] for details")
             return
 
-        table = Table(title="Available Catalogs", show_header=True)
-        table.add_column("Name", style="cyan", no_wrap=True)
-        table.add_column("Type", style="magenta")
-        table.add_column("Servers", justify="right", style="green")
-        table.add_column("Description", style="white")
+        # List all servers from catalogs
+        all_servers: list[tuple[str, str, str]] = []  # (id, description, catalog_name)
 
-        for cat in catalogs:
-            table.add_row(cat.name, cat.type, str(cat.server_count), cat.description)
+        if catalog.lower() == "all":
+            catalog_names = ["official", "local"]
+        else:
+            catalog_names = [catalog.lower()]
+
+        for cat_name in catalog_names:
+            cat = manager.get_catalog(cat_name)
+            if cat:
+                for server_id, server in cat.list_servers():
+                    all_servers.append(
+                        (server_id, server.description or "", cat_name)
+                    )
+
+        if not all_servers:
+            console.print("[yellow]No servers found in catalogs[/yellow]")
+            return
+
+        # Sort by server ID
+        all_servers.sort(key=lambda x: x[0].lower())
+
+        table = Table(title="Available MCP Servers", show_header=True)
+        table.add_column("Server ID", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_column("Catalog", style="magenta")
+
+        for server_id, description, cat_name in all_servers:
+            # Truncate description if too long
+            desc = description[:60] + "..." if len(description) > 60 else description
+            table.add_row(server_id, desc, cat_name)
 
         console.print(table)
-        console.print(f"\nUse [cyan]mcpi catalog info <name>[/cyan] for details")
+        console.print(f"\n[dim]{len(all_servers)} servers available[/dim]")
+        console.print(
+            f"Use [cyan]mcpi info <server-id>[/cyan] for details, "
+            f"[cyan]mcpi add <server-id>[/cyan] to install"
+        )
 
     except Exception as e:
         console.print(f"[red]Error listing catalogs: {e}[/red]")
@@ -2062,6 +2270,163 @@ def catalog_info(ctx: click.Context, name: str) -> None:
         raise
     except Exception as e:
         console.print(f"[red]Error getting catalog info: {e}[/red]")
+
+
+@catalog.command("add")
+@click.argument("source", nargs=-1, required=True)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be done without making changes",
+)
+@click.pass_context
+def catalog_add(ctx: click.Context, source: tuple, dry_run: bool) -> None:
+    """Add an MCP server to the local catalog using Claude.
+
+    SOURCE can be any of:
+    - URL to a GitHub repository
+    - Git clone URL (https or ssh)
+    - npx/npm package name
+    - JSON configuration blob
+    - Any text describing the MCP server
+
+    This command uses Claude in non-interactive mode to discover information
+    about the MCP server and add it to the local catalog.
+
+    Examples:
+
+        mcpi catalog add https://github.com/anthropics/mcp-filesystem-server
+
+        mcpi catalog add git@github.com:user/mcp-server.git
+
+        mcpi catalog add npx @modelcontextprotocol/server-postgres
+
+        mcpi catalog add "A filesystem MCP server for managing local files"
+
+        mcpi catalog add --dry-run https://github.com/some/mcp-server
+    """
+    import subprocess
+
+    # Join all source arguments into a single string
+    source_str = " ".join(source)
+
+    if not source_str.strip():
+        console.print("[red]Error: No source provided[/red]")
+        ctx.exit(1)
+
+    # Get paths for the prompt
+    package_dir = Path(__file__).parent.parent.parent
+    catalog_path = package_dir / "data" / "catalog.json"
+
+    # Build the prompt for Claude
+    prompt = f"""Discover the information about this MCP server and add it to the catalog.
+
+Source: {source_str}
+
+Instructions:
+1. Analyze the provided source (URL, git repo, package name, JSON, or description)
+2. Discover the MCP server's:
+   - Unique server ID (following the pattern: owner/name or @scope/name)
+   - Description of what the server does
+   - Command to run it (e.g., npx, python, node)
+   - Arguments for the command
+   - Repository URL if available
+   - Categories (e.g., "filesystem", "database", "ai", "tools")
+3. Add the server to the catalog at: {catalog_path}
+
+The catalog format is JSON with entries like:
+{{
+  "server-id": {{
+    "description": "Brief description of functionality",
+    "command": "npx",
+    "args": ["-y", "@package/server-name"],
+    "repository": "https://github.com/owner/repo",
+    "categories": ["category1", "category2"]
+  }}
+}}
+
+IMPORTANT:
+- Use the existing catalog.json file format exactly
+- Do NOT duplicate existing entries
+- Validate the server information is accurate
+- If you cannot determine the server details, explain why
+
+{"DRY RUN MODE: Show what would be added but do not modify any files." if dry_run else "Add the server to the catalog file."}"""
+
+    console.print(f"[blue]Analyzing source: {source_str}[/blue]")
+
+    if dry_run:
+        console.print("[yellow]Dry run mode - no changes will be made[/yellow]")
+
+    # Check if Claude CLI is available
+    try:
+        version_result = subprocess.run(
+            ["claude", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if version_result.returncode != 0:
+            console.print(
+                "[red]Error: Claude CLI not found or not working properly[/red]"
+            )
+            console.print(
+                "[dim]Install Claude CLI: https://docs.anthropic.com/en/docs/claude-code[/dim]"
+            )
+            ctx.exit(1)
+    except FileNotFoundError:
+        console.print("[red]Error: Claude CLI not found[/red]")
+        console.print(
+            "[dim]Install Claude CLI: https://docs.anthropic.com/en/docs/claude-code[/dim]"
+        )
+        ctx.exit(1)
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: Claude CLI check timed out[/red]")
+        ctx.exit(1)
+
+    # Run Claude in non-interactive mode
+    try:
+        console.print("[dim]Running Claude to discover server information...[/dim]")
+
+        result = subprocess.run(
+            [
+                "claude",
+                "--print",  # Non-interactive mode, print response
+                prompt,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(package_dir),  # Run in the package directory
+            timeout=120,  # 2 minute timeout
+        )
+
+        if result.returncode != 0:
+            console.print(f"[red]Error: Claude failed with code {result.returncode}[/red]")
+            if result.stderr:
+                console.print(f"[red]{result.stderr}[/red]")
+            ctx.exit(1)
+
+        # Display Claude's response
+        if result.stdout:
+            console.print("\n[bold]Claude's response:[/bold]")
+            console.print(result.stdout)
+
+        if not dry_run:
+            console.print(
+                f"\n[green]✓ Server catalog may have been updated at:[/green] {catalog_path}"
+            )
+            console.print(
+                "[dim]Use 'mcpi catalog list -c official' to verify the changes[/dim]"
+            )
+        else:
+            console.print("\n[yellow]Dry run complete - no changes were made[/yellow]")
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: Claude command timed out after 2 minutes[/red]")
+        ctx.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error running Claude: {e}[/red]")
+        ctx.exit(1)
 
 
 # BUNDLE MANAGEMENT COMMANDS

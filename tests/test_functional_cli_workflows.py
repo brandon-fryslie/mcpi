@@ -247,7 +247,7 @@ class TestCLIBasicCommands:
 
         VALIDATION (what user observes):
         - Command exits successfully
-        - Shows expected scope names (user-global, project-mcp, etc.)
+        - Shows expected scope names (user-mcp, project-mcp, etc.)
         - Indicates which scopes exist vs. don't exist
         - Output format helps user understand scope hierarchy
 
@@ -277,8 +277,8 @@ class TestCLIBasicCommands:
             # USER OBSERVABLE OUTCOME 2: Shows expected scopes
             output = result.output.lower()
             assert (
-                "user-global" in output
-            ), f"Should show user-global scope. Output: {result.output}"
+                "user-mcp" in output
+            ), f"Should show user-mcp scope. Output: {result.output}"
             assert (
                 "project-mcp" in output
             ), f"Should show project-mcp scope. Output: {result.output}"
@@ -325,7 +325,7 @@ class TestCLIServerManagement:
         """
         # Set up clean test environment
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
@@ -369,7 +369,7 @@ class TestCLIServerManagement:
                     "add",
                     "filesystem",
                     "--scope",
-                    "user-global",
+                    "user-mcp",
                     "--yes",  # Skip confirmation
                 ],
             )
@@ -378,12 +378,12 @@ class TestCLIServerManagement:
             # Note: This might fail if add command has issues, which is valuable information
             if result.exit_code == 0:
                 # USER OBSERVABLE OUTCOME 2: Server was actually added to file
-                mcp_harness.assert_valid_json("user-global")
-                mcp_harness.assert_server_exists("user-global", "filesystem")
+                mcp_harness.assert_valid_json("user-mcp")
+                mcp_harness.assert_server_exists("user-mcp", "filesystem")
 
                 # USER OBSERVABLE OUTCOME 3: Configuration is correct
                 saved_config = mcp_harness.get_server_config(
-                    "user-global", "filesystem"
+                    "user-mcp", "filesystem"
                 )
                 assert (
                     saved_config["command"] == "npx"
@@ -434,8 +434,8 @@ class TestCLIServerManagement:
             mock_get_manager.return_value = manager
 
             # Verify initial state - server exists
-            prepopulated_harness.assert_server_exists("user-global", "filesystem")
-            initial_count = prepopulated_harness.count_servers_in_scope("user-global")
+            prepopulated_harness.assert_server_exists("user-mcp", "filesystem")
+            initial_count = prepopulated_harness.count_servers_in_scope("user-mcp")
 
             # USER ACTION: Remove server
             result = self.runner.invoke(
@@ -444,7 +444,7 @@ class TestCLIServerManagement:
                     "remove",
                     "filesystem",
                     "--scope",
-                    "user-global",
+                    "user-mcp",
                     "--yes",  # Skip confirmation
                 ],
             )
@@ -452,7 +452,7 @@ class TestCLIServerManagement:
             # USER OBSERVABLE OUTCOME 1: Command behavior
             if result.exit_code == 0:
                 # USER OBSERVABLE OUTCOME 2: Server was actually removed
-                final_count = prepopulated_harness.count_servers_in_scope("user-global")
+                final_count = prepopulated_harness.count_servers_in_scope("user-mcp")
                 assert (
                     final_count < initial_count
                 ), "Server count should decrease after remove"
@@ -460,11 +460,11 @@ class TestCLIServerManagement:
                 # Verify server is gone (this should raise AssertionError)
                 with pytest.raises(AssertionError):
                     prepopulated_harness.assert_server_exists(
-                        "user-global", "filesystem"
+                        "user-mcp", "filesystem"
                     )
 
                 # Verify file is still valid JSON
-                prepopulated_harness.assert_valid_json("user-global")
+                prepopulated_harness.assert_valid_json("user-mcp")
             else:
                 # Document current behavior if remove doesn't work
                 print(

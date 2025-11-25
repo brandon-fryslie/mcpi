@@ -86,8 +86,8 @@ def sample_bundle_json() -> Dict[str, Any]:
         "version": "1.0.0",
         "author": "Test Suite",
         "servers": [
-            {"id": "filesystem"},
-            {"id": "fetch"},
+            {"id": "@anthropic/filesystem"},
+            {"id": "@anthropic/fetch"},
         ],
         "suggested_scope": "project-mcp",
     }
@@ -125,10 +125,10 @@ def web_dev_bundle_json() -> Dict[str, Any]:
         "version": "1.0.0",
         "author": "MCPI Team",
         "servers": [
-            {"id": "filesystem"},
-            {"id": "fetch"},
-            {"id": "github"},
-            {"id": "puppeteer"},
+            {"id": "@anthropic/filesystem"},
+            {"id": "@anthropic/fetch"},
+            {"id": "modelcontextprotocol/github"},
+            {"id": "modelcontextprotocol/puppeteer"},
         ],
         "suggested_scope": "project-mcp",
     }
@@ -165,11 +165,11 @@ def multi_bundle_dir(bundle_data_dir, sample_bundle_json, web_dev_bundle_json):
         "description": "Data science toolkit",
         "version": "1.0.0",
         "servers": [
-            {"id": "sqlite"},
-            {"id": "postgres"},
-            {"id": "filesystem"},
+            {"id": "@anthropic/sqlite"},
+            {"id": "modelcontextprotocol/postgres"},
+            {"id": "@anthropic/filesystem"},
         ],
-        "suggested_scope": "user-global",
+        "suggested_scope": "user-mcp",
     }
     (bundle_data_dir / "data-science.json").write_text(
         json.dumps(data_science, indent=2)
@@ -231,8 +231,8 @@ class TestBundleCatalog:
         assert bundle.name == "test-bundle"
         assert bundle.description == "Test bundle for automated testing"
         assert len(bundle.servers) == 2
-        assert bundle.servers[0].id == "filesystem"
-        assert bundle.servers[1].id == "fetch"
+        assert bundle.servers[0].id == "@anthropic/filesystem"
+        assert bundle.servers[1].id == "@anthropic/fetch"
         assert bundle.suggested_scope == "project-mcp"
 
     def test_catalog_lists_all_bundles(self, multi_bundle_dir):
@@ -331,8 +331,8 @@ class TestBundleCatalog:
             "name": "valid-bundle",
             "description": "Valid bundle",
             "version": "1.0.0",
-            "servers": [{"id": "filesystem"}],
-            "suggested_scope": "user-global",
+            "servers": [{"id": "@anthropic/filesystem"}],
+            "suggested_scope": "user-mcp",
         }
         (bundle_data_dir / "valid-bundle.json").write_text(
             json.dumps(valid_bundle, indent=2)
@@ -369,7 +369,7 @@ class TestBundleCatalog:
             "description": "Missing servers field",
             "version": "1.0.0",
             # Missing required 'servers' field
-            "suggested_scope": "user-global",
+            "suggested_scope": "user-mcp",
         }
         (bundle_data_dir / "invalid-schema.json").write_text(
             json.dumps(invalid_schema, indent=2)
@@ -380,8 +380,8 @@ class TestBundleCatalog:
             "name": "valid-bundle",
             "description": "Valid bundle",
             "version": "1.0.0",
-            "servers": [{"id": "filesystem"}],
-            "suggested_scope": "user-global",
+            "servers": [{"id": "@anthropic/filesystem"}],
+            "suggested_scope": "user-mcp",
         }
         (bundle_data_dir / "valid-bundle.json").write_text(
             json.dumps(valid_bundle, indent=2)
@@ -467,8 +467,8 @@ class TestBundleInstallation:
         harness.assert_valid_json("project-mcp")
 
         # VERIFY: All servers from bundle present
-        harness.assert_server_exists("project-mcp", "filesystem")
-        harness.assert_server_exists("project-mcp", "fetch")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/fetch")
 
         # VERIFY: Server count correct
         server_count = harness.count_servers_in_scope("project-mcp")
@@ -484,8 +484,8 @@ class TestBundleInstallation:
         """Test: User can install same bundle to different scopes.
 
         User Journey:
-        - User installs bundle to user-global scope
-        - Servers appear in user-global config
+        - User installs bundle to user-mcp scope
+        - Servers appear in user-mcp config
         - Later installs same bundle to project-mcp
         - Servers in both scopes, independent configs
 
@@ -507,11 +507,11 @@ class TestBundleInstallation:
         # SETUP: Create installer with REAL ServerCatalog
         installer = BundleInstaller(manager=manager, catalog=real_server_catalog)
 
-        # EXECUTE: Install to user-global
-        results_global = installer.install_bundle(
-            bundle=bundle, scope="user-global", client_name="claude-code"
+        # EXECUTE: Install to user-internal (user-mcp was removed)
+        results_user = installer.install_bundle(
+            bundle=bundle, scope="user-internal", client_name="claude-code"
         )
-        assert all(r.success for r in results_global)
+        assert all(r.success for r in results_user)
 
         # EXECUTE: Install to project-mcp
         results_project = installer.install_bundle(
@@ -520,13 +520,13 @@ class TestBundleInstallation:
         assert all(r.success for r in results_project)
 
         # VERIFY: Both scopes have the servers
-        harness.assert_server_exists("user-global", "filesystem")
-        harness.assert_server_exists("user-global", "fetch")
-        harness.assert_server_exists("project-mcp", "filesystem")
-        harness.assert_server_exists("project-mcp", "fetch")
+        harness.assert_server_exists("user-internal", "@anthropic/filesystem")
+        harness.assert_server_exists("user-internal", "@anthropic/fetch")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/fetch")
 
         # VERIFY: Scopes are independent
-        assert harness.count_servers_in_scope("user-global") == 2
+        assert harness.count_servers_in_scope("user-internal") == 2
         assert harness.count_servers_in_scope("project-mcp") == 2
 
     def test_install_bundle_skips_existing_servers(
@@ -560,12 +560,12 @@ class TestBundleInstallation:
             type="stdio",
         )
         result = manager.add_server(
-            "filesystem", fs_config, "project-mcp", "claude-code"
+            "@anthropic/filesystem", fs_config, "project-mcp", "claude-code"
         )
         assert result.success
 
         # VERIFY: Pre-existing server there
-        harness.assert_server_exists("project-mcp", "filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
         initial_count = harness.count_servers_in_scope("project-mcp")
         assert initial_count == 1
 
@@ -588,8 +588,8 @@ class TestBundleInstallation:
         assert len(results) == 2, "Should process both servers"
 
         # VERIFY: Both servers present (no duplication)
-        harness.assert_server_exists("project-mcp", "filesystem")
-        harness.assert_server_exists("project-mcp", "fetch")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/fetch")
 
         # VERIFY: Server count correct (2 total, not 3)
         final_count = harness.count_servers_in_scope("project-mcp")
@@ -687,9 +687,9 @@ class TestBundleInstallation:
             "description": "Bundle with invalid server reference",
             "version": "1.0.0",
             "servers": [
-                {"id": "filesystem"},  # Valid
+                {"id": "@anthropic/filesystem"},  # Valid
                 {"id": "nonexistent-server-12345"},  # Invalid - truly doesn't exist
-                {"id": "fetch"},  # Valid
+                {"id": "@anthropic/fetch"},  # Valid
             ],
             "suggested_scope": "project-mcp",
         }
@@ -719,8 +719,8 @@ class TestBundleInstallation:
         assert not nonexistent_result.success, "Missing server should fail"
 
         # VERIFY: Valid servers still installed
-        harness.assert_server_exists("project-mcp", "filesystem")
-        harness.assert_server_exists("project-mcp", "fetch")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/fetch")
 
         # VERIFY: Server count correct (2 valid servers)
         assert harness.count_servers_in_scope("project-mcp") == 2
@@ -779,8 +779,8 @@ class TestBundleRemoval:
         assert all(r.success for r in install_results)
 
         # VERIFY: Servers exist before removal
-        harness.assert_server_exists("project-mcp", "filesystem")
-        harness.assert_server_exists("project-mcp", "fetch")
+        harness.assert_server_exists("project-mcp", "@anthropic/filesystem")
+        harness.assert_server_exists("project-mcp", "@anthropic/fetch")
         assert harness.count_servers_in_scope("project-mcp") == 2
 
         # EXECUTE: Remove bundle
@@ -799,8 +799,8 @@ class TestBundleRemoval:
         # VERIFY: Servers actually removed
         config_content = harness.read_scope_file("project-mcp")
         if config_content and "mcpServers" in config_content:
-            assert "filesystem" not in config_content["mcpServers"]
-            assert "fetch" not in config_content["mcpServers"]
+            assert "@anthropic/filesystem" not in config_content["mcpServers"]
+            assert "@anthropic/fetch" not in config_content["mcpServers"]
 
         # VERIFY: Server count correct (0 servers)
         assert harness.count_servers_in_scope("project-mcp") == 0
@@ -815,10 +815,10 @@ class TestBundleRemoval:
         """Test: Remove bundle from one scope doesn't affect other scopes.
 
         User Journey:
-        - User installs bundle to both project-mcp and user-global
+        - User installs bundle to both project-mcp and user-internal
         - User removes bundle from project-mcp only
         - Servers removed from project-mcp
-        - Servers remain in user-global
+        - Servers remain in user-internal
 
         Verification:
         - Servers removed from target scope only
@@ -836,11 +836,11 @@ class TestBundleRemoval:
         installer = BundleInstaller(manager=manager, catalog=real_server_catalog)
 
         installer.install_bundle(bundle, "project-mcp", "claude-code")
-        installer.install_bundle(bundle, "user-global", "claude-code")
+        installer.install_bundle(bundle, "user-internal", "claude-code")
 
         # VERIFY: Both scopes have servers
         assert harness.count_servers_in_scope("project-mcp") == 2
-        assert harness.count_servers_in_scope("user-global") == 2
+        assert harness.count_servers_in_scope("user-internal") == 2
 
         # EXECUTE: Remove from project-mcp only
         installer.remove_bundle(bundle, "project-mcp", "claude-code")
@@ -848,10 +848,10 @@ class TestBundleRemoval:
         # VERIFY: project-mcp servers removed
         assert harness.count_servers_in_scope("project-mcp") == 0
 
-        # VERIFY: user-global servers still present
-        harness.assert_server_exists("user-global", "filesystem")
-        harness.assert_server_exists("user-global", "fetch")
-        assert harness.count_servers_in_scope("user-global") == 2
+        # VERIFY: user-internal servers still present
+        harness.assert_server_exists("user-internal", "@anthropic/filesystem")
+        harness.assert_server_exists("user-internal", "@anthropic/fetch")
+        assert harness.count_servers_in_scope("user-internal") == 2
 
     def test_bundle_remove_handles_missing_bundle(
         self, mcp_manager_with_harness, bundle_data_dir, real_server_catalog
@@ -875,7 +875,7 @@ class TestBundleRemoval:
             "name": "uninstalled-bundle",
             "description": "Bundle that was never installed",
             "version": "1.0.0",
-            "servers": [{"id": "filesystem"}],
+            "servers": [{"id": "@anthropic/filesystem"}],
             "suggested_scope": "project-mcp",
         }
         (bundle_data_dir / "uninstalled-bundle.json").write_text(
@@ -987,9 +987,9 @@ class TestBundleCLICommands:
             assert "1.0.0" in result.output
 
             # VERIFY: Server list shown
-            assert "filesystem" in result.output
-            assert "fetch" in result.output
-            assert "github" in result.output
+            assert "@anthropic/filesystem" in result.output
+            assert "@anthropic/fetch" in result.output
+            assert "modelcontextprotocol/github" in result.output
             assert "puppeteer" in result.output
 
             # VERIFY: Suggested scope shown
@@ -1221,10 +1221,10 @@ class TestBundleIntegrationWorkflows:
         server_ids = {info.id for info in servers.values()}
 
         # VERIFY: All bundle servers present
-        assert "filesystem" in server_ids
-        assert "fetch" in server_ids
-        assert "github" in server_ids
-        assert "puppeteer" in server_ids
+        assert "@anthropic/filesystem" in server_ids
+        assert "@anthropic/fetch" in server_ids
+        assert "modelcontextprotocol/github" in server_ids
+        assert "modelcontextprotocol/puppeteer" in server_ids
 
     def test_bundle_installation_isolated_in_test_harness(
         self,
@@ -1288,8 +1288,8 @@ class TestBundleIntegrationWorkflows:
         content = harness.read_scope_file("project-mcp")
         assert content is not None
         assert "mcpServers" in content
-        assert "filesystem" in content["mcpServers"]
-        assert "fetch" in content["mcpServers"]
+        assert "@anthropic/filesystem" in content["mcpServers"]
+        assert "@anthropic/fetch" in content["mcpServers"]
 
     def test_bundle_with_custom_server_configs(
         self, bundle_data_dir, mcp_manager_with_harness, real_server_catalog
@@ -1318,11 +1318,11 @@ class TestBundleIntegrationWorkflows:
             "version": "1.0.0",
             "servers": [
                 {
-                    "id": "github",
+                    "id": "modelcontextprotocol/github",
                     "config": {"env": {"GITHUB_TOKEN": "${GITHUB_PERSONAL_TOKEN}"}},
                 },
                 {
-                    "id": "filesystem",
+                    "id": "@anthropic/filesystem",
                     "config": {
                         "args": [
                             "-y",
@@ -1354,7 +1354,7 @@ class TestBundleIntegrationWorkflows:
         assert all(r.success for r in results)
 
         # VERIFY: Custom configs applied - CHECK ACTUAL VALUES
-        github_config = harness.get_server_config("project-mcp", "github")
+        github_config = harness.get_server_config("project-mcp", "modelcontextprotocol/github")
         assert github_config is not None, "GitHub server should be installed"
 
         # VERIFY: Custom env var actually present with correct value
@@ -1366,7 +1366,7 @@ class TestBundleIntegrationWorkflows:
                 github_config["env"]["GITHUB_TOKEN"] == "${GITHUB_PERSONAL_TOKEN}"
             ), "Custom env var should have correct value"
 
-        filesystem_config = harness.get_server_config("project-mcp", "filesystem")
+        filesystem_config = harness.get_server_config("project-mcp", "@anthropic/filesystem")
         assert filesystem_config is not None, "Filesystem server should be installed"
 
         # VERIFY: Custom args actually present with correct values

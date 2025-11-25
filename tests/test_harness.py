@@ -34,11 +34,12 @@ class MCPTestHarness:
             Dictionary mapping scope names to file paths
         """
         # Define all scopes we want to test
+        # NOTE: user-mcp scope was removed because ~/.claude/settings.json
+        # is NOT used for MCP servers by Claude Code.
         scopes = [
             "project-mcp",
             "project-local",
             "user-local",
-            "user-global",
             "user-internal",
             "user-mcp",
         ]
@@ -50,14 +51,12 @@ class MCPTestHarness:
                 original = ".mcp.json"
             elif scope_name == "project-local":
                 original = "settings.local.json"
-            elif scope_name in ["user-local", "user-global"]:
-                original = (
-                    "settings.json" if "global" in scope_name else "settings.local.json"
-                )
+            elif scope_name == "user-local":
+                original = "settings.local.json"
             elif scope_name == "user-internal":
                 original = ".claude.json"
             elif scope_name == "user-mcp":
-                original = "mcp_servers.json"
+                original = ".mcp.json"
             else:
                 original = "config.json"
 
@@ -65,23 +64,40 @@ class MCPTestHarness:
             file_path = self.tmp_dir / f"{client_name}_{scope_name}_{original}"
             self.path_overrides[scope_name] = file_path
 
-        # Add the disabled file for user-global scope (FILE-MOVE MECHANISM)
-        # REQUIREMENT (from CLAUDE.md lines 406-411):
-        # - Active file: ~/.claude/settings.json
-        # - Disabled file: ~/.claude/disabled-mcp.json
-        # - disable/enable operations MOVE configs between files
-        user_global_disabled_file = (
-            self.tmp_dir / f"{client_name}_user-global-disabled_disabled-mcp.json"
-        )
-        self.path_overrides["user-global-disabled"] = user_global_disabled_file
+        # NOTE: user-mcp scope was removed because ~/.claude/settings.json
+        # is NOT used for MCP servers by Claude Code.
 
-        # Add the disabled file for user-internal scope
-        # This stores disabled server configurations (file-move mechanism)
+        # Add disabled files for scopes using file-move mechanism
+        # These store disabled server configurations
+
+        # project-mcp: .mcp.disabled.json
+        project_mcp_disabled_file = (
+            self.tmp_dir / f"{client_name}_project-mcp-disabled_.mcp.disabled.json"
+        )
+        self.path_overrides["project-mcp-disabled"] = project_mcp_disabled_file
+
+        # user-internal: ~/.claude/.disabled-servers.json
         user_internal_disabled_file = (
             self.tmp_dir
             / f"{client_name}_user-internal-disabled_.disabled-servers.json"
         )
         self.path_overrides["user-internal-disabled"] = user_internal_disabled_file
+
+        # user-mcp: ~/.mcp.disabled.json
+        user_mcp_disabled_file = (
+            self.tmp_dir / f"{client_name}_user-mcp-disabled_.mcp.disabled.json"
+        )
+        self.path_overrides["user-mcp-disabled"] = user_mcp_disabled_file
+
+        # Add path overrides for plugin scope
+        # These ensure plugin discovery reads from test files, not real user files
+        plugin_settings_file = self.tmp_dir / f"{client_name}_plugin-settings.json"
+        self.path_overrides["plugin-settings"] = plugin_settings_file
+
+        plugin_installed_file = (
+            self.tmp_dir / f"{client_name}_plugin-installed_plugins.json"
+        )
+        self.path_overrides["plugin-installed"] = plugin_installed_file
 
         return self.path_overrides
 
@@ -160,7 +176,7 @@ class MCPTestHarness:
         if scope_name in ["project-mcp", "user-mcp"]:
             # MCP config format: {"mcpServers": {...}}
             servers = content.get("mcpServers", {})
-        elif scope_name in ["project-local", "user-local", "user-global"]:
+        elif scope_name in ["project-local", "user-local"]:
             # Claude settings format: {"mcpEnabled": true, "mcpServers": {...}}
             servers = content.get("mcpServers", {})
         elif scope_name == "user-internal":
@@ -192,7 +208,7 @@ class MCPTestHarness:
         # Handle different file formats
         if scope_name in ["project-mcp", "user-mcp"]:
             servers = content.get("mcpServers", {})
-        elif scope_name in ["project-local", "user-local", "user-global"]:
+        elif scope_name in ["project-local", "user-local"]:
             servers = content.get("mcpServers", {})
         elif scope_name == "user-internal":
             servers = content.get("mcpServers", {})
@@ -238,7 +254,7 @@ class MCPTestHarness:
         # Handle different file formats
         if scope_name in ["project-mcp", "user-mcp"]:
             servers = content.get("mcpServers", {})
-        elif scope_name in ["project-local", "user-local", "user-global"]:
+        elif scope_name in ["project-local", "user-local"]:
             servers = content.get("mcpServers", {})
         elif scope_name == "user-internal":
             servers = content.get("mcpServers", {})
@@ -310,11 +326,10 @@ def prepopulated_harness(mcp_harness):
     """
     # Add some sample servers to different scopes
 
-    # User-global scope with a couple servers
+    # User-mcp scope with a couple servers (~/.mcp.json)
     mcp_harness.prepopulate_file(
-        "user-global",
+        "user-mcp",
         {
-            "mcpEnabled": True,
             "mcpServers": {
                 "filesystem": {
                     "command": "npx",

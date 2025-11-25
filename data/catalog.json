@@ -1,5 +1,5 @@
 {
-  "filesystem": {
+  "@anthropic/filesystem": {
     "description": "Access and manage local filesystem operations",
     "command": "npx",
     "args": [
@@ -8,7 +8,7 @@
     ],
     "repository": "https://github.com/anthropics/mcp-filesystem-server"
   },
-  "brave-search": {
+  "@anthropic/brave-search": {
     "description": "Search the web using Brave Search API",
     "command": "npx",
     "args": [
@@ -17,7 +17,7 @@
     ],
     "repository": "https://github.com/anthropics/mcp-brave-search"
   },
-  "context7": {
+  "upstash/context7": {
     "description": "Up-to-date code documentation for LLMs and AI code editors",
     "command": "npx",
     "args": [
@@ -26,7 +26,7 @@
     ],
     "repository": "https://github.com/upstash/context7"
   },
-  "sqlite": {
+  "@anthropic/sqlite": {
     "description": "Query and manage SQLite databases",
     "command": "npx",
     "args": [
@@ -35,7 +35,7 @@
     ],
     "repository": "https://github.com/anthropics/mcp-sqlite"
   },
-  "fetch": {
+  "@anthropic/fetch": {
     "description": "Make HTTP requests and fetch web content",
     "command": "npx",
     "args": [
@@ -44,7 +44,7 @@
     ],
     "repository": "https://github.com/anthropics/mcp-fetch"
   },
-  "github": {
+  "modelcontextprotocol/github": {
     "description": "Interact with GitHub repositories, issues, and pull requests",
     "command": "npx",
     "args": [
@@ -53,7 +53,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "gitlab": {
+  "modelcontextprotocol/gitlab": {
     "description": "Interact with GitLab repositories and merge requests",
     "command": "npx",
     "args": [
@@ -62,7 +62,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "postgres": {
+  "modelcontextprotocol/postgres": {
     "description": "Query and manage PostgreSQL databases",
     "command": "npx",
     "args": [
@@ -71,7 +71,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "slack": {
+  "modelcontextprotocol/slack": {
     "description": "Send and receive messages in Slack workspaces",
     "command": "npx",
     "args": [
@@ -80,7 +80,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "google-maps": {
+  "modelcontextprotocol/google-maps": {
     "description": "Search locations and get directions using Google Maps",
     "command": "npx",
     "args": [
@@ -89,7 +89,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "puppeteer": {
+  "modelcontextprotocol/puppeteer": {
     "description": "Automate web browser interactions and scraping",
     "command": "npx",
     "args": [
@@ -98,7 +98,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "aws": {
+  "modelcontextprotocol/aws": {
     "description": "Manage AWS resources and services",
     "command": "npx",
     "args": [
@@ -107,7 +107,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "memory": {
+  "@anthropic/memory": {
     "description": "Simple key-value memory storage",
     "command": "npx",
     "args": [
@@ -116,7 +116,7 @@
     ],
     "repository": "https://github.com/anthropics/mcp-memory"
   },
-  "docker": {
+  "ckreiling/docker": {
     "description": "Manage Docker containers and images",
     "command": "npx",
     "args": [
@@ -125,7 +125,7 @@
     ],
     "repository": "https://github.com/ckreiling/mcp-server-docker"
   },
-  "playwright": {
+  "executeautomation/playwright": {
     "description": "Browser automation and testing with Playwright",
     "command": "npx",
     "args": [
@@ -134,7 +134,16 @@
     ],
     "repository": "https://github.com/executeautomation/playwright-mcp-server"
   },
-  "peekaboo": {
+  "steipete/claude-code-mcp": {
+    "description": "Run Claude Code CLI in one-shot mode for coding tasks, file operations, and git workflows",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@steipete/claude-code-mcp"
+    ],
+    "repository": "https://github.com/steipete/claude-code-mcp"
+  },
+  "steipete/peekaboo": {
     "description": "Peekaboo MCP server",
     "command": "npx",
     "args": [
@@ -143,7 +152,7 @@
     ],
     "repository": "https://github.com/steipete/Peekaboo"
   },
-  "time": {
+  "modelcontextprotocol/time": {
     "description": "Get current time and timezone information",
     "command": "npx",
     "args": [
@@ -152,7 +161,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "everything": {
+  "modelcontextprotocol/everything": {
     "description": "The ultimate MCP server with every tool",
     "command": "npx",
     "args": [
@@ -161,7 +170,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "sequentialthinking": {
+  "modelcontextprotocol/sequentialthinking": {
     "description": "Tools for systematic reasoning and problem solving",
     "command": "npx",
     "args": [
@@ -170,7 +179,7 @@
     ],
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
-  "design-patterns": {
+  "bmf/design-patterns": {
     "description": "Deterministic access to software design pattern documentation with section-addressable queries",
     "command": "node",
     "args": [
@@ -181,7 +190,7 @@
       "PATTERNS_DIR": "/Users/bmf/icode/design-pattern-mcp/corpus"
     }
   },
-  "xcodebuildmcp": {
+  "cameroncooke/xcodebuildmcp": {
     "description": "Xcode project management, simulator control, and Swift package tools for AI assistants",
     "command": "npx",
     "args": [
@@ -189,5 +198,23 @@
       "xcodebuildmcp@latest"
     ],
     "repository": "https://github.com/cameroncooke/XcodeBuildMCP"
+  },
+  "r-huijts/xcode": {
+    "description": "Comprehensive Xcode project management with building, testing, CocoaPods, SPM, and iOS simulator control",
+    "command": "npx",
+    "args": [
+      "-y",
+      "github:r-huijts/xcode-mcp-server"
+    ],
+    "repository": "https://github.com/r-huijts/xcode-mcp-server"
+  },
+  "nickgnd/tmux-mcp": {
+    "description": "Interact with and control tmux sessions, windows, and panes",
+    "command": "npx",
+    "args": [
+      "-y",
+      "tmux-mcp"
+    ],
+    "repository": "https://github.com/nickgnd/tmux-mcp"
   }
 }

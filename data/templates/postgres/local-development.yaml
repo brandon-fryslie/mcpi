@@ -1,7 +1,7 @@
 name: local-development
 description: "Local PostgreSQL database for development"
 server_id: postgres
-scope: user-global
+scope: user-mcp
 priority: high
 
 config:
@@ -25,6 +25,20 @@ prompts:
     required: false
     default: ""
     validation_pattern: "^[a-zA-Z0-9_]*$"
+
+# Template discovery metadata
+best_for:
+  - local-development
+  - native-postgres
+  - peer-auth
+  - no-docker
+
+keywords:
+  - local
+  - development
+  - postgresql
+  - native
+  - peer-authentication
 
 notes: |
   This template creates a PostgreSQL connection URL for local development.

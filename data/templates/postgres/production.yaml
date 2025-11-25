@@ -1,7 +1,7 @@
 name: production
 description: "Production PostgreSQL with SSL connection"
 server_id: postgres
-scope: user-global
+scope: user-mcp
 priority: medium
 
 config:
@@ -47,6 +47,20 @@ prompts:
     required: true
     default: "require"
     validation_pattern: "^(require|verify-ca|verify-full|prefer|disable)$"
+
+# Template discovery metadata
+best_for:
+  - production
+  - remote-database
+  - ssl-required
+  - cloud-hosted
+
+keywords:
+  - production
+  - ssl
+  - secure
+  - remote
+  - cloud
 
 notes: |
   This template creates a secure PostgreSQL connection for production databases.

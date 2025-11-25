@@ -45,10 +45,10 @@ class TestMCPHarnessBasics:
     def test_assert_valid_json(self, mcp_harness):
         """Test JSON validation assertions."""
         # Prepopulate with valid JSON
-        mcp_harness.prepopulate_file("user-global", {"test": "data"})
+        mcp_harness.prepopulate_file("user-mcp", {"test": "data"})
 
         # Should not raise
-        mcp_harness.assert_valid_json("user-global")
+        mcp_harness.assert_valid_json("user-mcp")
 
         # Test with non-existent file
         with pytest.raises(AssertionError, match="does not exist"):
@@ -57,15 +57,15 @@ class TestMCPHarnessBasics:
     def test_server_assertions(self, prepopulated_harness):
         """Test server-related assertions."""
         # Test server exists
-        prepopulated_harness.assert_server_exists("user-global", "filesystem")
+        prepopulated_harness.assert_server_exists("user-mcp", "filesystem")
         prepopulated_harness.assert_server_exists("project-mcp", "project-tool")
 
         # Test server doesn't exist
         with pytest.raises(AssertionError, match="not found"):
-            prepopulated_harness.assert_server_exists("user-global", "nonexistent")
+            prepopulated_harness.assert_server_exists("user-mcp", "nonexistent")
 
         # Test command assertion
-        prepopulated_harness.assert_server_command("user-global", "filesystem", "npx")
+        prepopulated_harness.assert_server_command("user-mcp", "filesystem", "npx")
         prepopulated_harness.assert_server_command(
             "project-mcp", "project-tool", "python"
         )
@@ -73,12 +73,12 @@ class TestMCPHarnessBasics:
         # Test wrong command
         with pytest.raises(AssertionError, match="Expected command"):
             prepopulated_harness.assert_server_command(
-                "user-global", "filesystem", "node"
+                "user-mcp", "filesystem", "node"
             )
 
     def test_count_servers(self, prepopulated_harness):
         """Test counting servers in scopes."""
-        assert prepopulated_harness.count_servers_in_scope("user-global") == 2
+        assert prepopulated_harness.count_servers_in_scope("user-mcp") == 2
         assert prepopulated_harness.count_servers_in_scope("project-mcp") == 1
         # The prepopulated_harness has 2 servers in user-internal scope
         assert prepopulated_harness.count_servers_in_scope("user-internal") == 2
@@ -97,13 +97,13 @@ class TestMCPManagerIntegration:
         # Add a server
         config = ServerConfig(command="npx", args=["-y", "test-server"], type="stdio")
 
-        result = manager.add_server("test-server", config, "user-global", "claude-code")
+        result = manager.add_server("test-server", config, "user-mcp", "claude-code")
         assert result.success
 
         # Verify the file was written to the test directory
-        harness.assert_valid_json("user-global")
-        harness.assert_server_exists("user-global", "test-server")
-        harness.assert_server_command("user-global", "test-server", "npx")
+        harness.assert_valid_json("user-mcp")
+        harness.assert_server_exists("user-mcp", "test-server")
+        harness.assert_server_command("user-mcp", "test-server", "npx")
 
     def test_list_servers_from_prepopulated(
         self, mcp_manager_with_harness, prepopulated_harness
@@ -205,11 +205,11 @@ class TestMultiClientScenarios:
         manager.add_server("multi-scope", config1, "project-mcp", "claude-code")
 
         # Add to user scope (lower priority)
-        manager.add_server("multi-scope", config2, "user-global", "claude-code")
+        manager.add_server("multi-scope", config2, "user-mcp", "claude-code")
 
         # Verify both files have the server
         harness.assert_server_exists("project-mcp", "multi-scope")
-        harness.assert_server_exists("user-global", "multi-scope")
+        harness.assert_server_exists("user-mcp", "multi-scope")
 
         # List servers and check that we get both
         servers = manager.list_servers("claude-code")
@@ -222,7 +222,7 @@ class TestMultiClientScenarios:
             if info.id == "multi-scope":
                 if info.scope == "project-mcp":
                     project_server = info
-                elif info.scope == "user-global":
+                elif info.scope == "user-mcp":
                     user_server = info
 
         assert project_server is not None
@@ -237,7 +237,7 @@ class TestMultiClientScenarios:
 
         # Add servers to different scopes
         configs = {
-            "user-global": ServerConfig(
+            "user-mcp": ServerConfig(
                 command="npx", args=["global-server"], type="stdio"
             ),
             "user-local": ServerConfig(
@@ -252,15 +252,15 @@ class TestMultiClientScenarios:
             manager.add_server(f"{scope}-test", config, scope, "claude-code")
 
         # Verify each scope has only its server
-        assert harness.count_servers_in_scope("user-global") == 1
+        assert harness.count_servers_in_scope("user-mcp") == 1
         assert harness.count_servers_in_scope("user-local") == 1
         assert harness.count_servers_in_scope("project-mcp") == 1
 
         # Remove from one scope
-        manager.remove_server("user-global-test", "user-global", "claude-code")
+        manager.remove_server("user-mcp-test", "user-mcp", "claude-code")
 
         # Verify only that scope was affected
-        assert harness.count_servers_in_scope("user-global") == 0
+        assert harness.count_servers_in_scope("user-mcp") == 0
         assert harness.count_servers_in_scope("user-local") == 1
         assert harness.count_servers_in_scope("project-mcp") == 1
 

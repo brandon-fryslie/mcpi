@@ -158,8 +158,8 @@ class TestCatalogListCommand:
         # When implemented, should show both catalogs
         assert result.exit_code == 0 or "not implemented" in result.output.lower()
 
-    def test_catalog_list_shows_metadata(self, cli_runner, test_catalogs, monkeypatch):
-        """Shows name, type, server count, description."""
+    def test_catalog_list_shows_servers(self, cli_runner, test_catalogs, monkeypatch):
+        """Default behavior shows all servers from all catalogs."""
         manager, _, _ = test_catalogs
         if manager is None:
             pytest.skip("CatalogManager not implemented yet")
@@ -167,7 +167,24 @@ class TestCatalogListCommand:
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "list"])
 
-        # Should show metadata when implemented
+        # Should list servers from all catalogs
+        if result.exit_code == 0:
+            assert "Server ID" in result.output
+            assert "official" in result.output  # Catalog column
+            assert "servers available" in result.output
+
+    def test_catalog_list_summary_shows_metadata(
+        self, cli_runner, test_catalogs, monkeypatch
+    ):
+        """--summary flag shows catalog metadata (old behavior)."""
+        manager, _, _ = test_catalogs
+        if manager is None:
+            pytest.skip("CatalogManager not implemented yet")
+
+        inject_catalog_manager_into_cli(manager, monkeypatch)
+        result = cli_runner.invoke(cli, ["catalog", "list", "--summary"])
+
+        # Should show catalog metadata
         if result.exit_code == 0:
             assert "official" in result.output or "builtin" in result.output
             assert "local" in result.output or "custom" in result.output
@@ -402,10 +419,10 @@ class TestAddWithCatalog:
         if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        # Setup: Create user-global scope file
+        # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         # Create plugin with path overrides
@@ -423,7 +440,7 @@ class TestAddWithCatalog:
         monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
 
         # Test: Run add command
-        result = cli_runner.invoke(cli, ["add", "filesystem", "--scope", "user-global"])
+        result = cli_runner.invoke(cli, ["add", "filesystem", "--scope", "user-mcp"])
 
         # Exit code depends on whether it's in a valid project context
         # At minimum, it should recognize the server exists
@@ -441,10 +458,10 @@ class TestAddWithCatalog:
         if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        # Setup: Create user-global scope file
+        # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         # Create plugin with path overrides
@@ -463,7 +480,7 @@ class TestAddWithCatalog:
 
         # Test: Run add command
         result = cli_runner.invoke(
-            cli, ["add", "custom-tool", "--catalog", "local", "--scope", "user-global"]
+            cli, ["add", "custom-tool", "--catalog", "local", "--scope", "user-mcp"]
         )
 
         # Should recognize the server from local catalog
@@ -547,10 +564,10 @@ class TestBackwardCompatibility:
         if catalog_manager is None:
             pytest.skip("CatalogManager not implemented yet")
 
-        # Setup: Create user-global scope file
+        # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         # Create plugin with path overrides
@@ -568,7 +585,7 @@ class TestBackwardCompatibility:
         monkeypatch.setattr("mcpi.cli.get_mcp_manager", mock_get_mcp_manager)
 
         # Test: Run add command
-        result = cli_runner.invoke(cli, ["add", "database", "--scope", "user-global"])
+        result = cli_runner.invoke(cli, ["add", "database", "--scope", "user-mcp"])
 
         # Should recognize server from official catalog
         # Exit code may vary based on project context
@@ -577,3 +594,139 @@ class TestBackwardCompatibility:
             or result.exit_code == 0
             or "not found" in result.output.lower()
         )
+
+
+class TestCatalogAddCommand:
+    """Test mcpi catalog add command.
+
+    This command uses Claude CLI in non-interactive mode to discover
+    MCP server information and add it to the catalog.
+    """
+
+    def test_catalog_add_help(self, cli_runner):
+        """mcpi catalog add --help shows proper help text."""
+        result = cli_runner.invoke(cli, ["catalog", "add", "--help"])
+
+        assert result.exit_code == 0
+        assert "SOURCE" in result.output
+        assert "Claude" in result.output or "claude" in result.output
+        assert "--dry-run" in result.output
+        assert "github" in result.output.lower() or "url" in result.output.lower()
+
+    def test_catalog_add_requires_source(self, cli_runner):
+        """mcpi catalog add with no source shows error."""
+        result = cli_runner.invoke(cli, ["catalog", "add"])
+
+        # Click should complain about missing required argument
+        assert result.exit_code != 0
+        assert "SOURCE" in result.output.upper() or "missing" in result.output.lower()
+
+    def test_catalog_add_missing_claude_cli(self, cli_runner, monkeypatch):
+        """mcpi catalog add handles missing Claude CLI gracefully."""
+        import subprocess
+
+        # Mock subprocess.run to raise FileNotFoundError for claude
+        original_run = subprocess.run
+
+        def mock_run(args, **kwargs):
+            if args[0] == "claude":
+                raise FileNotFoundError("claude not found")
+            return original_run(args, **kwargs)
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+
+        result = cli_runner.invoke(
+            cli, ["catalog", "add", "https://example.com/mcp-server"]
+        )
+
+        assert result.exit_code != 0
+        assert "claude" in result.output.lower()
+        assert "not found" in result.output.lower()
+
+    def test_catalog_add_dry_run_flag(self, cli_runner, monkeypatch):
+        """mcpi catalog add --dry-run shows dry run message."""
+        import subprocess
+
+        # Mock subprocess.run to return success
+        def mock_run(args, **kwargs):
+            if args[0] == "claude":
+                if "--version" in args:
+                    return subprocess.CompletedProcess(args, 0, "1.0.0", "")
+                else:
+                    return subprocess.CompletedProcess(
+                        args,
+                        0,
+                        "DRY RUN: Would add server-id with config...",
+                        "",
+                    )
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+
+        result = cli_runner.invoke(
+            cli, ["catalog", "add", "--dry-run", "https://example.com/mcp-server"]
+        )
+
+        assert result.exit_code == 0
+        assert "dry run" in result.output.lower()
+
+    def test_catalog_add_accepts_multiple_args(self, cli_runner, monkeypatch):
+        """mcpi catalog add accepts multiple words as source."""
+        import subprocess
+
+        # Mock subprocess.run to verify the source is joined properly
+        captured_prompt = []
+
+        def mock_run(args, **kwargs):
+            if args[0] == "claude":
+                if "--version" in args:
+                    return subprocess.CompletedProcess(args, 0, "1.0.0", "")
+                else:
+                    # Capture the prompt to verify it contains all source words
+                    captured_prompt.append(args[-1])
+                    return subprocess.CompletedProcess(
+                        args, 0, "Server added successfully", ""
+                    )
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "catalog",
+                "add",
+                "https://github.com/user/repo",
+                "with",
+                "extra",
+                "context",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Verify all words were passed
+        assert len(captured_prompt) == 1
+        prompt = captured_prompt[0]
+        assert "github.com/user/repo" in prompt
+        assert "with extra context" in prompt
+
+    def test_catalog_add_handles_claude_failure(self, cli_runner, monkeypatch):
+        """mcpi catalog add handles Claude CLI failures."""
+        import subprocess
+
+        def mock_run(args, **kwargs):
+            if args[0] == "claude":
+                if "--version" in args:
+                    return subprocess.CompletedProcess(args, 0, "1.0.0", "")
+                else:
+                    return subprocess.CompletedProcess(args, 1, "", "Error occurred")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+
+        result = cli_runner.invoke(
+            cli, ["catalog", "add", "https://example.com/mcp-server"]
+        )
+
+        assert result.exit_code != 0
+        assert "error" in result.output.lower()

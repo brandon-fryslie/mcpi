@@ -1,7 +1,7 @@
-"""Comprehensive tests for user-global custom disable mechanism.
+"""Comprehensive tests for user-mcp custom disable mechanism.
 
 REQUIREMENT (from CLAUDE.md lines 406-411):
-For user-global MCP servers (~/.claude/settings.json):
+For user-mcp MCP servers (~/.claude/settings.json):
 - Two configuration files:
   - Active file: ~/.claude/settings.json (ENABLED servers)
   - Disabled file: ~/.claude.disabled-mcp.json (DISABLED servers)
@@ -33,7 +33,7 @@ from mcpi.clients.types import ServerState
 
 
 class TestUserGlobalDisableMechanismUnit:
-    """Unit tests for user-global disable mechanism.
+    """Unit tests for user-mcp disable mechanism.
 
     These tests verify the core move-based mechanism at the handler level.
     """
@@ -46,13 +46,13 @@ class TestUserGlobalDisableMechanismUnit:
     @pytest.fixture
     def active_file(self, mcp_harness):
         """Get path to active config file."""
-        return mcp_harness.path_overrides["user-global"]
+        return mcp_harness.path_overrides["user-mcp"]
 
     @pytest.fixture
     def disabled_file(self, mcp_harness):
         """Get path to disabled config file."""
         # Based on requirement: ~/.claude.disabled-mcp.json
-        return mcp_harness.path_overrides["user-global-disabled"]
+        return mcp_harness.path_overrides["user-mcp-disabled"]
 
     def test_initially_empty_disabled_file_does_not_exist(self, disabled_file):
         """Test that disabled file doesn't exist initially."""
@@ -67,7 +67,7 @@ class TestUserGlobalDisableMechanismUnit:
         """
         # Setup: Add server to active config
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -86,7 +86,7 @@ class TestUserGlobalDisableMechanismUnit:
         assert not disabled_file.exists()
 
         # Execute: Disable the server
-        result = plugin.disable_server("test-server", scope="user-global")
+        result = plugin.disable_server("test-server", scope="user-mcp")
 
         # Verify: Operation succeeded
         assert result.success, f"Disable should succeed: {result.message}"
@@ -122,7 +122,7 @@ class TestUserGlobalDisableMechanismUnit:
         """
         # Setup: Create active file with empty mcpServers
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -153,7 +153,7 @@ class TestUserGlobalDisableMechanismUnit:
         assert "test-server" not in active_data["mcpServers"]
 
         # Execute: Enable the server
-        result = plugin.enable_server("test-server", scope="user-global")
+        result = plugin.enable_server("test-server", scope="user-mcp")
 
         # Verify: Operation succeeded
         assert result.success, f"Enable should succeed: {result.message}"
@@ -187,7 +187,7 @@ class TestUserGlobalDisableMechanismUnit:
         """
         # Setup: Add enabled server to active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -217,8 +217,8 @@ class TestUserGlobalDisableMechanismUnit:
             )
         )
 
-        # Execute: List servers in user-global scope
-        servers = plugin.list_servers(scope="user-global")
+        # Execute: List servers in user-mcp scope
+        servers = plugin.list_servers(scope="user-mcp")
 
         # Verify: Both servers appear in list
         server_ids = [info.id for info in servers.values()]
@@ -241,7 +241,7 @@ class TestUserGlobalDisableMechanismUnit:
         """Test that disabling a nonexistent server fails gracefully."""
         # Setup: Empty active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -249,7 +249,7 @@ class TestUserGlobalDisableMechanismUnit:
         )
 
         # Execute: Try to disable nonexistent server
-        result = plugin.disable_server("nonexistent", scope="user-global")
+        result = plugin.disable_server("nonexistent", scope="user-mcp")
 
         # Verify: Operation fails
         assert not result.success
@@ -261,7 +261,7 @@ class TestUserGlobalDisableMechanismUnit:
         """Test that enabling a nonexistent server fails gracefully."""
         # Setup: Empty active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -273,7 +273,7 @@ class TestUserGlobalDisableMechanismUnit:
         disabled_file.write_text(json.dumps({"mcpServers": {}}, indent=2))
 
         # Execute: Try to enable nonexistent server
-        result = plugin.enable_server("nonexistent", scope="user-global")
+        result = plugin.enable_server("nonexistent", scope="user-mcp")
 
         # Verify: Operation fails
         assert not result.success
@@ -288,7 +288,7 @@ class TestUserGlobalDisableMechanismUnit:
         """
         # Setup: Add server to active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -308,7 +308,7 @@ class TestUserGlobalDisableMechanismUnit:
         }
 
         # Cycle 1: Disable
-        result = plugin.disable_server("test-server", scope="user-global")
+        result = plugin.disable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: In disabled file
@@ -316,7 +316,7 @@ class TestUserGlobalDisableMechanismUnit:
         assert disabled_data["mcpServers"]["test-server"] == expected_config
 
         # Cycle 1: Enable
-        result = plugin.enable_server("test-server", scope="user-global")
+        result = plugin.enable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: In active file
@@ -324,7 +324,7 @@ class TestUserGlobalDisableMechanismUnit:
         assert active_data["mcpServers"]["test-server"] == expected_config
 
         # Cycle 2: Disable again
-        result = plugin.disable_server("test-server", scope="user-global")
+        result = plugin.disable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: In disabled file again
@@ -332,7 +332,7 @@ class TestUserGlobalDisableMechanismUnit:
         assert disabled_data["mcpServers"]["test-server"] == expected_config
 
         # Cycle 2: Enable again
-        result = plugin.enable_server("test-server", scope="user-global")
+        result = plugin.enable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: In active file again
@@ -341,7 +341,7 @@ class TestUserGlobalDisableMechanismUnit:
 
 
 class TestUserGlobalDisableMechanismIntegration:
-    """Integration tests for user-global disable mechanism.
+    """Integration tests for user-mcp disable mechanism.
 
     These tests verify the full workflow with multiple servers and edge cases.
     """
@@ -354,12 +354,12 @@ class TestUserGlobalDisableMechanismIntegration:
     @pytest.fixture
     def active_file(self, mcp_harness):
         """Get path to active config file."""
-        return mcp_harness.path_overrides["user-global"]
+        return mcp_harness.path_overrides["user-mcp"]
 
     @pytest.fixture
     def disabled_file(self, mcp_harness):
         """Get path to disabled config file."""
-        return mcp_harness.path_overrides["user-global-disabled"]
+        return mcp_harness.path_overrides["user-mcp-disabled"]
 
     def test_disable_one_server_among_many(
         self, plugin, mcp_harness, active_file, disabled_file
@@ -367,7 +367,7 @@ class TestUserGlobalDisableMechanismIntegration:
         """Test that disabling one server doesn't affect others."""
         # Setup: Add multiple servers to active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -391,7 +391,7 @@ class TestUserGlobalDisableMechanismIntegration:
         )
 
         # Execute: Disable server-2
-        result = plugin.disable_server("server-2", scope="user-global")
+        result = plugin.disable_server("server-2", scope="user-mcp")
         assert result.success
 
         # Verify: server-1 and server-3 still in active file
@@ -407,7 +407,7 @@ class TestUserGlobalDisableMechanismIntegration:
         assert "server-3" not in disabled_data["mcpServers"]
 
         # Verify: list_servers shows all 3 with correct states
-        servers = plugin.list_servers(scope="user-global")
+        servers = plugin.list_servers(scope="user-mcp")
         server_states = {info.id: info.state for info in servers.values()}
 
         assert server_states["server-1"] == ServerState.ENABLED
@@ -420,7 +420,7 @@ class TestUserGlobalDisableMechanismIntegration:
         """Test that disabling all servers empties the active file's mcpServers."""
         # Setup: Add 2 servers to active file
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -439,8 +439,8 @@ class TestUserGlobalDisableMechanismIntegration:
         )
 
         # Execute: Disable both servers
-        result1 = plugin.disable_server("server-1", scope="user-global")
-        result2 = plugin.disable_server("server-2", scope="user-global")
+        result1 = plugin.disable_server("server-1", scope="user-mcp")
+        result2 = plugin.disable_server("server-2", scope="user-mcp")
         assert result1.success
         assert result2.success
 
@@ -459,7 +459,7 @@ class TestUserGlobalDisableMechanismIntegration:
         """Test that enabling all servers empties the disabled file's mcpServers."""
         # Setup: Active file with empty mcpServers
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -489,8 +489,8 @@ class TestUserGlobalDisableMechanismIntegration:
         )
 
         # Execute: Enable both servers
-        result1 = plugin.enable_server("server-1", scope="user-global")
-        result2 = plugin.enable_server("server-2", scope="user-global")
+        result1 = plugin.enable_server("server-1", scope="user-mcp")
+        result2 = plugin.enable_server("server-2", scope="user-mcp")
         assert result1.success
         assert result2.success
 
@@ -509,7 +509,7 @@ class TestUserGlobalDisableMechanismIntegration:
         """Test that disable/enable preserves other fields in active file (mcpEnabled, etc)."""
         # Setup: Active file with additional fields
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "someOtherField": "value",
@@ -524,7 +524,7 @@ class TestUserGlobalDisableMechanismIntegration:
         )
 
         # Execute: Disable server
-        result = plugin.disable_server("test-server", scope="user-global")
+        result = plugin.disable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: Other fields preserved
@@ -533,7 +533,7 @@ class TestUserGlobalDisableMechanismIntegration:
         assert active_data["someOtherField"] == "value"
 
         # Execute: Enable server
-        result = plugin.enable_server("test-server", scope="user-global")
+        result = plugin.enable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: Other fields still preserved
@@ -543,7 +543,7 @@ class TestUserGlobalDisableMechanismIntegration:
 
 
 class TestUserGlobalDisableMechanismE2E:
-    """End-to-end tests for user-global disable mechanism.
+    """End-to-end tests for user-mcp disable mechanism.
 
     These tests verify the complete workflow including validation criteria.
     """
@@ -563,7 +563,7 @@ class TestUserGlobalDisableMechanismE2E:
         """
         # Setup: Add servers to active file (these would be in `claude mcp list`)
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -582,7 +582,7 @@ class TestUserGlobalDisableMechanismE2E:
         )
 
         # Execute: List servers (equivalent to `mcpi list`)
-        servers = plugin.list_servers(scope="user-global")
+        servers = plugin.list_servers(scope="user-mcp")
 
         # Verify: Both servers shown as ENABLED
         server_states = {info.id: info.state for info in servers.values()}
@@ -598,7 +598,7 @@ class TestUserGlobalDisableMechanismE2E:
         Requirement: `claude mcp list` (which reads settings.json) won't see them.
         """
         # Setup: Add server to disabled file (NOT in active file)
-        disabled_file = mcp_harness.path_overrides["user-global-disabled"]
+        disabled_file = mcp_harness.path_overrides["user-mcp-disabled"]
         disabled_file.parent.mkdir(parents=True, exist_ok=True)
         disabled_file.write_text(
             json.dumps(
@@ -617,7 +617,7 @@ class TestUserGlobalDisableMechanismE2E:
 
         # Setup: Active file has NO servers
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {},
@@ -625,12 +625,12 @@ class TestUserGlobalDisableMechanismE2E:
         )
 
         # Verify: Active file is empty (simulates `claude mcp list` seeing nothing)
-        active_file = mcp_harness.path_overrides["user-global"]
+        active_file = mcp_harness.path_overrides["user-mcp"]
         active_data = json.loads(active_file.read_text())
         assert active_data["mcpServers"] == {}
 
         # Execute: List servers (equivalent to `mcpi list`)
-        servers = plugin.list_servers(scope="user-global")
+        servers = plugin.list_servers(scope="user-mcp")
 
         # Verify: mcpi shows the disabled server
         server_ids = [info.id for info in servers.values()]
@@ -652,7 +652,7 @@ class TestUserGlobalDisableMechanismE2E:
         """
         # Setup: One enabled, one disabled
         mcp_harness.prepopulate_file(
-            "user-global",
+            "user-mcp",
             {
                 "mcpEnabled": True,
                 "mcpServers": {
@@ -665,7 +665,7 @@ class TestUserGlobalDisableMechanismE2E:
             },
         )
 
-        disabled_file = mcp_harness.path_overrides["user-global-disabled"]
+        disabled_file = mcp_harness.path_overrides["user-mcp-disabled"]
         disabled_file.parent.mkdir(parents=True, exist_ok=True)
         disabled_file.write_text(
             json.dumps(
@@ -683,7 +683,7 @@ class TestUserGlobalDisableMechanismE2E:
         )
 
         # Execute: List servers
-        servers = plugin.list_servers(scope="user-global")
+        servers = plugin.list_servers(scope="user-mcp")
 
         # Verify: Both servers appear
         server_ids = [info.id for info in servers.values()]
@@ -708,36 +708,36 @@ class TestUserGlobalDisableMechanismE2E:
             args=["-y", "test-server"],
             type="stdio",
         )
-        result = plugin.add_server("test-server", config, scope="user-global")
+        result = plugin.add_server("test-server", config, scope="user-mcp")
         assert result.success
 
         # Verify: Server is ENABLED
-        info = plugin.get_server_info("test-server", scope="user-global")
+        info = plugin.get_server_info("test-server", scope="user-mcp")
         assert info is not None
         assert info.state == ServerState.ENABLED
 
         # Step 2: Disable server
-        result = plugin.disable_server("test-server", scope="user-global")
+        result = plugin.disable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: Server is DISABLED
-        info = plugin.get_server_info("test-server", scope="user-global")
+        info = plugin.get_server_info("test-server", scope="user-mcp")
         assert info is not None
         assert info.state == ServerState.DISABLED
 
         # Step 3: Enable server
-        result = plugin.enable_server("test-server", scope="user-global")
+        result = plugin.enable_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: Server is ENABLED again
-        info = plugin.get_server_info("test-server", scope="user-global")
+        info = plugin.get_server_info("test-server", scope="user-mcp")
         assert info is not None
         assert info.state == ServerState.ENABLED
 
         # Step 4: Remove server
-        result = plugin.remove_server("test-server", scope="user-global")
+        result = plugin.remove_server("test-server", scope="user-mcp")
         assert result.success
 
         # Verify: Server is gone
-        info = plugin.get_server_info("test-server", scope="user-global")
+        info = plugin.get_server_info("test-server", scope="user-mcp")
         assert info is None

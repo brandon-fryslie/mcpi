@@ -6,10 +6,15 @@ Servers added to .mcp.json show as ENABLED in `mcpi list` but don't appear in
 `claude mcp list` because MCPI doesn't check Claude Code's approval mechanism.
 
 Expected Behavior After Fix:
-- Server added to .mcp.json → Shows DISABLED (not approved)
+- Server added to .mcp.json → Shows UNAPPROVED (not approved)
 - Server enabled via `mcpi enable` → Shows ENABLED (approved)
 - Server disabled via `mcpi disable` → Shows DISABLED
 - State in `mcpi list` matches actual Claude Code behavior
+
+ServerState values:
+- ENABLED: Server is in enabledMcpjsonServers array
+- DISABLED: Server is in disabledMcpjsonServers array OR has inline disabled=true
+- UNAPPROVED: Server is not in either array (pending approval)
 
 Why These Tests Are UN-GAMEABLE:
 =================================
@@ -71,16 +76,16 @@ class TestProjectMCPApprovalIntegration:
 
         return manager, harness
 
-    def test_add_server_shows_disabled_not_approved(self, manager_and_harness):
-        """Add server to .mcp.json → Shows DISABLED (not approved).
+    def test_add_server_shows_unapproved(self, manager_and_harness):
+        """Add server to .mcp.json → Shows UNAPPROVED (not approved).
 
         This is the CORE BUG being fixed. After adding a server, it should
-        show as DISABLED until explicitly enabled (approved).
+        show as UNAPPROVED until explicitly enabled (approved).
 
         Why un-gameable:
         - Uses real MCPManager.add_server()
         - Uses real MCPManager.list_servers()
-        - Verifies actual ServerState.DISABLED
+        - Verifies actual ServerState.UNAPPROVED
         - Checks file contents to confirm approval state
         - Full stack integration (manager → plugin → scope → handler)
         """
@@ -108,7 +113,7 @@ class TestProjectMCPApprovalIntegration:
             "mcpServers", {}
         ), "Server not in .mcp.json"
 
-        # CRITICAL: Verify server shows as DISABLED (not approved)
+        # CRITICAL: Verify server shows as UNAPPROVED (not approved)
         servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
 
         # Find the filesystem server
@@ -119,8 +124,8 @@ class TestProjectMCPApprovalIntegration:
                 break
 
         assert filesystem_info is not None, "Server not in list_servers() output"
-        assert filesystem_info.state == ServerState.DISABLED, (
-            f"Server should be DISABLED (not approved), got {filesystem_info.state}. "
+        assert filesystem_info.state == ServerState.UNAPPROVED, (
+            f"Server should be UNAPPROVED (not approved), got {filesystem_info.state}. "
             f"This is the BUG - server shows ENABLED without approval!"
         )
 
@@ -158,7 +163,7 @@ class TestProjectMCPApprovalIntegration:
             },
         )
 
-        # Verify: Server initially DISABLED (not approved)
+        # Verify: Server initially UNAPPROVED (not approved)
         servers_before = manager.list_servers(
             scope="project-mcp", client_name="claude-code"
         )
@@ -167,8 +172,8 @@ class TestProjectMCPApprovalIntegration:
         )
         assert fs_before is not None, "Server not found"
         assert (
-            fs_before.state == ServerState.DISABLED
-        ), "Server should start DISABLED (not approved)"
+            fs_before.state == ServerState.UNAPPROVED
+        ), "Server should start UNAPPROVED (not approved)"
 
         # Execute: Enable server (approve)
         result = manager.enable_server(
@@ -346,8 +351,8 @@ class TestProjectMCPApprovalIntegration:
         ), "approved-server should be ENABLED (in enabledMcpjsonServers)"
 
         assert (
-            server_states.get("unapproved-server") == ServerState.DISABLED
-        ), "unapproved-server should be DISABLED (not in any array = not approved)"
+            server_states.get("unapproved-server") == ServerState.UNAPPROVED
+        ), "unapproved-server should be UNAPPROVED (not in any array = not approved)"
 
         assert (
             server_states.get("explicitly-disabled") == ServerState.DISABLED

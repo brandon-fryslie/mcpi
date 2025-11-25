@@ -47,6 +47,21 @@ def validate_path(path: str, must_exist: bool = False) -> bool:
 def validate_server_id(server_id: str) -> bool:
     """Validate server ID format.
 
+    ALL server IDs must be namespaced with exactly one '/' to indicate ownership.
+    Optionally, verified accounts may prefix their namespace with '@'.
+
+    Valid formats:
+        - owner/server (standard namespace)
+        - @owner/server (verified account)
+
+    Examples:
+        - anthropic/filesystem ✓
+        - @anthropic/filesystem ✓ (verified)
+        - r-huijts/xcode ✓
+        - @modelcontextprotocol/github ✓ (verified)
+        - filesystem ✗ (missing namespace)
+        - owner/path/server ✗ (too many slashes)
+
     Args:
         server_id: Server ID to validate
 
@@ -56,19 +71,15 @@ def validate_server_id(server_id: str) -> bool:
     if not server_id or not isinstance(server_id, str):
         return False
 
-    # Server ID can be:
-    # 1. Simple alphanumeric with hyphens/underscores: my-server, my_server_123
-    # 2. Domain-style with slashes and dots: mcpmarket.com/screenshot-9, github.com/user/repo
+    # Pattern: optional '@', owner name, exactly one '/', server name
+    # owner and server must be lowercase alphanumeric with hyphens
+    # Must start and end with alphanumeric (not hyphen)
+    pattern = r"^@?[a-z0-9]([a-z0-9-]*[a-z0-9])?/[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
 
-    # Check if it's a domain-style ID (contains dots and/or slashes)
-    if "." in server_id or "/" in server_id:
-        # Allow domain-style IDs with dots and slashes
-        # Pattern: allows letters, numbers, dots, slashes, hyphens, underscores
-        pattern = r"^[a-z0-9][a-z0-9._/-]*[a-z0-9]$"
-        return bool(re.match(pattern, server_id))
+    # Count slashes - must be exactly 1
+    if server_id.count('/') != 1:
+        return False
 
-    # Standard server ID format
-    pattern = r"^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$"
     return bool(re.match(pattern, server_id))
 
 

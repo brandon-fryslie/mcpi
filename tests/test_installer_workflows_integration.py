@@ -27,16 +27,16 @@ class TestInstallerWorkflowsWithHarness:
             type="stdio",
         )
 
-        result = manager.add_server("filesystem", config, "user-global", "claude-code")
+        result = manager.add_server("filesystem", config, "user-mcp", "claude-code")
         assert result.success
 
         # Verify file was created with correct content
-        harness.assert_valid_json("user-global")
-        harness.assert_server_exists("user-global", "filesystem")
-        harness.assert_server_command("user-global", "filesystem", "npx")
+        harness.assert_valid_json("user-mcp")
+        harness.assert_server_exists("user-mcp", "filesystem")
+        harness.assert_server_command("user-mcp", "filesystem", "npx")
 
         # Verify the full configuration
-        server_config = harness.get_server_config("user-global", "filesystem")
+        server_config = harness.get_server_config("user-mcp", "filesystem")
         assert server_config["args"] == [
             "-y",
             "@modelcontextprotocol/server-filesystem",
@@ -73,7 +73,7 @@ class TestInstallerWorkflowsWithHarness:
 
         NOTE: Different scopes use different disable mechanisms:
         - project-mcp: inline 'disabled' field in server config
-        - user-global: file-move mechanism (disabled-mcp.json)
+        - user-mcp: file-move mechanism (disabled-mcp.json)
         - user-internal: file-move mechanism (.disabled-servers.json)
 
         This test uses project-mcp scope which uses the inline field mechanism.
@@ -169,7 +169,7 @@ class TestComplexWorkflows:
         """Test migrating servers from one scope to another."""
         manager, harness = mcp_manager_with_harness
 
-        # Use prepopulated harness that has servers in user-global
+        # Use prepopulated harness that has servers in user-mcp
         from mcpi.clients.claude_code import ClaudeCodePlugin
 
         manager.registry.inject_client_instance(
@@ -178,11 +178,11 @@ class TestComplexWorkflows:
         )
 
         # Verify initial state
-        prepopulated_harness.assert_server_exists("user-global", "filesystem")
-        prepopulated_harness.assert_server_exists("user-global", "github")
+        prepopulated_harness.assert_server_exists("user-mcp", "filesystem")
+        prepopulated_harness.assert_server_exists("user-mcp", "github")
 
         # Get the filesystem server config
-        fs_config = prepopulated_harness.get_server_config("user-global", "filesystem")
+        fs_config = prepopulated_harness.get_server_config("user-mcp", "filesystem")
 
         # "Migrate" filesystem to project scope
         config = ServerConfig(
@@ -194,16 +194,16 @@ class TestComplexWorkflows:
         assert result.success
 
         # Remove from user scope
-        result = manager.remove_server("filesystem", "user-global", "claude-code")
+        result = manager.remove_server("filesystem", "user-mcp", "claude-code")
         assert result.success
 
         # Verify migration complete
         prepopulated_harness.assert_server_exists("project-mcp", "filesystem")
         with pytest.raises(AssertionError):
-            prepopulated_harness.assert_server_exists("user-global", "filesystem")
+            prepopulated_harness.assert_server_exists("user-mcp", "filesystem")
 
-        # GitHub server should still be in user-global
-        prepopulated_harness.assert_server_exists("user-global", "github")
+        # GitHub server should still be in user-mcp
+        prepopulated_harness.assert_server_exists("user-mcp", "github")
 
     def test_bulk_operations(self, mcp_manager_with_harness):
         """Test bulk adding and removing servers."""
@@ -258,18 +258,18 @@ class TestComplexWorkflows:
         config = ServerConfig(
             command="python", args=["-m", "test_server"], type="stdio"
         )
-        manager.add_server("test-server", config, "user-global", "claude-code")
+        manager.add_server("test-server", config, "user-mcp", "claude-code")
 
         # Try to add duplicate (should handle gracefully)
-        result = manager.add_server("test-server", config, "user-global", "claude-code")
+        result = manager.add_server("test-server", config, "user-mcp", "claude-code")
         # This might succeed (overwrite) or fail (duplicate check)
 
         # Try to remove non-existent server
-        result = manager.remove_server("nonexistent", "user-global", "claude-code")
+        result = manager.remove_server("nonexistent", "user-mcp", "claude-code")
         assert not result.success
 
         # Original server should still be there
-        harness.assert_server_exists("user-global", "test-server")
+        harness.assert_server_exists("user-mcp", "test-server")
 
         # Try to add to non-existent scope
         result = manager.add_server(

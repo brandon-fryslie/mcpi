@@ -1,7 +1,7 @@
 name: docker
 description: "PostgreSQL running in Docker container"
 server_id: postgres
-scope: user-global
+scope: user-mcp
 priority: high
 
 config:
@@ -37,6 +37,20 @@ prompts:
     type: port
     required: true
     default: "5432"
+
+# Template discovery metadata
+best_for:
+  - docker
+  - docker-compose
+  - containers
+  - containerized-databases
+
+keywords:
+  - docker
+  - compose
+  - postgresql
+  - database
+  - containers
 
 notes: |
   This template creates a PostgreSQL connection URL for Docker containers.

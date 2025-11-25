@@ -822,7 +822,7 @@ TO:
         writer=json_writer,
     )
 
-This makes user-internal work exactly like user-global: servers are MOVED
+This makes user-internal work exactly like user-mcp: servers are MOVED
 between files, not just tracked in a separate file.
 
 Traceability:

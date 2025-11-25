@@ -20,11 +20,14 @@ class TestClaudeCodePlugin:
 
     def test_initialize_scopes(self, plugin):
         """Test that all expected scopes are initialized."""
+        # NOTE: user-mcp scope was removed because ~/.claude/settings.json
+        # is NOT used for MCP servers by Claude Code. MCP servers are stored
+        # in ~/.claude.json (user-internal scope).
         expected_scopes = [
+            "plugin",  # Plugin-based MCP servers (read-only)
             "project-mcp",
             "project-local",
             "user-local",
-            "user-global",
             "user-internal",
             "user-mcp",
         ]
@@ -38,12 +41,13 @@ class TestClaudeCodePlugin:
 
         scope_priorities = {s.name: s.priority for s in scopes}
 
+        assert scope_priorities["plugin"] == 0  # Highest priority (read-only)
         assert scope_priorities["project-mcp"] == 1
         assert scope_priorities["project-local"] == 2
         assert scope_priorities["user-local"] == 3
-        assert scope_priorities["user-global"] == 4
-        assert scope_priorities["user-internal"] == 5
-        assert scope_priorities["user-mcp"] == 6
+        # user-mcp was removed (settings.json not used for MCP servers)
+        assert scope_priorities["user-internal"] == 4
+        assert scope_priorities["user-mcp"] == 5
 
     def test_scope_types(self, plugin):
         """Test that scopes are correctly categorized as user/project."""
@@ -57,8 +61,9 @@ class TestClaudeCodePlugin:
         assert "project-local" in project_names
 
         user_names = [s.name for s in user_scopes]
+        assert "plugin" in user_names  # Plugin scope is user-level
         assert "user-local" in user_names
-        assert "user-global" in user_names
+        # user-mcp was removed (settings.json not used for MCP servers)
         assert "user-internal" in user_names
         assert "user-mcp" in user_names
 
@@ -76,8 +81,10 @@ class TestClaudeCodePlugin:
         scopes = plugin.get_scopes()
         user_scopes = [s.name for s in scopes if s.is_user_level]
 
+        assert "plugin" in user_scopes  # Plugin scope is user-level
         assert "user-local" in user_scopes
-        assert "user-global" in user_scopes
+        # user-mcp was removed (settings.json not used for MCP servers)
+        assert "user-internal" in user_scopes
         assert "user-mcp" in user_scopes
         assert "project-mcp" not in user_scopes
 
@@ -393,3 +400,130 @@ class TestClaudeCodePlugin:
         # Verify it's disabled
         state_after = plugin.get_server_state("test-server")
         assert state_after == ServerState.DISABLED
+
+    def test_get_server_state_unapproved(self, plugin, mcp_harness):
+        """Test getting state of unapproved server in project-mcp scope.
+
+        Servers in .mcp.json that haven't been through Claude's approval process
+        (not in enabledMcpjsonServers or disabledMcpjsonServers) should be UNAPPROVED.
+        """
+        # Prepopulate server in project-mcp (active file)
+        # Servers in the active file are ENABLED by default
+        mcp_harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "test-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                    }
+                }
+            },
+        )
+
+        # With file-move mechanism, servers in active file are ENABLED
+        state = plugin.get_server_state("test-server")
+        assert state == ServerState.ENABLED
+
+    def test_project_mcp_server_in_active_file_is_enabled(self, plugin, mcp_harness):
+        """Test that a server in the active .mcp.json file shows as ENABLED."""
+        # Prepopulate server in project-mcp (active file)
+        mcp_harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "active-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                    }
+                }
+            },
+        )
+
+        state = plugin.get_server_state("active-server")
+        assert state == ServerState.ENABLED
+
+    def test_enable_disabled_server(self, plugin, mcp_harness):
+        """Test enabling a DISABLED server moves it from disabled to active file.
+
+        With file-move mechanism, enabling moves the server config from
+        .mcp.disabled.json to .mcp.json.
+        """
+        # Prepopulate empty active file (required for scope to exist)
+        mcp_harness.prepopulate_file(
+            "project-mcp",
+            {"mcpServers": {}},
+        )
+
+        # Prepopulate server in disabled file
+        mcp_harness.prepopulate_file(
+            "project-mcp-disabled",
+            {
+                "mcpServers": {
+                    "disabled-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                    }
+                }
+            },
+        )
+
+        # Verify it starts as DISABLED
+        state_before = plugin.get_server_state("disabled-server")
+        assert state_before == ServerState.DISABLED
+
+        # Enable it
+        result = plugin.enable_server("disabled-server", "project-mcp")
+
+        assert result.success
+        assert "enabled" in result.message.lower()
+
+        # Verify it's now ENABLED
+        state_after = plugin.get_server_state("disabled-server")
+        assert state_after == ServerState.ENABLED
+
+    def test_project_mcp_enabled_server(self, plugin, mcp_harness):
+        """Test that a server in the active project-mcp file shows as ENABLED."""
+        # Prepopulate server in project-mcp (active file)
+        mcp_harness.prepopulate_file(
+            "project-mcp",
+            {
+                "mcpServers": {
+                    "enabled-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                    }
+                }
+            },
+        )
+
+        state = plugin.get_server_state("enabled-server")
+        assert state == ServerState.ENABLED
+
+    def test_project_mcp_disabled_server(self, plugin, mcp_harness):
+        """Test that a server in the disabled file shows as DISABLED.
+
+        With file-move mechanism, disabled servers are stored in .mcp.disabled.json
+        instead of using approval arrays in settings.local.json.
+        """
+        # Prepopulate empty active file (required for scope to exist)
+        mcp_harness.prepopulate_file(
+            "project-mcp",
+            {"mcpServers": {}},
+        )
+
+        # Prepopulate server in disabled file (not active file)
+        mcp_harness.prepopulate_file(
+            "project-mcp-disabled",
+            {
+                "mcpServers": {
+                    "disabled-server": {
+                        "command": "python",
+                        "args": ["-m", "test_server"],
+                    }
+                }
+            },
+        )
+
+        state = plugin.get_server_state("disabled-server")
+        assert state == ServerState.DISABLED

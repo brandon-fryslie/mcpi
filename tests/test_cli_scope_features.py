@@ -87,7 +87,7 @@ class TestDynamicScopeType:
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
             {"name": "user-internal"},
-            {"name": "user-global"},
+            {"name": "user-mcp"},
             {"name": "project-mcp"},
         ]
 
@@ -100,7 +100,7 @@ class TestDynamicScopeType:
         completion_values = [c.value for c in completions]
 
         assert "user-internal" in completion_values
-        assert "user-global" in completion_values
+        assert "user-mcp" in completion_values
         assert "project-mcp" not in completion_values  # Doesn't start with "user"
 
     def test_shell_complete_fallback(self):

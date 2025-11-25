@@ -30,7 +30,7 @@ class TestRescopeAggressiveSingleScope:
     """Test rescope when server exists in single scope."""
 
     def test_rescope_from_user_global_to_project_mcp(self, mcp_manager_with_harness):
-        """Test moving server from user-global to project-mcp scope.
+        """Test moving server from user-mcp to project-mcp scope.
 
         This test cannot be gamed because:
         1. Uses real file operations via harness
@@ -41,17 +41,17 @@ class TestRescopeAggressiveSingleScope:
         manager, harness = mcp_manager_with_harness
         runner = CliRunner()
 
-        # Setup: Server in user-global scope
+        # Setup: Server in user-mcp scope
         config = ServerConfig(
             command="npx",
             args=["-y", "@modelcontextprotocol/server-filesystem"],
             type="stdio",
         )
-        result = manager.add_server("filesystem", config, "user-global", "claude-code")
+        result = manager.add_server("filesystem", config, "user-mcp", "claude-code")
         assert result.success
 
         # Verify initial state
-        harness.assert_server_exists("user-global", "filesystem")
+        harness.assert_server_exists("user-mcp", "filesystem")
         assert harness.count_servers_in_scope("project-mcp") == 0
 
         # Execute rescope
@@ -68,7 +68,7 @@ class TestRescopeAggressiveSingleScope:
         harness.assert_server_exists("project-mcp", "filesystem")
 
         # Verify server removed from source
-        user_global_content = harness.read_scope_file("user-global")
+        user_global_content = harness.read_scope_file("user-mcp")
         if user_global_content and "mcpServers" in user_global_content:
             assert (
                 "filesystem" not in user_global_content["mcpServers"]
@@ -132,12 +132,12 @@ class TestRescopeAggressiveMultiScope:
         # Setup: Add same server to 3 different scopes
         config = ServerConfig(command="node", args=["server.js"], type="stdio")
 
-        manager.add_server("multi-scope", config, "user-global", "claude-code")
+        manager.add_server("multi-scope", config, "user-mcp", "claude-code")
         manager.add_server("multi-scope", config, "project-mcp", "claude-code")
         manager.add_server("multi-scope", config, "user-internal", "claude-code")
 
         # Verify initial state
-        harness.assert_server_exists("user-global", "multi-scope")
+        harness.assert_server_exists("user-mcp", "multi-scope")
         harness.assert_server_exists("project-mcp", "multi-scope")
         harness.assert_server_exists("user-internal", "multi-scope")
 
@@ -155,7 +155,7 @@ class TestRescopeAggressiveMultiScope:
         harness.assert_server_exists("user-mcp", "multi-scope")
 
         # Verify server removed from ALL previous scopes
-        for scope in ["user-global", "project-mcp", "user-internal"]:
+        for scope in ["user-mcp", "project-mcp", "user-internal"]:
             content = harness.read_scope_file(scope)
             if content and "mcpServers" in content:
                 assert (
@@ -176,12 +176,12 @@ class TestRescopeAggressiveMultiScope:
 
         # Setup: Server in 3 scopes
         config = ServerConfig(command="npx", args=["pkg"], type="stdio")
-        manager.add_server("overlap-test", config, "user-global", "claude-code")
+        manager.add_server("overlap-test", config, "user-mcp", "claude-code")
         manager.add_server("overlap-test", config, "project-mcp", "claude-code")
         manager.add_server("overlap-test", config, "user-mcp", "claude-code")
 
         # Verify initial state
-        harness.assert_server_exists("user-global", "overlap-test")
+        harness.assert_server_exists("user-mcp", "overlap-test")
         harness.assert_server_exists("project-mcp", "overlap-test")
         harness.assert_server_exists("user-mcp", "overlap-test")
 
@@ -199,7 +199,7 @@ class TestRescopeAggressiveMultiScope:
         harness.assert_server_exists("project-mcp", "overlap-test")
 
         # Verify removed from other scopes
-        for scope in ["user-global", "user-mcp"]:
+        for scope in ["user-mcp", "user-mcp"]:
             content = harness.read_scope_file(scope)
             if content and "mcpServers" in content:
                 assert "overlap-test" not in content["mcpServers"]
@@ -250,7 +250,7 @@ class TestRescopeAggressiveErrorHandling:
 
         # Setup: Server exists in a scope
         config = ServerConfig(command="node", args=["test.js"], type="stdio")
-        manager.add_server("test-server", config, "user-global", "claude-code")
+        manager.add_server("test-server", config, "user-mcp", "claude-code")
 
         # Try to rescope to invalid scope
         result = runner.invoke(
@@ -268,7 +268,7 @@ class TestRescopeAggressiveErrorHandling:
         )
 
         # CRITICAL VERIFICATION: Source unchanged
-        harness.assert_server_exists("user-global", "test-server")
+        harness.assert_server_exists("user-mcp", "test-server")
 
     def test_rescope_idempotent_when_server_already_in_both_scopes(
         self, mcp_manager_with_harness
@@ -276,9 +276,9 @@ class TestRescopeAggressiveErrorHandling:
         """Test idempotent behavior when server exists in source and destination.
 
         This test verifies the AGGRESSIVE rescope behavior:
-        1. Server exists in both user-global and project-mcp
+        1. Server exists in both user-mcp and project-mcp
         2. Rescope to project-mcp (already exists there)
-        3. Rescope should remove from user-global, keep in project-mcp
+        3. Rescope should remove from user-mcp, keep in project-mcp
         4. Result: Server ONLY in project-mcp
 
         This test cannot be gamed because:
@@ -292,16 +292,16 @@ class TestRescopeAggressiveErrorHandling:
 
         # Setup: Server in source scope
         config = ServerConfig(command="node", args=["app.js"], type="stdio")
-        manager.add_server("rollback-test", config, "user-global", "claude-code")
+        manager.add_server("rollback-test", config, "user-mcp", "claude-code")
 
         # Verify server was added
-        harness.assert_server_exists("user-global", "rollback-test")
+        harness.assert_server_exists("user-mcp", "rollback-test")
 
         # Also add to destination scope (simulating server already exists)
         manager.add_server("rollback-test", config, "project-mcp", "claude-code")
 
         # Verify server in both scopes
-        harness.assert_server_exists("user-global", "rollback-test")
+        harness.assert_server_exists("user-mcp", "rollback-test")
         harness.assert_server_exists("project-mcp", "rollback-test")
 
         # Try to rescope to project-mcp (idempotent - already exists in destination)
@@ -320,11 +320,11 @@ class TestRescopeAggressiveErrorHandling:
         # CRITICAL VERIFICATION: Server REMOVED from source (AGGRESSIVE behavior)
         # When rescope is idempotent (server already in destination), it still
         # removes from all OTHER scopes per OPTION A AGGRESSIVE specification
-        user_global_content = harness.read_scope_file("user-global")
+        user_global_content = harness.read_scope_file("user-mcp")
         if user_global_content and "mcpServers" in user_global_content:
             assert (
                 "rollback-test" not in user_global_content["mcpServers"]
-            ), "Server should be removed from user-global after idempotent rescope"
+            ), "Server should be removed from user-mcp after idempotent rescope"
 
 
 class TestRescopeAggressiveDryRun:
@@ -342,12 +342,12 @@ class TestRescopeAggressiveDryRun:
         manager, harness = mcp_manager_with_harness
         runner = CliRunner()
 
-        # Setup: Server in user-global
+        # Setup: Server in user-mcp
         config = ServerConfig(command="npx", args=["pkg"], type="stdio")
-        manager.add_server("dry-run-test", config, "user-global", "claude-code")
+        manager.add_server("dry-run-test", config, "user-mcp", "claude-code")
 
         # Capture initial state
-        initial_user_global = harness.read_scope_file("user-global")
+        initial_user_global = harness.read_scope_file("user-mcp")
         initial_project_mcp = harness.read_scope_file("project-mcp")
 
         # Execute dry-run
@@ -364,7 +364,7 @@ class TestRescopeAggressiveDryRun:
         assert "would" in result.output.lower() or "dry" in result.output.lower()
 
         # CRITICAL: Verify NO changes made
-        final_user_global = harness.read_scope_file("user-global")
+        final_user_global = harness.read_scope_file("user-mcp")
         final_project_mcp = harness.read_scope_file("project-mcp")
 
         assert initial_user_global == final_user_global, "Dry-run modified source"
@@ -384,14 +384,14 @@ class TestRescopeAggressiveDryRun:
 
         # Setup: Server in 3 scopes
         config = ServerConfig(command="node", args=["srv.js"], type="stdio")
-        manager.add_server("multi-dry", config, "user-global", "claude-code")
+        manager.add_server("multi-dry", config, "user-mcp", "claude-code")
         manager.add_server("multi-dry", config, "project-mcp", "claude-code")
         manager.add_server("multi-dry", config, "user-internal", "claude-code")
 
         # Capture initial states
         initial_states = {
             scope: harness.read_scope_file(scope)
-            for scope in ["user-global", "project-mcp", "user-internal", "user-mcp"]
+            for scope in ["user-mcp", "project-mcp", "user-internal", "user-mcp"]
         }
 
         # Execute dry-run
@@ -408,7 +408,7 @@ class TestRescopeAggressiveDryRun:
         assert "would" in result.output.lower() or "dry" in result.output.lower()
 
         # CRITICAL: Verify NO changes made to ANY scope
-        for scope in ["user-global", "project-mcp", "user-internal", "user-mcp"]:
+        for scope in ["user-mcp", "project-mcp", "user-internal", "user-mcp"]:
             final_state = harness.read_scope_file(scope)
             assert (
                 initial_states[scope] == final_state

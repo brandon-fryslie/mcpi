@@ -132,7 +132,7 @@ class TestP0_2_GetServerConfigAPI:
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
         # Get a real scope handler
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # CRITICAL CHECK: Method must exist
         assert hasattr(
@@ -175,7 +175,7 @@ class TestP0_2_GetServerConfigAPI:
         """
         # Create real plugin with test file paths
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Call the API method
         server_config = scope_handler.get_server_config("filesystem")
@@ -205,7 +205,7 @@ class TestP0_2_GetServerConfigAPI:
         # VALIDATION 4: Compare to actual file contents (ANTI-GAMING)
         # Read the file directly using test harness (independent of implementation)
         file_content = prepopulated_harness.get_server_config(
-            "user-global", "filesystem"
+            "user-mcp", "filesystem"
         )
 
         assert server_config == file_content, (
@@ -235,7 +235,7 @@ class TestP0_2_GetServerConfigAPI:
         - Cannot pass by returning None or empty dict
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Attempt to get config for non-existent server
         with pytest.raises(Exception) as exc_info:
@@ -256,7 +256,7 @@ class TestP0_2_GetServerConfigAPI:
         Priority: HIGH
 
         VALIDATION:
-        - Works for user-global scope (Claude settings.json format)
+        - Works for user-mcp scope (Claude settings.json format)
         - Works for project-mcp scope (.mcp.json format)
         - Works for user-internal scope (.claude.json format)
         - Returns consistent data structure across scopes
@@ -270,16 +270,16 @@ class TestP0_2_GetServerConfigAPI:
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
-        # TEST 1: user-global scope (settings.json: {"mcpEnabled": true, "mcpServers": {...}})
-        user_global = plugin.get_scope_handler("user-global")
+        # TEST 1: user-mcp scope (settings.json: {"mcpEnabled": true, "mcpServers": {...}})
+        user_global = plugin.get_scope_handler("user-mcp")
         fs_config = user_global.get_server_config("filesystem")
 
         assert (
             fs_config["command"] == "npx"
-        ), "user-global scope: get_server_config returned wrong command"
+        ), "user-mcp scope: get_server_config returned wrong command"
         assert isinstance(
             fs_config["args"], list
-        ), "user-global scope: args should be list"
+        ), "user-mcp scope: args should be list"
 
         # TEST 2: project-mcp scope (.mcp.json: {"mcpServers": {...}})
         project_mcp = plugin.get_scope_handler("project-mcp")
@@ -328,7 +328,7 @@ class TestP0_2_GetServerConfigAPI:
         - Compares to actual file contents
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Get config for github server (has env vars)
         github_config = scope_handler.get_server_config("github")
@@ -345,7 +345,7 @@ class TestP0_2_GetServerConfigAPI:
         ), "args should contain github package"
 
         # Compare to file contents (ANTI-GAMING)
-        file_content = prepopulated_harness.get_server_config("user-global", "github")
+        file_content = prepopulated_harness.get_server_config("user-mcp", "github")
         assert (
             github_config == file_content
         ), "get_server_config should return exact file contents for complex configs"
@@ -508,7 +508,7 @@ class TestP0_4_ScopeOperations:
         """
         # Setup: Create plugin with test paths
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Verify file doesn't have our test server initially
         initial_servers = scope_handler.get_servers()
@@ -548,7 +548,7 @@ class TestP0_4_ScopeOperations:
         ), "Added server env should match"
 
         # VALIDATION 4: File on disk is updated (ANTI-GAMING)
-        file_content = mcp_harness.read_scope_file("user-global")
+        file_content = mcp_harness.read_scope_file("user-mcp")
         assert (
             "test-new-server" in file_content["mcpServers"]
         ), "Server should be in actual file on disk"
@@ -577,7 +577,7 @@ class TestP0_4_ScopeOperations:
         """
         # Setup: Use prepopulated harness with known servers
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Verify server exists initially
         initial_servers = scope_handler.get_servers()
@@ -600,7 +600,7 @@ class TestP0_4_ScopeOperations:
         assert "github" in updated_servers, "Other servers should remain after remove"
 
         # VALIDATION 4: File on disk is updated (ANTI-GAMING)
-        file_content = prepopulated_harness.read_scope_file("user-global")
+        file_content = prepopulated_harness.read_scope_file("user-mcp")
         assert (
             "filesystem" not in file_content["mcpServers"]
         ), "Server should not be in actual file on disk"
@@ -689,7 +689,7 @@ class TestP1_1_RescopeFeature_TDD:
         # Setup: Ensure source scope has the server
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
         source_scope = plugin.get_scope_handler("project-mcp")
-        dest_scope = plugin.get_scope_handler("user-global")
+        dest_scope = plugin.get_scope_handler("user-mcp")
 
         # Verify initial state
         source_servers_before = source_scope.get_servers()
@@ -715,7 +715,7 @@ class TestP1_1_RescopeFeature_TDD:
                 "--from",
                 "project-mcp",
                 "--to",
-                "user-global",
+                "user-mcp",
             ],
             capture_output=True,
             text=True,
@@ -749,7 +749,7 @@ class TestP1_1_RescopeFeature_TDD:
 
         # VALIDATION 5: Files on disk updated (ANTI-GAMING)
         source_file = prepopulated_harness.read_scope_file("project-mcp")
-        dest_file = prepopulated_harness.read_scope_file("user-global")
+        dest_file = prepopulated_harness.read_scope_file("user-mcp")
 
         assert "project-tool" not in source_file.get(
             "mcpServers", {}
@@ -781,7 +781,7 @@ class TestP1_1_RescopeFeature_TDD:
         """
         # Setup: Use github server (has env vars)
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        source_scope = plugin.get_scope_handler("user-global")
+        source_scope = plugin.get_scope_handler("user-mcp")
         dest_scope = plugin.get_scope_handler("project-mcp")
 
         # Get original config
@@ -800,7 +800,7 @@ class TestP1_1_RescopeFeature_TDD:
                 "rescope",
                 "github",
                 "--from",
-                "user-global",
+                "user-mcp",
                 "--to",
                 "project-mcp",
             ],
@@ -856,7 +856,7 @@ class TestP1_1_RescopeFeature_TDD:
         """
         # Setup
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        source_scope = plugin.get_scope_handler("user-global")
+        source_scope = plugin.get_scope_handler("user-mcp")
 
         # Get servers before operation
         servers_before = source_scope.get_servers()
@@ -869,7 +869,7 @@ class TestP1_1_RescopeFeature_TDD:
                 "rescope",
                 "filesystem",
                 "--from",
-                "user-global",
+                "user-mcp",
                 "--to",
                 "invalid-scope-name",
             ],
@@ -893,7 +893,7 @@ class TestP1_1_RescopeFeature_TDD:
         ), "Server should remain in source after failed rescope"
 
         # VALIDATION 4: File on disk unchanged
-        file_content = prepopulated_harness.read_scope_file("user-global")
+        file_content = prepopulated_harness.read_scope_file("user-mcp")
         assert (
             "filesystem" in file_content["mcpServers"]
         ), "Source file should be unchanged after failed rescope"

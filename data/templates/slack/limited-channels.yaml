@@ -1,7 +1,7 @@
 name: limited-channels
 description: "Slack bot with access restricted to specific channels"
 server_id: slack
-scope: user-global
+scope: user-mcp
 priority: medium
 
 config:

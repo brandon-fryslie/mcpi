@@ -1,7 +1,7 @@
 name: custom-directories
 description: "Access to multiple custom directories (advanced)"
 server_id: filesystem
-scope: user-global
+scope: user-mcp
 priority: low
 
 config:

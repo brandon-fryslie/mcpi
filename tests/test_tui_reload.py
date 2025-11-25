@@ -76,7 +76,7 @@ class TestReloadServerListFunction:
         )
 
         # Create REAL plugin with path overrides
-        path_overrides = {"user-global": test_config_path}
+        path_overrides = {"user-mcp": test_config_path}
         real_plugin = ClaudeCodePlugin(path_overrides=path_overrides)
 
         # Create REAL registry and manager
@@ -155,7 +155,7 @@ class TestReloadServerListFunction:
         )
 
         # Create REAL objects
-        real_plugin = ClaudeCodePlugin(path_overrides={"user-global": test_config})
+        real_plugin = ClaudeCodePlugin(path_overrides={"user-mcp": test_config})
         registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
@@ -257,7 +257,7 @@ class TestReloadServerListFunction:
 
         # Create REAL plugin with multiple scopes
         path_overrides = {
-            "user-global": enabled_config,
+            "user-mcp": enabled_config,
             "user-local": disabled_config,
         }
         real_plugin = ClaudeCodePlugin(path_overrides=path_overrides)
@@ -624,7 +624,7 @@ class TestFzfIntegrationWithReload:
         config_file.write_text(json.dumps({"mcpEnabled": True, "mcpServers": {}}))
 
         # Create REAL plugin and manager
-        real_plugin = ClaudeCodePlugin(path_overrides={"user-global": config_file})
+        real_plugin = ClaudeCodePlugin(path_overrides={"user-mcp": config_file})
         registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 
@@ -651,7 +651,7 @@ class TestFzfIntegrationWithReload:
             args=["-y", "test"],
             type="stdio",
         )
-        result = real_manager.add_server("test-server", config, "user-global")
+        result = real_manager.add_server("test-server", config, "user-mcp")
         assert result.success, f"Add operation should succeed: {result.message}"
 
         # Verify file was actually written
@@ -724,7 +724,7 @@ class TestReloadEdgeCases:
         config_file.write_text("{invalid json")
 
         # Create plugin that will encounter the corrupted file
-        real_plugin = ClaudeCodePlugin(path_overrides={"user-global": config_file})
+        real_plugin = ClaudeCodePlugin(path_overrides={"user-mcp": config_file})
         registry = ClientRegistry(auto_discover=False)
         registry.inject_client_instance("claude-code", real_plugin)
 

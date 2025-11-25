@@ -1,7 +1,7 @@
 name: read-only
 description: "Read-only access to GitHub repositories"
 server_id: github
-scope: user-global
+scope: user-mcp
 priority: medium
 
 config:

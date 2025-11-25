@@ -33,7 +33,7 @@ class TestTemplateManager:
             "name": "production",
             "description": "Production PostgreSQL setup",
             "server_id": "postgres",
-            "scope": "user-global",
+            "scope": "user-mcp",
             "priority": "high",
             "config": {
                 "command": "npx",
@@ -102,7 +102,7 @@ class TestTemplateManager:
                 "name": "default",
                 "description": f"Default {server_id} setup",
                 "server_id": server_id,
-                "scope": "user-global",
+                "scope": "user-mcp",
                 "priority": "medium",
                 "config": {"command": "npx", "args": ["-y", f"@mcp/{server_id}"]},
             }
@@ -220,7 +220,7 @@ class TestTemplateManager:
                 "name": name,
                 "description": f"{name} setup",
                 "server_id": "postgres",
-                "scope": "user-global",
+                "scope": "user-mcp",
                 "priority": priority,
                 "config": {"command": "npx", "args": []},
             }
@@ -263,7 +263,7 @@ class TestTemplateManager:
             name="basic",
             description="Basic setup",
             server_id="github",
-            scope="user-global",
+            scope="user-mcp",
             priority="low",
             config={
                 "command": "npx",
@@ -285,7 +285,7 @@ class TestTemplateManager:
             name="production",
             description="Production setup",
             server_id="postgres",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={
                 "command": "npx",
@@ -326,7 +326,7 @@ class TestTemplateManager:
             name="custom",
             description="Custom setup",
             server_id="test",
-            scope="user-global",
+            scope="user-mcp",
             priority="medium",
             config={
                 "command": "npx",
@@ -347,7 +347,7 @@ class TestTemplateManager:
             name="sse",
             description="SSE setup",
             server_id="test",
-            scope="user-global",
+            scope="user-mcp",
             priority="low",
             config={
                 "command": "npx",

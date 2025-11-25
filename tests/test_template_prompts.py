@@ -226,7 +226,7 @@ class TestCollectTemplateValues:
             name="simple",
             description="Simple template",
             server_id="test",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={"command": "npx", "args": ["test"]},
             prompts=[],
@@ -241,7 +241,7 @@ class TestCollectTemplateValues:
             name="test",
             description="Test template",
             server_id="test",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={"command": "npx", "args": ["test"]},
             prompts=[
@@ -265,7 +265,7 @@ class TestCollectTemplateValues:
             name="test",
             description="Test template",
             server_id="postgres",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={"command": "npx", "args": ["test"]},
             prompts=[
@@ -303,7 +303,7 @@ class TestCollectTemplateValues:
             name="test",
             description="Test template",
             server_id="test",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={"command": "npx", "args": ["test"]},
             prompts=[
@@ -326,7 +326,7 @@ class TestCollectTemplateValues:
             name="production",
             description="Production setup",
             server_id="postgres",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={"command": "npx", "args": ["test"]},
             prompts=[

@@ -1,7 +1,7 @@
 name: user-documents
 description: "Access to user's Documents directory"
 server_id: filesystem
-scope: user-global
+scope: user-mcp
 priority: medium
 
 config:

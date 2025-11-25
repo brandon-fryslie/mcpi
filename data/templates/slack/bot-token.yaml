@@ -1,7 +1,7 @@
 name: bot-token
 description: "Slack bot with access to all public channels"
 server_id: slack
-scope: user-global
+scope: user-mcp
 priority: high
 
 config:

@@ -352,7 +352,7 @@ class TestCatalogManagerSearchAll:
         create_test_catalog_file(
             official_path,
             {
-                "filesystem": {
+                "@anthropic/filesystem": {
                     "description": "File system access",
                     "command": "npx",
                     "args": [],
@@ -364,12 +364,12 @@ class TestCatalogManagerSearchAll:
         create_test_catalog_file(local_path, {})
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
-        results = manager.search_all("filesystem")
+        results = manager.search_all("@anthropic/filesystem")
 
         assert len(results) == 1
         catalog_name, server_id, server = results[0]
         assert catalog_name == "official"
-        assert server_id == "filesystem"
+        assert server_id == "@anthropic/filesystem"
 
     def test_search_all_local_only(self, tmp_path: Path):
         """Finds server in local catalog."""
@@ -406,14 +406,14 @@ class TestCatalogManagerSearchAll:
         create_test_catalog_file(
             official_path,
             {
-                "filesystem": {
+                "@anthropic/filesystem": {
                     "description": "File system access",
                     "command": "npx",
                     "args": [],
                     "repository": None,
                     "categories": [],
                 },
-                "github": {
+                "modelcontextprotocol/github": {
                     "description": "GitHub integration",
                     "command": "npx",
                     "args": [],
@@ -455,8 +455,8 @@ class TestCatalogManagerSearchAll:
         assert results[3][0] == "local"
 
         # Verify alphabetical within each catalog
-        assert results[0][1] == "filesystem"  # f before g
-        assert results[1][1] == "github"
+        assert results[0][1] == "@anthropic/filesystem"  # f before g
+        assert results[1][1] == "modelcontextprotocol/github"
         assert results[2][1] == "api"  # a before d
         assert results[3][1] == "database"
 
@@ -469,7 +469,7 @@ class TestCatalogManagerSearchAll:
         create_test_catalog_file(
             official_path,
             {
-                "filesystem": {
+                "@anthropic/filesystem": {
                     "description": "Official filesystem",
                     "command": "npx",
                     "args": [],
@@ -481,7 +481,7 @@ class TestCatalogManagerSearchAll:
         create_test_catalog_file(
             local_path,
             {
-                "filesystem": {
+                "@anthropic/filesystem": {
                     "description": "Custom filesystem",
                     "command": "python",
                     "args": [],
@@ -492,14 +492,14 @@ class TestCatalogManagerSearchAll:
         )
 
         manager = CatalogManager(official_path=official_path, local_path=local_path)
-        results = manager.search_all("filesystem")
+        results = manager.search_all("@anthropic/filesystem")
 
         # Should get BOTH entries
         assert len(results) == 2
         assert results[0][0] == "official"  # Official first
-        assert results[0][1] == "filesystem"
+        assert results[0][1] == "@anthropic/filesystem"
         assert results[1][0] == "local"  # Then local
-        assert results[1][1] == "filesystem"
+        assert results[1][1] == "@anthropic/filesystem"
 
     def test_search_all_empty(self, tmp_path: Path):
         """Returns empty list when no matches."""
@@ -722,6 +722,6 @@ class TestWithRealProductionCatalog:
         assert len(servers) > 0
 
         # Search should work
-        results = manager.search_all("filesystem")
+        results = manager.search_all("@anthropic/filesystem")
         # Most catalogs have filesystem server
         assert len(results) >= 0  # Don't hardcode expectation

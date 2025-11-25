@@ -416,10 +416,10 @@ class TestContextAwareServerCompletion:
 
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            "client/user-global/server1": ServerInfo(
+            "client/user-mcp/server1": ServerInfo(
                 id="server1",
                 client="claude-code",
-                scope="user-global",
+                scope="user-mcp",
                 config={},
                 state=ServerState.ENABLED,
             ),
@@ -430,10 +430,10 @@ class TestContextAwareServerCompletion:
                 config={},
                 state=ServerState.ENABLED,
             ),
-            "client/user-global/server2": ServerInfo(
+            "client/user-mcp/server2": ServerInfo(
                 id="server2",
                 client="claude-code",
-                scope="user-global",
+                scope="user-mcp",
                 config={},
                 state=ServerState.ENABLED,
             ),
@@ -451,13 +451,13 @@ class TestContextAwareServerCompletion:
         # Check that the help text contains the key information (ignoring color codes for testing)
         server1_helps = [c.help for c in completions if c.value == "server1"]
         assert len(server1_helps) == 2
-        assert any("user-global" in h for h in server1_helps)
+        assert any("user-mcp" in h for h in server1_helps)
         assert any("project-mcp" in h for h in server1_helps)
 
         # server2 should appear once with its scope
         server2_helps = [c.help for c in completions if c.value == "server2"]
         assert len(server2_helps) == 1
-        assert "user-global" in server2_helps[0]
+        assert "user-mcp" in server2_helps[0]
 
         # Verify total count
         assert len(completions) == 3
@@ -477,10 +477,10 @@ class TestContextAwareServerCompletion:
 
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            "client/user-global/disabled-server": ServerInfo(
+            "client/user-mcp/disabled-server": ServerInfo(
                 id="disabled-server",
                 client="claude-code",
-                scope="user-global",
+                scope="user-mcp",
                 config={},
                 state=ServerState.DISABLED,
             ),
@@ -498,7 +498,7 @@ class TestContextAwareServerCompletion:
         assert completions[0].value == "disabled-server"
         # Check for key content in help text (ignoring color codes)
         assert "disabled-server" in completions[0].help
-        assert "user-global" in completions[0].help
+        assert "user-mcp" in completions[0].help
         assert "disabled" in completions[0].help
 
 
@@ -1011,8 +1011,8 @@ class TestRescopeCompletion:
     def test_rescope_server_name_completion_from_source_scope(self):
         """Test that server name completes with servers from --from scope.
 
-        Workflow: User types `mcpi rescope --to project-mcp --from user-global <TAB>`
-        Expected: Shows only servers that exist in user-global scope
+        Workflow: User types `mcpi rescope --to project-mcp --from user-mcp <TAB>`
+        Expected: Shows only servers that exist in user-mcp scope
 
         This test is un-gameable because:
         - Must query actual servers in specified source scope
@@ -1024,7 +1024,7 @@ class TestRescopeCompletion:
         # Setup: Mock manager with servers in different scopes
         mock_manager = Mock()
         mock_manager.list_servers.return_value = {
-            "server-in-user-global": Mock(state=ServerState.ENABLED),
+            "server-in-user-mcp": Mock(state=ServerState.ENABLED),
             "another-server": Mock(state=ServerState.ENABLED),
         }
         mock_manager.get_default_client.return_value = "claude-code"
@@ -1034,7 +1034,7 @@ class TestRescopeCompletion:
         mock_ctx.obj = {"mcp_manager": mock_manager}
         mock_ctx.params = {
             "to_scope": "project-mcp",
-            "from_scope": "user-global",
+            "from_scope": "user-mcp",
             "client": "claude-code",
         }
 
@@ -1043,19 +1043,19 @@ class TestRescopeCompletion:
 
         # Verify completion calls list_servers with correct scope
         mock_manager.list_servers.assert_called_with(
-            client="claude-code", scope="user-global"
+            client="claude-code", scope="user-mcp"
         )
 
         # Verify returns servers from that scope
         completion_values = [c.value for c in completions]
-        assert "server-in-user-global" in completion_values
+        assert "server-in-user-mcp" in completion_values
         assert "another-server" in completion_values
 
     def test_rescope_to_scope_excludes_from_scope(self):
         """Test that --to completion excludes the --from scope.
 
-        Workflow: User types `mcpi rescope server1 --from user-global --to <TAB>`
-        Expected: Shows all scopes EXCEPT user-global (can't rescope to same scope)
+        Workflow: User types `mcpi rescope server1 --from user-mcp --to <TAB>`
+        Expected: Shows all scopes EXCEPT user-mcp (can't rescope to same scope)
 
         This test is un-gameable because:
         - Must filter out the source scope from results
@@ -1068,15 +1068,15 @@ class TestRescopeCompletion:
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
             {"name": "project-mcp", "priority": 1},
-            {"name": "user-global", "priority": 4},
+            {"name": "user-internal", "priority": 4},
             {"name": "user-local", "priority": 3},
-            {"name": "user-mcp", "priority": 6},
+            {"name": "user-mcp", "priority": 5},
         ]
 
-        # Create context where --from is already set to user-global
+        # Create context where --from is already set to user-mcp
         mock_ctx = Mock()
         mock_ctx.obj = {"mcp_manager": mock_manager}
-        mock_ctx.params = {"from_scope": "user-global", "client": "claude-code"}
+        mock_ctx.params = {"from_scope": "user-mcp", "client": "claude-code"}
 
         # Create mock param to indicate we're completing the --to parameter
         mock_param = Mock()
@@ -1088,16 +1088,13 @@ class TestRescopeCompletion:
 
         completion_values = [c.value for c in completions]
 
-        # Should include other scopes
+        # Should include other scopes (not user-mcp since that's the --from scope)
         assert "project-mcp" in completion_values
         assert "user-local" in completion_values
-        assert "user-mcp" in completion_values
+        assert "user-internal" in completion_values
 
         # Should NOT include the --from scope
-        assert (
-            "user-global" not in completion_values
-            or len([c for c in completions if c.value == "user-global"]) == 0
-        )
+        assert "user-mcp" not in completion_values
 
     def test_rescope_completion_with_no_from_scope_shows_all(self):
         """Test that without --from set, all scopes are shown.
@@ -1114,7 +1111,7 @@ class TestRescopeCompletion:
         mock_manager = Mock()
         mock_manager.get_scopes_for_client.return_value = [
             {"name": "project-mcp", "priority": 1},
-            {"name": "user-global", "priority": 4},
+            {"name": "user-mcp", "priority": 4},
             {"name": "user-local", "priority": 3},
         ]
 
@@ -1134,7 +1131,7 @@ class TestRescopeCompletion:
 
         # Should show all scopes when source unknown
         assert "project-mcp" in completion_values
-        assert "user-global" in completion_values
+        assert "user-mcp" in completion_values
         assert "user-local" in completion_values
 
     def test_rescope_without_scopes_shows_all_servers(self):

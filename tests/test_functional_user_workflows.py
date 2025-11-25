@@ -70,14 +70,14 @@ class TestServerLifecycleWorkflows:
         Priority: HIGHEST
 
         USER WORKFLOW:
-        1. User has servers installed in different scopes (project, user-global, etc.)
+        1. User has servers installed in different scopes (project, user-mcp, etc.)
         2. User wants to inspect a server's configuration (command, args, env, etc.)
         3. User calls get_server_config() via their chosen interface (CLI/API)
         4. System returns the full configuration object from the server's scope
         5. User validates configuration matches what they expect
 
         VALIDATION (what user observes):
-        - Can retrieve config from any scope (project-mcp, user-global, user-internal)
+        - Can retrieve config from any scope (project-mcp, user-mcp, user-internal)
         - Config contains expected fields (command, args, env, type, etc.)
         - Config matches actual file contents in that scope
         - Different scopes have different file formats (handled transparently)
@@ -114,8 +114,8 @@ class TestServerLifecycleWorkflows:
         ), "get_server_config() should match raw file"
 
         # TEST 2: User-global scope server (filesystem from settings.json)
-        user_global_scope = plugin.get_scope_handler("user-global")
-        global_config = user_global_scope.get_server_config("filesystem")
+        user_global_scope = plugin.get_scope_handler("user-mcp")
+        global_config = user_global_scope.get_server_config("@anthropic/filesystem")
 
         assert global_config["command"] == "npx", "Global server should use npx command"
         assert "@modelcontextprotocol/server-filesystem" in " ".join(
@@ -123,8 +123,8 @@ class TestServerLifecycleWorkflows:
         ), "Global server should have filesystem package"
 
         # Verify against raw file
-        raw_global_file = prepopulated_harness.read_scope_file("user-global")
-        raw_global_config = raw_global_file["mcpServers"]["filesystem"]
+        raw_global_file = prepopulated_harness.read_scope_file("user-mcp")
+        raw_global_config = raw_global_file["mcpServers"]["@anthropic/filesystem"]
         assert global_config == raw_global_config, "Config should match raw file"
 
         # TEST 3: User-internal scope server (internal-server from config.json)
@@ -153,7 +153,7 @@ class TestServerLifecycleWorkflows:
 
         USER WORKFLOW:
         1. User starts with empty MCP configuration
-        2. User adds a server to a scope (e.g., filesystem to user-global)
+        2. User adds a server to a scope (e.g., filesystem to user-mcp)
         3. User verifies server appears in listings
         4. User retrieves server configuration
         5. User removes the server
@@ -180,13 +180,13 @@ class TestServerLifecycleWorkflows:
         registry.inject_client_instance("claude-code", plugin)
         manager = MCPManager(registry=registry, default_client="claude-code")
 
-        # STEP 1: Verify starting with no servers in user-global
+        # STEP 1: Verify starting with no servers in user-mcp
         initial_servers = manager.list_servers("claude-code")
-        # All server IDs are qualified (e.g., 'claude-code:user-global:server-name')
+        # All server IDs are qualified (e.g., 'claude-code:user-mcp:server-name')
         user_global_servers = [
-            sid for sid in initial_servers.keys() if "user-global" in sid
+            sid for sid in initial_servers.keys() if "user-mcp" in sid
         ]
-        assert len(user_global_servers) == 0, "Should start with no user-global servers"
+        assert len(user_global_servers) == 0, "Should start with no user-mcp servers"
 
         # STEP 2: Add a server
         server_config = ServerConfig(
@@ -196,34 +196,34 @@ class TestServerLifecycleWorkflows:
         )
 
         add_result = manager.add_server(
-            "filesystem", server_config, "user-global", "claude-code"
+            "@anthropic/filesystem", server_config, "user-mcp", "claude-code"
         )
         assert add_result.success, f"Add operation failed: {add_result.message}"
 
         # STEP 3: Verify server appears in listings
         servers_after_add = manager.list_servers("claude-code")
         user_global_servers_after = [
-            sid for sid in servers_after_add.keys() if "user-global:filesystem" in sid
+            sid for sid in servers_after_add.keys() if "user-mcp:filesystem" in sid
         ]
         assert (
             len(user_global_servers_after) == 1
-        ), f"Should have 1 user-global server after add, found {len(user_global_servers_after)}"
+        ), f"Should have 1 user-mcp server after add, found {len(user_global_servers_after)}"
 
         # STEP 4: Verify file was actually created/modified
-        user_global_file = mcp_harness.read_scope_file("user-global")
+        user_global_file = mcp_harness.read_scope_file("user-mcp")
         assert user_global_file is not None, "User-global file should exist after add"
         assert "mcpServers" in user_global_file, "File should have mcpServers section"
         assert (
-            "filesystem" in user_global_file["mcpServers"]
+            "@anthropic/filesystem" in user_global_file["mcpServers"]
         ), "File should contain filesystem server"
-        file_config = user_global_file["mcpServers"]["filesystem"]
+        file_config = user_global_file["mcpServers"]["@anthropic/filesystem"]
         assert (
             file_config["command"] == server_config.command
         ), "File config should match added config"
 
         # STEP 5: Remove the server
         remove_result = manager.remove_server(
-            "filesystem", "user-global", "claude-code"
+            "@anthropic/filesystem", "user-mcp", "claude-code"
         )
         assert (
             remove_result.success
@@ -234,17 +234,17 @@ class TestServerLifecycleWorkflows:
         user_global_servers_final = [
             sid
             for sid in servers_after_remove.keys()
-            if "user-global:filesystem" in sid
+            if "user-mcp:filesystem" in sid
         ]
         assert (
             len(user_global_servers_final) == 0
-        ), "Should have no user-global servers after remove"
+        ), "Should have no user-mcp servers after remove"
 
         # STEP 7: Verify file was actually modified
-        user_global_file_final = mcp_harness.read_scope_file("user-global")
+        user_global_file_final = mcp_harness.read_scope_file("user-mcp")
         if user_global_file_final and "mcpServers" in user_global_file_final:
             assert (
-                "filesystem" not in user_global_file_final["mcpServers"]
+                "@anthropic/filesystem" not in user_global_file_final["mcpServers"]
             ), "File should not contain filesystem server after remove"
 
     def test_server_state_management_workflow(self, prepopulated_harness):
@@ -278,7 +278,7 @@ class TestServerLifecycleWorkflows:
 
         NOTE: Different scopes use different disable mechanisms:
         - project-mcp: inline 'disabled' field in server config
-        - user-global: file-move mechanism (disabled-mcp.json)
+        - user-mcp: file-move mechanism (disabled-mcp.json)
         - user-internal: file-move mechanism (.disabled-servers.json)
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
@@ -373,7 +373,7 @@ class TestMultiScopeWorkflows:
         Priority: MEDIUM
 
         USER WORKFLOW:
-        1. User has servers in multiple scopes (project-mcp, user-global, user-internal)
+        1. User has servers in multiple scopes (project-mcp, user-mcp, user-internal)
         2. User runs 'mcpi list' (or equivalent API call)
         3. System aggregates servers from all scopes
         4. User sees unified listing with scope information
@@ -403,11 +403,11 @@ class TestMultiScopeWorkflows:
 
         # User-global: filesystem, github
         assert any(
-            "filesystem" in sid for sid in server_ids
-        ), "Should have 'filesystem' from user-global scope"
+            "@anthropic/filesystem" in sid for sid in server_ids
+        ), "Should have '@anthropic/filesystem' from user-mcp scope"
         assert any(
-            "github" in sid for sid in server_ids
-        ), "Should have 'github' from user-global scope"
+            "modelcontextprotocol/github" in sid for sid in server_ids
+        ), "Should have 'modelcontextprotocol/github' from user-mcp scope"
 
         # Project-mcp: project-tool
         assert any(
@@ -422,7 +422,7 @@ class TestMultiScopeWorkflows:
         # Verify scope information is preserved
         for server_id, info in all_servers.items():
             # Server IDs should be qualified with scope
-            # E.g., 'claude-code:user-global:filesystem'
+            # E.g., 'claude-code:user-mcp:filesystem'
             assert ":" in server_id, f"Server ID should be qualified: {server_id}"
 
             # Verify info object has scope attribute
@@ -430,7 +430,7 @@ class TestMultiScopeWorkflows:
                 info, "scope"
             ), f"ServerInfo should have scope attribute for {server_id}"
             assert info.scope in [
-                "user-global",
+                "user-mcp",
                 "project-mcp",
                 "user-internal",
                 "project-local",

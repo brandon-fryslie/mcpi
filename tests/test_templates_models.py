@@ -237,7 +237,7 @@ class TestServerTemplate:
             name="production",
             description="Production setup",
             server_id="postgres",
-            scope="user-global",
+            scope="user-mcp",
             priority="high",
             config={
                 "command": "npx",
@@ -258,7 +258,7 @@ class TestServerTemplate:
         assert template.name == "production"
         assert template.description == "Production setup"
         assert template.server_id == "postgres"
-        assert template.scope == "user-global"
+        assert template.scope == "user-mcp"
         assert template.priority == "high"
         assert template.config["command"] == "npx"
         assert len(template.prompts) == 1
@@ -289,7 +289,7 @@ class TestServerTemplate:
                 name="invalid",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={
                     "args": ["test"],  # Missing command
@@ -304,7 +304,7 @@ class TestServerTemplate:
                 name="invalid",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={
                     "command": "npx",  # Missing args
@@ -319,7 +319,7 @@ class TestServerTemplate:
                 name="invalid",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={
                     "command": "npx",
@@ -335,7 +335,7 @@ class TestServerTemplate:
                 name="invalid",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={
                     "command": "npx",
@@ -352,7 +352,7 @@ class TestServerTemplate:
                 name="invalid",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="critical",  # Not valid priority
                 config={"command": "npx", "args": []},
             )
@@ -365,7 +365,7 @@ class TestServerTemplate:
                 name="",
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={"command": "npx", "args": []},
             )
@@ -378,7 +378,7 @@ class TestServerTemplate:
                 name="invalid name!",  # Space and exclamation not allowed
                 description="Invalid",
                 server_id="test",
-                scope="user-global",
+                scope="user-mcp",
                 priority="low",
                 config={"command": "npx", "args": []},
             )

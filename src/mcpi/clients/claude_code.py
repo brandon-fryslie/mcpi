@@ -6,9 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .base import MCPClientPlugin, ScopeHandler
 from .enable_disable_handlers import (
-    ApprovalRequiredEnableDisableHandler,
     ArrayBasedEnableDisableHandler,
-    InlineEnableDisableHandler,
 )
 from .file_based import (
     FileBasedScope,
@@ -17,6 +15,7 @@ from .file_based import (
     YAMLSchemaValidator,
 )
 from .file_move_enable_disable_handler import FileMoveEnableDisableHandler
+from .plugin_based import PluginBasedScope
 from .types import OperationResult, ScopeConfig, ServerConfig, ServerInfo, ServerState
 
 
@@ -72,15 +71,42 @@ class ClaudeCodePlugin(MCPClientPlugin):
         json_reader = JSONFileReader()
         json_writer = JSONFileWriter()
 
+        # Plugin-based MCP servers (discovered from Claude Code plugins)
+        # Priority 0 = highest, shown first in list output
+        # These servers are read-only and managed by Claude Code's plugin system
+        plugin_settings_path = self._get_scope_path(
+            "plugin-settings", Path.home() / ".claude" / "settings.json"
+        )
+        plugin_installed_path = self._get_scope_path(
+            "plugin-installed",
+            Path.home() / ".claude" / "plugins" / "installed_plugins.json",
+        )
+        scopes["plugin"] = PluginBasedScope(
+            config=ScopeConfig(
+                name="plugin",
+                description="MCP servers from Claude Code plugins (read-only)",
+                priority=0,
+                path=plugin_settings_path,  # Primary path for exists() checks
+                is_user_level=True,
+            ),
+            settings_path=plugin_settings_path,
+            installed_plugins_path=plugin_installed_path,
+        )
+
         # Project-level MCP configuration (.mcp.json)
-        # This scope requires APPROVAL via .claude/settings.local.json
-        # Uses ApprovalRequiredEnableDisableHandler to check both:
-        # - Inline disabled field in .mcp.json
-        # - Approval arrays in .claude/settings.local.json
+        # Uses FileMoveEnableDisableHandler:
+        # - Active file: .mcp.json (ENABLED servers)
+        # - Disabled file: .mcp.disabled.json (DISABLED servers)
+        # - disable operation: MOVE server config from active to disabled file
+        # - enable operation: MOVE server config from disabled to active file
         project_mcp_path = self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json")
+        project_mcp_disabled_path = self._get_scope_path(
+            "project-mcp-disabled", Path.cwd() / ".mcp.disabled.json"
+        )
         project_local_path = self._get_scope_path(
             "project-local", Path.cwd() / ".claude" / "settings.local.json"
         )
+
         scopes["project-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="project-mcp",
@@ -93,9 +119,9 @@ class ClaudeCodePlugin(MCPClientPlugin):
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
-            enable_disable_handler=ApprovalRequiredEnableDisableHandler(
-                mcp_json_path=project_mcp_path,
-                settings_local_path=project_local_path,
+            enable_disable_handler=FileMoveEnableDisableHandler(
+                active_file_path=project_mcp_path,
+                disabled_file_path=project_mcp_disabled_path,
                 reader=json_reader,
                 writer=json_writer,
             ),
@@ -142,39 +168,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
             ),
         )
 
-        # User-global Claude settings (~/.claude/settings.json)
-        # CUSTOM DISABLE MECHANISM (REQUIREMENT from CLAUDE.md lines 406-411):
-        # - Active file: ~/.claude/settings.json (ENABLED servers)
-        # - Disabled file: ~/.claude/disabled-mcp.json (DISABLED servers)
-        # - disable operation: MOVE server config from active to disabled file
-        # - enable operation: MOVE server config from disabled to active file
-        # - list operation: Show servers from BOTH files with correct states
-        user_global_path = self._get_scope_path(
-            "user-global", Path.home() / ".claude" / "settings.json"
-        )
-        user_global_disabled_path = self._get_scope_path(
-            "user-global-disabled",
-            Path.home() / ".claude" / "disabled-mcp.json",
-        )
-        scopes["user-global"] = FileBasedScope(
-            config=ScopeConfig(
-                name="user-global",
-                description="User-global Claude settings (~/.claude/settings.json)",
-                priority=4,
-                path=user_global_path,
-                is_user_level=True,
-            ),
-            reader=json_reader,
-            writer=json_writer,
-            validator=YAMLSchemaValidator(),
-            schema_path=schemas_dir / "claude-settings-schema.yaml",
-            enable_disable_handler=FileMoveEnableDisableHandler(
-                active_file_path=user_global_path,
-                disabled_file_path=user_global_disabled_path,
-                reader=json_reader,
-                writer=json_writer,
-            ),
-        )
+        # NOTE: ~/.claude/settings.json is NOT used for MCP servers by Claude Code.
+        # It's used for permissions, hooks, plugins, etc. but MCP servers are stored
+        # in ~/.claude.json (the user-internal scope below).
+        # The "user-global" scope was removed because it read from settings.json
+        # which caused servers to appear in mcpi that didn't exist in claude mcp list.
 
         # User internal configuration (~/.claude.json)
         # CUSTOM DISABLE MECHANISM (same as user-global):
@@ -195,7 +193,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
             config=ScopeConfig(
                 name="user-internal",
                 description="User internal Claude configuration (~/.claude.json)",
-                priority=5,
+                priority=4,  # Was 5, renumbered after removing user-global
                 path=user_internal_path,
                 is_user_level=True,
             ),
@@ -211,23 +209,34 @@ class ClaudeCodePlugin(MCPClientPlugin):
             ),
         )
 
-        # User MCP servers configuration (~/.claude/mcp_servers.json)
-        # This scope does NOT support enable/disable (no arrays in .mcp.json format)
+        # User MCP servers configuration (~/.mcp.json)
+        # Uses FileMoveEnableDisableHandler:
+        # - Active file: ~/.mcp.json (ENABLED servers)
+        # - Disabled file: ~/.mcp.disabled.json (DISABLED servers)
+        # - disable operation: MOVE server config from active to disabled file
+        # - enable operation: MOVE server config from disabled to active file
+        user_mcp_path = self._get_scope_path("user-mcp", Path.home() / ".mcp.json")
+        user_mcp_disabled_path = self._get_scope_path(
+            "user-mcp-disabled", Path.home() / ".mcp.disabled.json"
+        )
         scopes["user-mcp"] = FileBasedScope(
             config=ScopeConfig(
                 name="user-mcp",
-                description="User MCP servers configuration (~/.claude/mcp_servers.json)",
-                priority=6,
-                path=self._get_scope_path(
-                    "user-mcp", Path.home() / ".claude" / "mcp_servers.json"
-                ),
+                description="User MCP servers configuration (~/.mcp.json)",
+                priority=5,  # Was 6, renumbered after removing user-global
+                path=user_mcp_path,
                 is_user_level=True,
             ),
             reader=json_reader,
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
-            enable_disable_handler=None,  # user-mcp doesn't support enable/disable
+            enable_disable_handler=FileMoveEnableDisableHandler(
+                active_file_path=user_mcp_path,
+                disabled_file_path=user_mcp_disabled_path,
+                reader=json_reader,
+                writer=json_writer,
+            ),
         )
 
         return scopes
@@ -239,10 +248,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
 
         Uses the scope's enable/disable handler to determine state. Different scopes
         have different mechanisms:
-        - project-mcp: Use ApprovalRequiredEnableDisableHandler (checks inline + approval)
+        - project-mcp: Uses approval handler to check enabledMcpjsonServers/disabledMcpjsonServers
+                       in .claude/settings.local.json. Servers not in either array are UNAPPROVED.
         - project-local, user-local: Use enabledMcpjsonServers/disabledMcpjsonServers arrays
-        - user-global: Use file-move mechanism (disabled-mcp.json file)
         - user-internal: Use file-move mechanism (.disabled-servers.json file)
+        - user-mcp: Use file-move mechanism (.mcp.disabled.json file)
         - Other scopes: Don't support enable/disable (always ENABLED)
 
         Additionally checks for inline "disabled" field in config for backward compatibility.
@@ -253,7 +263,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
             config_dict: Optional server configuration to check for inline disabled field
 
         Returns:
-            Server state (ENABLED, DISABLED, or NOT_INSTALLED)
+            Server state (ENABLED, DISABLED, UNAPPROVED, or NOT_INSTALLED)
         """
         if scope not in self._scopes:
             return ServerState.ENABLED
@@ -412,7 +422,10 @@ class ClaudeCodePlugin(MCPClientPlugin):
     def enable_server(
         self, server_id: str, scope: Optional[str] = None
     ) -> OperationResult:
-        """Enable a disabled server in the specified scope.
+        """Enable a disabled or unapproved server in the specified scope.
+
+        For project-mcp scope, this uses the approval handler to add the server
+        to enabledMcpjsonServers in .claude/settings.local.json.
 
         Args:
             server_id: Server identifier
@@ -464,6 +477,9 @@ class ClaudeCodePlugin(MCPClientPlugin):
         self, server_id: str, scope: Optional[str] = None
     ) -> OperationResult:
         """Disable an enabled server in the specified scope.
+
+        For scopes using file-move mechanism (project-mcp, user-mcp, user-internal),
+        the server config is moved from the active file to the disabled file.
 
         Args:
             server_id: Server identifier

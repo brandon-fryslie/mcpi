@@ -216,13 +216,14 @@ class TestProjectMCPClaudeValidation:
         manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Execute: Get MCPI's view of servers
-        servers = manager.list_servers(scope="project-mcp", client="claude-code")
+        servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
         fs = next((s for s in servers.values() if s.id == "filesystem"), None)
 
-        # CRITICAL: Verify MCPI shows server as DISABLED (matching Claude's behavior)
+        # CRITICAL: Verify MCPI shows server as UNAPPROVED (matching Claude's behavior)
+        # UNAPPROVED means server is not in either enabledMcpjsonServers or disabledMcpjsonServers
         assert fs is not None, "Server should appear in MCPI list"
-        assert fs.state == ServerState.DISABLED, (
-            f"MCPI should show unapproved server as DISABLED, got {fs.state}. "
+        assert fs.state == ServerState.UNAPPROVED, (
+            f"MCPI should show unapproved server as UNAPPROVED, got {fs.state}. "
             f"This means MCPI state doesn't match Claude Code behavior!"
         )
 
@@ -285,7 +286,7 @@ class TestProjectMCPClaudeValidation:
         manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Execute: Get MCPI's view of servers
-        servers = manager.list_servers(scope="project-mcp", client="claude-code")
+        servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
         fs = next((s for s in servers.values() if s.id == "filesystem"), None)
 
         # CRITICAL: Verify MCPI shows server as ENABLED (matching Claude's behavior)
@@ -350,7 +351,7 @@ class TestProjectMCPClaudeValidation:
         manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Execute: Get MCPI's view of servers
-        servers = manager.list_servers(scope="project-mcp", client="claude-code")
+        servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
         fs = next((s for s in servers.values() if s.id == "filesystem"), None)
 
         # CRITICAL: Verify MCPI shows server as DISABLED (matching Claude's behavior)
@@ -431,7 +432,7 @@ class TestProjectMCPClaudeValidation:
         manager = MCPManager(registry=registry, default_client="claude-code")
 
         # Execute: Get MCPI's view of servers
-        mcpi_servers = manager.list_servers(scope="project-mcp", client="claude-code")
+        mcpi_servers = manager.list_servers(scope="project-mcp", client_name="claude-code")
 
         # Create lookup dict for MCPI states
         mcpi_states = {
@@ -441,14 +442,15 @@ class TestProjectMCPClaudeValidation:
         }
 
         # Expected states
+        # Note: UNAPPROVED servers are not in either array, DISABLED servers are in disabledMcpjsonServers
         expected_states = {
             "approved-server": (
                 ServerState.ENABLED,
                 True,
             ),  # (mcpi_state, in_claude_list)
-            "unapproved-server": (ServerState.DISABLED, False),
-            "disabled-server": (ServerState.DISABLED, False),
-            "inline-disabled-server": (ServerState.DISABLED, False),
+            "unapproved-server": (ServerState.UNAPPROVED, False),  # Not in either array
+            "disabled-server": (ServerState.DISABLED, False),  # In disabledMcpjsonServers
+            "inline-disabled-server": (ServerState.DISABLED, False),  # Inline disabled=true
         }
 
         # Verify: All servers have correct state in both MCPI and Claude
@@ -479,9 +481,10 @@ class TestProjectMCPClaudeValidation:
 
             # Check consistency
             # ENABLED in MCPI → Should be in Claude list
-            # DISABLED in MCPI → Should NOT be in Claude list
+            # DISABLED or UNAPPROVED in MCPI → Should NOT be in Claude list
             consistent = (mcpi_state == ServerState.ENABLED and in_claude) or (
-                mcpi_state == ServerState.DISABLED and not in_claude
+                mcpi_state in (ServerState.DISABLED, ServerState.UNAPPROVED)
+                and not in_claude
             )
 
             if consistent and mcpi_correct and claude_correct:

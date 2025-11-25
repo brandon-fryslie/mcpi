@@ -30,11 +30,10 @@ class TestCLIHighImpactCoverage:
     def test_registry_show_json_output(self):
         """Test info with --json flag.
 
-        Targets lines 134-135: JSON output functionality.
+        Targets JSON output functionality.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
             self.mock_catalog.get_server.return_value = self.mock_server
 
             result = self.runner.invoke(main, ["info", "test-server", "--json"])
@@ -52,15 +51,14 @@ class TestCLIHighImpactCoverage:
 
         Targets error handling paths.
         """
-        with patch("mcpi.cli.create_default_catalog") as mock_catalog_fn:
-            mock_catalog_fn.return_value = self.mock_catalog
-            self.mock_catalog.load_catalog.return_value = None
+        with patch("mcpi.cli.get_catalog") as mock_get_catalog:
+            mock_get_catalog.return_value = self.mock_catalog
             self.mock_catalog.get_server.return_value = None
 
             result = self.runner.invoke(main, ["info", "nonexistent-server"])
 
             assert result.exit_code == 1
-            assert "not found in registry" in result.output
+            assert "not found" in result.output
 
     def test_status_with_json_flag(self):
         """Test status command with --json flag.

@@ -124,7 +124,7 @@ class TestTemplateStructure:
         valid_scopes = {
             "project-mcp",
             "project-local",
-            "user-global",
+            "user-mcp",
             "user-internal",
         }
         for template in all_templates:

@@ -18,8 +18,8 @@ from mcpi.registry.catalog import (
     MCPServer,
     ServerCatalog,
     ServerRegistry,
-    create_default_catalog,
 )
+from mcpi.registry.catalog_manager import create_default_catalog_manager
 
 console = Console()
 
@@ -401,8 +401,8 @@ def reload_server_list(
     try:
         # Create instances if not provided (allows for dependency injection in tests)
         if catalog is None:
-            catalog = create_default_catalog()
-            catalog.load_catalog()
+            catalog_manager = create_default_catalog_manager()
+            catalog = catalog_manager.get_catalog("official")
         else:
             # Catalog was provided (e.g., by tests) - ensure it's marked as loaded
             # to prevent auto-loading from production file in list_servers()

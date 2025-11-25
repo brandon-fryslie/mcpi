@@ -136,22 +136,23 @@ class TestActualRegistryValidation:
                 ), f"Server {server_id} repository must be a valid URL: {server.repository}"
 
     def test_server_ids_are_valid(self):
-        """Validate all server IDs follow naming conventions."""
+        """Validate all server IDs follow naming conventions.
+
+        All server IDs MUST be namespaced with exactly one '/':
+        - Standard format: owner/server (e.g., anthropic/filesystem)
+        - Verified format: @owner/server (e.g., @anthropic/filesystem)
+
+        The '@' prefix is reserved for verified accounts only.
+        """
+        from mcpi.utils.validation import validate_server_id
+
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
         for server_id in data.keys():
-            # Server IDs should be lowercase alphanumeric with hyphens
-            assert server_id, "Server ID cannot be empty"
-            assert (
-                server_id == server_id.lower()
-            ), f"Server ID {server_id} should be lowercase"
-            assert all(
-                c.isalnum() or c == "-" for c in server_id
-            ), f"Server ID {server_id} should only contain lowercase letters, numbers, and hyphens"
-            assert not server_id.startswith("-") and not server_id.endswith(
-                "-"
-            ), f"Server ID {server_id} should not start or end with hyphen"
+            assert validate_server_id(
+                server_id
+            ), f"Server ID '{server_id}' is not valid. Must use namespaced format: owner/server or @owner/server"
 
     def test_no_duplicate_servers(self):
         """Verify no duplicate server entries."""
@@ -170,8 +171,13 @@ class TestActualRegistryValidation:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
-        # Servers we just added/verified
-        expected_servers = ["context7", "sequentialthinking"]
+        # Verify some common namespaced servers are present
+        expected_servers = [
+            "@anthropic/filesystem",
+            "upstash/context7",
+            "modelcontextprotocol/sequentialthinking",
+            "r-huijts/xcode",
+        ]
 
         for server_id in expected_servers:
             assert (

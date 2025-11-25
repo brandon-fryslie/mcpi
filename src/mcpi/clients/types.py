@@ -7,10 +7,18 @@ from typing import Any, Dict, List, Optional
 
 
 class ServerState(Enum):
-    """Server state enumeration."""
+    """Server state enumeration.
+
+    States:
+        ENABLED: Server is approved and enabled
+        DISABLED: Server is explicitly disabled by user
+        UNAPPROVED: Server exists but hasn't been approved yet (project-mcp only)
+        NOT_INSTALLED: Server is not installed in any scope
+    """
 
     ENABLED = auto()
     DISABLED = auto()
+    UNAPPROVED = auto()  # For project-mcp servers not yet approved
     NOT_INSTALLED = auto()
 
 

@@ -1,7 +1,7 @@
 name: personal-full-access
 description: "Full access to personal GitHub repositories"
 server_id: github
-scope: user-global
+scope: user-mcp
 priority: high
 
 config:
@@ -41,3 +41,15 @@ notes: |
 
   Security note: This token has full access to your repositories.
   Keep it secure and never commit it to version control.
+# Template discovery metadata
+best_for:
+  - personal-repos
+  - full-access
+  - private-repos
+
+keywords:
+  - github
+  - git
+  - repositories
+  - personal
+  - full-access

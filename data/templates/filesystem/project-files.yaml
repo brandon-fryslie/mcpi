@@ -48,3 +48,16 @@ notes: |
     - Access files outside this directory
     - Access parent directories
     - Access system files
+
+# Template discovery metadata
+best_for:
+  - project-files
+  - local-filesystem
+  - file-management
+
+keywords:
+  - filesystem
+  - files
+  - project
+  - local
+  - directory

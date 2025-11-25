@@ -121,7 +121,7 @@ class TestCriticalAPI:
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
         # Get a real scope handler
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # CRITICAL: Verify the method exists
         assert hasattr(
@@ -154,7 +154,7 @@ class TestCriticalAPI:
         """
         # Create a real plugin instance
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Test 1: Get config for existing server
         server_config = scope_handler.get_server_config("filesystem")
@@ -179,7 +179,7 @@ class TestCriticalAPI:
 
         # Verify complete data matches file contents (semantic comparison)
         file_content = prepopulated_harness.get_server_config(
-            "user-global", "filesystem"
+            "user-mcp", "filesystem"
         )
         _assert_config_matches(
             config_dict,
@@ -205,7 +205,7 @@ class TestCriticalAPI:
         Priority: HIGH
 
         VALIDATION:
-        - Works for user-global scope (Claude settings.json)
+        - Works for user-mcp scope (Claude settings.json)
         - Works for project-mcp scope (.mcp.json)
         - Works for user-internal scope (.claude.json)
         - Returns consistent data structure across all scope types
@@ -217,13 +217,13 @@ class TestCriticalAPI:
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
-        # Test user-global scope (settings.json format)
-        user_global = plugin.get_scope_handler("user-global")
+        # Test user-mcp scope (settings.json format)
+        user_global = plugin.get_scope_handler("user-mcp")
         fs_config = user_global.get_server_config("filesystem")
         fs_dict = _to_dict(fs_config)
         assert (
             fs_dict["command"] == "npx"
-        ), "user-global scope: get_server_config returned wrong data"
+        ), "user-mcp scope: get_server_config returned wrong data"
 
         # Test project-mcp scope (.mcp.json format)
         project_mcp = plugin.get_scope_handler("project-mcp")
@@ -266,7 +266,7 @@ class TestCoreUserWorkflows:
         Priority: HIGH
 
         VALIDATION:
-        - Lists all servers from user-global scope
+        - Lists all servers from user-mcp scope
         - Lists all servers from project-mcp scope
         - Lists all servers from user-internal scope
         - Returns correct count and server IDs
@@ -280,17 +280,17 @@ class TestCoreUserWorkflows:
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
-        # Test user-global scope
-        user_global = plugin.get_scope_handler("user-global")
+        # Test user-mcp scope
+        user_global = plugin.get_scope_handler("user-mcp")
         user_servers = user_global.get_servers()
 
         assert (
             len(user_servers) == 2
-        ), f"Expected 2 servers in user-global, got {len(user_servers)}"
+        ), f"Expected 2 servers in user-mcp, got {len(user_servers)}"
         assert (
             "filesystem" in user_servers
-        ), "user-global should contain 'filesystem' server"
-        assert "github" in user_servers, "user-global should contain 'github' server"
+        ), "user-mcp should contain 'filesystem' server"
+        assert "github" in user_servers, "user-mcp should contain 'github' server"
 
         # Test project-mcp scope
         project_mcp = plugin.get_scope_handler("project-mcp")
@@ -347,14 +347,14 @@ class TestCoreUserWorkflows:
         """
         # Create a clean test environment
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Initial state: no servers
-        initial_count = mcp_harness.count_servers_in_scope("user-global")
+        initial_count = mcp_harness.count_servers_in_scope("user-mcp")
         assert initial_count == 0, "Should start with 0 servers"
 
         # ADD OPERATION
@@ -371,15 +371,15 @@ class TestCoreUserWorkflows:
         assert result.success, f"Add operation failed: {result.message}"
 
         # VERIFICATION: Check file was actually modified
-        mcp_harness.assert_valid_json("user-global")
-        mcp_harness.assert_server_exists("user-global", "memory-server")
+        mcp_harness.assert_valid_json("user-mcp")
+        mcp_harness.assert_server_exists("user-mcp", "memory-server")
 
         # Verify server appears in listing
         servers = scope_handler.get_servers()
         assert "memory-server" in servers, "Server not in listing after add"
 
         # Verify configuration is correct
-        saved_config = mcp_harness.get_server_config("user-global", "memory-server")
+        saved_config = mcp_harness.get_server_config("user-mcp", "memory-server")
         assert (
             saved_config["command"] == "npx"
         ), f"Expected command 'npx', got '{saved_config['command']}'"
@@ -394,7 +394,7 @@ class TestCoreUserWorkflows:
         assert result.success, f"Remove operation failed: {result.message}"
 
         # VERIFICATION: Check file was actually modified
-        final_count = mcp_harness.count_servers_in_scope("user-global")
+        final_count = mcp_harness.count_servers_in_scope("user-mcp")
         assert final_count == 0, f"Expected 0 servers after remove, got {final_count}"
 
         # Verify server no longer in listing
@@ -420,7 +420,7 @@ class TestCoreUserWorkflows:
         - Validates complete file integrity
         """
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
-        scope_handler = plugin.get_scope_handler("user-global")
+        scope_handler = plugin.get_scope_handler("user-mcp")
 
         # Capture initial state of all servers
         initial_servers = scope_handler.get_servers()
@@ -502,7 +502,7 @@ class TestRescopeFeaturePreparation:
 
         # Initial state verification
         project_mcp = plugin.get_scope_handler("project-mcp")
-        user_global = plugin.get_scope_handler("user-global")
+        user_global = plugin.get_scope_handler("user-mcp")
 
         # Verify server exists in source
         assert project_mcp.has_server(
@@ -524,7 +524,7 @@ class TestRescopeFeaturePreparation:
         result = rescope_server(
             server_name="project-tool",
             from_scope="project-mcp",
-            to_scope="user-global",
+            to_scope="user-mcp",
             client="claude-code",
         )
 
@@ -585,7 +585,7 @@ class TestRescopeFeaturePreparation:
 
         # Prepopulate empty destination
         mcp_harness.prepopulate_file(
-            "user-global", {"mcpEnabled": True, "mcpServers": {}}
+            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
         )
 
         # RESCOPE OPERATION
@@ -594,14 +594,14 @@ class TestRescopeFeaturePreparation:
         result = rescope_server(
             server_name="complex-server",
             from_scope="project-mcp",
-            to_scope="user-global",
+            to_scope="user-mcp",
             client="claude-code",
         )
 
         assert result.success, f"Rescope failed: {result.message}"
 
         # VERIFICATION: All fields preserved
-        dest_config = mcp_harness.get_server_config("user-global", "complex-server")
+        dest_config = mcp_harness.get_server_config("user-mcp", "complex-server")
 
         assert (
             dest_config["command"] == complex_config["command"]
@@ -651,7 +651,7 @@ class TestRescopeFeaturePreparation:
         initial_project_count = prepopulated_harness.count_servers_in_scope(
             "project-mcp"
         )
-        initial_user_count = prepopulated_harness.count_servers_in_scope("user-global")
+        initial_user_count = prepopulated_harness.count_servers_in_scope("user-mcp")
 
         # Mock remove_server to fail
         with patch.object(
@@ -665,7 +665,7 @@ class TestRescopeFeaturePreparation:
             result = rescope_server(
                 server_name="project-tool",
                 from_scope="project-mcp",
-                to_scope="user-global",
+                to_scope="user-mcp",
                 client="claude-code",
             )
 
@@ -680,7 +680,7 @@ class TestRescopeFeaturePreparation:
 
         # Destination should NOT have server (rollback deleted it)
         assert (
-            prepopulated_harness.count_servers_in_scope("user-global")
+            prepopulated_harness.count_servers_in_scope("user-mcp")
             == initial_user_count
         ), "Destination scope changed despite failure (rollback didn't work)"
 
@@ -730,7 +730,7 @@ class TestManagerIntegration:
 
         # Verify scope names
         scope_names = [s["name"] for s in scopes]
-        assert "user-global" in scope_names, "user-global scope should be available"
+        assert "user-mcp" in scope_names, "user-mcp scope should be available"
         assert "project-mcp" in scope_names, "project-mcp scope should be available"
 
     def test_manager_get_servers_aggregates_across_scopes(self, prepopulated_harness):
@@ -768,10 +768,10 @@ class TestManagerIntegration:
         # Verify we have servers from different scopes
         # Fix: servers is a dict, so use keys() to get server IDs
         server_ids = list(servers.keys())
-        # Server IDs are qualified (e.g., 'claude-code:user-global:filesystem')
+        # Server IDs are qualified (e.g., 'claude-code:user-mcp:filesystem')
         assert any(
             "filesystem" in sid for sid in server_ids
-        ), "Should have 'filesystem' from user-global scope"
+        ), "Should have 'filesystem' from user-mcp scope"
         assert any(
             "project-tool" in sid for sid in server_ids
         ), "Should have 'project-tool' from project-mcp scope"

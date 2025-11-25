@@ -65,10 +65,10 @@ class TestCliIntegration:
 
     def test_registry_search(self):
         """Test search functionality."""
-        result = self.runner.invoke(main, ["search", "filesystem"])
+        result = self.runner.invoke(main, ["search", "--query", "filesystem"])
         assert result.exit_code == 0
         # Should show search results or "No servers found"
-        assert "Search Results" in result.output or "No servers found" in result.output
+        assert "CATALOG" in result.output or "No servers found" in result.output
 
     def test_info_nonexistent(self):
         """Test showing a nonexistent server."""
