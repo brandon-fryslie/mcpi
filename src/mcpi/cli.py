@@ -509,15 +509,8 @@ def complete_server_ids(
         )
 
         # Get command name for context-aware filtering
-        # Try multiple methods to get the command name
-        command_name = None
-        if hasattr(ctx, "info_name"):
-            command_name = ctx.info_name
-        elif hasattr(ctx, "command") and hasattr(ctx.command, "name"):
-            command_name = ctx.command.name
-        # Also check parent context for command groups
-        if not command_name and ctx.parent and hasattr(ctx.parent, "info_name"):
-            command_name = ctx.parent.info_name
+        # Click context always has info_name (may be None) and parent attributes
+        command_name = ctx.info_name or (ctx.parent.info_name if ctx.parent else None)
 
         log_completion("Command context", ctx=ctx, command_name=command_name)
 
