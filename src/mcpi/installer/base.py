@@ -1,5 +1,6 @@
 """Base installer interface and common utilities."""
 
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -7,6 +8,30 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcpi.registry.catalog import MCPServer
+
+
+def check_command_available(command: str, timeout: int = 10) -> bool:
+    """Check if a command is available on the system.
+
+    This is a shared utility for checking tool availability (npm, pip, uv, git, etc.)
+
+    Args:
+        command: Command name to check (e.g., "npm", "git", "python")
+        timeout: Maximum time to wait for version check in seconds
+
+    Returns:
+        True if command is available and responds to --version, False otherwise
+    """
+    try:
+        result = subprocess.run(
+            [command, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
 
 
 class InstallationStatus(str, Enum):

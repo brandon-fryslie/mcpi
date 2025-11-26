@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from mcpi.installer.base import BaseInstaller, InstallationResult
+from mcpi.installer.base import BaseInstaller, InstallationResult, check_command_available
 from mcpi.registry.catalog import InstallationMethod, MCPServer
 
 # Configuration constants
@@ -432,21 +432,8 @@ class GitInstaller(BaseInstaller):
         return None
 
     def _check_git_available(self) -> bool:
-        """Check if git command is available.
-
-        Returns:
-            True if git is available, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                ["git", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=GIT_VERSION_TIMEOUT,
-            )
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
+        """Check if git command is available."""
+        return check_command_available("git", timeout=GIT_VERSION_TIMEOUT)
 
     def _run_git_command(
         self, args: List[str], cwd: Optional[Path] = None

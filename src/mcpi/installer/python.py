@@ -4,7 +4,7 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-from mcpi.installer.base import BaseInstaller, InstallationResult
+from mcpi.installer.base import BaseInstaller, InstallationResult, check_command_available
 from mcpi.registry.catalog import InstallationMethod, MCPServer
 
 
@@ -324,35 +324,12 @@ class PythonInstaller(BaseInstaller):
         return details
 
     def _check_python_available(self) -> bool:
-        """Check if Python executable is available.
-
-        Returns:
-            True if Python is available, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                [self.python_path, "--version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
+        """Check if Python executable is available."""
+        return check_command_available(self.python_path)
 
     def _check_uv_available(self) -> bool:
-        """Check if uv command is available.
-
-        Returns:
-            True if uv is available, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                ["uv", "--version"], capture_output=True, text=True, timeout=10
-            )
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
+        """Check if uv command is available."""
+        return check_command_available("uv")
 
     def _run_pip_command(self, args: List[str]) -> subprocess.CompletedProcess:
         """Run pip command with given arguments.

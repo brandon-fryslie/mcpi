@@ -4,7 +4,7 @@ import json
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from mcpi.installer.base import BaseInstaller, InstallationResult
+from mcpi.installer.base import BaseInstaller, InstallationResult, check_command_available
 from mcpi.registry.catalog import InstallationMethod, MCPServer
 
 
@@ -225,18 +225,8 @@ class NPMInstaller(BaseInstaller):
             )
 
     def _check_npm_available(self) -> bool:
-        """Check if npm command is available.
-
-        Returns:
-            True if npm is available, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                ["npm", "--version"], capture_output=True, text=True, timeout=10
-            )
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
+        """Check if npm command is available."""
+        return check_command_available("npm")
 
     def _get_install_flags(self) -> List[str]:
         """Get NPM install flags.
