@@ -46,6 +46,7 @@ from mcpi.templates.discovery import ProjectDetector
 from mcpi.templates.recommender import TemplateRecommender
 
 
+@pytest.mark.skip(reason="--recommend flag not yet implemented (PLAN P1-12)")
 class TestRecommendFlagBasics:
     """Basic functional tests for --recommend flag.
 
@@ -217,6 +218,7 @@ class TestRecommendFlagBasics:
         pass  # Placeholder
 
 
+@pytest.mark.skip(reason="--recommend flag not yet implemented (PLAN P1-13)")
 class TestRecommendationDisplay:
     """Tests for Rich console output formatting.
 
@@ -370,6 +372,7 @@ class TestRecommendationDisplay:
         pass  # Placeholder
 
 
+@pytest.mark.skip(reason="--recommend flag not yet implemented (PLAN P1-14)")
 class TestInteractiveFlow:
     """Tests for interactive recommendation acceptance/decline.
 
@@ -517,6 +520,7 @@ class TestInteractiveFlow:
         pass  # Placeholder
 
 
+@pytest.mark.skip(reason="--recommend flag not yet implemented (PLAN P1-14)")
 class TestEdgeCases:
     """Edge case tests for CLI recommendation feature.
 
@@ -642,6 +646,7 @@ class TestEdgeCases:
         pass  # Placeholder
 
 
+@pytest.mark.skip(reason="--recommend flag not yet implemented (PLAN P1-14)")
 class TestRecommendationIntegrationWithRealTemplates:
     """Integration tests using actual template files.
 

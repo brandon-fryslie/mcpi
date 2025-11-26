@@ -64,10 +64,10 @@ class TestCliSmoke:
 
     def test_registry_search_basic(self):
         """Test that search works without crashing."""
-        code, stdout, stderr = run_cli_command(["search", "test"])
+        code, stdout, stderr = run_cli_command(["search", "--query", "test"])
         # Should work even if no results
         assert code == 0
-        assert "Search Results" in stdout or "No servers found" in stdout
+        assert "CATALOG" in stdout or "No servers found" in stdout
 
     def test_info_help(self):
         """Test that info --help works."""

@@ -394,37 +394,40 @@ class TestMCPManagerDependencyInjection:
     def test_mcp_manager_server_operations_use_registry_methods(
         self, mock_registry_with_plugin, mock_client_plugin
     ):
-        """Verify all server operations delegate to registry methods.
+        """Verify all server operations delegate through registry to client plugin.
 
         USER WORKFLOW:
         1. User performs various server operations via manager
-        2. Manager delegates to registry for each operation
-        3. Registry handles the actual plugin interaction
+        2. Manager uses registry to get the client plugin
+        3. Manager delegates operations to the client plugin
 
         VALIDATION:
-        - add_server() calls registry.add_server()
+        - add_server() calls registry.add_server() (for add/remove)
         - remove_server() calls registry.remove_server()
-        - enable_server() calls registry.enable_server()
-        - disable_server() calls registry.disable_server()
-        - All operations use injected registry
+        - enable_server() delegates to client.enable_server() via registry.get_client()
+        - disable_server() delegates to client.disable_server() via registry.get_client()
+        - All operations use injected registry to access clients
 
         GAMING RESISTANCE:
-        - Configures registry mocks to track calls
+        - Configures registry and client mocks to track calls
         - Performs multiple different operations
-        - Verifies each operation called correct registry method
-        - Cannot pass without delegating to registry
+        - Verifies each operation called correct method on correct object
+        - Cannot pass without using injected registry
         """
-        # Configure registry mock to track operations
+        # Configure registry mock to track operations (add/remove go through registry)
         mock_registry_with_plugin.add_server = Mock(
             return_value=OperationResult.success_result("Added")
         )
         mock_registry_with_plugin.remove_server = Mock(
             return_value=OperationResult.success_result("Removed")
         )
-        mock_registry_with_plugin.enable_server = Mock(
+
+        # Configure client mock to track enable/disable operations
+        # (enable/disable go through client.enable_server/disable_server directly)
+        mock_client_plugin.enable_server = Mock(
             return_value=OperationResult.success_result("Enabled")
         )
-        mock_registry_with_plugin.disable_server = Mock(
+        mock_client_plugin.disable_server = Mock(
             return_value=OperationResult.success_result("Disabled")
         )
 
@@ -448,15 +451,16 @@ class TestMCPManagerDependencyInjection:
             "test-client", "test-server", "user"
         )
 
-        # Test enable_server
+        # Test enable_server - delegates to client via registry.get_client()
         result = manager.enable_server("test-server")
         assert result.success, "enable_server should succeed"
-        mock_registry_with_plugin.enable_server.assert_called()
+        mock_registry_with_plugin.get_client.assert_called()  # Manager gets client from registry
+        mock_client_plugin.enable_server.assert_called()  # Then calls client's method
 
-        # Test disable_server
+        # Test disable_server - delegates to client via registry.get_client()
         result = manager.disable_server("test-server")
         assert result.success, "disable_server should succeed"
-        mock_registry_with_plugin.disable_server.assert_called()
+        mock_client_plugin.disable_server.assert_called()  # Calls client's method
 
     def test_mcp_manager_uses_only_injected_registry_no_internal_registry(self):
         """CRITICAL: Verify manager uses ONLY injected registry, doesn't create internal one.
@@ -563,12 +567,14 @@ class TestMCPManagerDependencyInjection:
         USER WORKFLOW:
         1. Developer creates manager with spy registry
         2. Developer performs multiple different operations
-        3. Developer verifies ALL operations delegated to spy registry
+        3. Developer verifies ALL operations delegated via spy registry
 
         VALIDATION:
-        - Every operation calls registry methods
+        - Every operation uses registry to access clients/data
         - No operation creates or uses internal registry
-        - Registry is the single source of truth
+        - Registry is the single source of truth for client access
+        - add/remove go through registry.add_server/remove_server
+        - enable/disable go through registry.get_client().enable_server/disable_server
 
         GAMING RESISTANCE:
         - Creates comprehensive spy registry that tracks ALL calls
@@ -577,6 +583,14 @@ class TestMCPManagerDependencyInjection:
         - Cannot pass by mixing injected and internal registry
         - Cannot pass by selectively using injected registry
         """
+        # Configure client mock for enable/disable operations
+        mock_client_plugin.enable_server = Mock(
+            return_value=OperationResult.success_result("Enabled")
+        )
+        mock_client_plugin.disable_server = Mock(
+            return_value=OperationResult.success_result("Disabled")
+        )
+
         # Create spy registry that tracks all method calls
         spy_registry = Mock(spec=ClientRegistry)
         spy_registry.get_available_clients = Mock(return_value=["test-client"])
@@ -588,12 +602,6 @@ class TestMCPManagerDependencyInjection:
         )
         spy_registry.remove_server = Mock(
             return_value=OperationResult.success_result("Removed")
-        )
-        spy_registry.enable_server = Mock(
-            return_value=OperationResult.success_result("Enabled")
-        )
-        spy_registry.disable_server = Mock(
-            return_value=OperationResult.success_result("Disabled")
         )
         spy_registry.get_client = Mock(return_value=mock_client_plugin)
 
@@ -614,11 +622,12 @@ class TestMCPManagerDependencyInjection:
         # CRITICAL: Verify spy registry was used for ALL operations
         spy_registry.get_available_clients.assert_called()
         spy_registry.get_client_info.assert_called()
-        spy_registry.get_client.assert_called()  # For list_servers
+        spy_registry.get_client.assert_called()  # For list_servers, enable, disable
         spy_registry.add_server.assert_called()
         spy_registry.remove_server.assert_called()
-        spy_registry.enable_server.assert_called()
-        spy_registry.disable_server.assert_called()
+        # enable/disable go through client obtained via registry.get_client()
+        mock_client_plugin.enable_server.assert_called()
+        mock_client_plugin.disable_server.assert_called()
 
         # CRITICAL: Verify manager has ONLY the injected registry
         assert (

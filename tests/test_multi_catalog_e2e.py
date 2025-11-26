@@ -82,66 +82,62 @@ class TestFreshInstall:
     def test_fresh_install_creates_local_catalog(self, isolated_home: Path):
         """Fresh install creates official + local catalogs."""
         with patch.object(Path, "home", return_value=isolated_home):
-            with pytest.raises(NotImplementedError):
-                # Simulate fresh install - no catalogs exist yet
-                manager = create_default_catalog_manager()
+            # Simulate fresh install - no catalogs exist yet
+            manager = create_default_catalog_manager()
 
-                # Verify manager created
-                assert manager is not None
+            # Verify manager created
+            assert manager is not None
 
-                # Local catalog should be auto-created
-                expected_local_path = (
-                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
-                )
-                assert expected_local_path.exists()
+            # Local catalog should be auto-created
+            expected_local_path = (
+                isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+            )
+            assert expected_local_path.exists()
 
-                # Should be valid JSON
-                with open(expected_local_path) as f:
-                    content = json.load(f)
-                assert isinstance(content, dict)
+            # Should be valid JSON
+            with open(expected_local_path) as f:
+                content = json.load(f)
+            assert isinstance(content, dict)
 
     def test_local_catalog_auto_initialization(self, isolated_home: Path):
         """Local catalog auto-created if missing."""
         with patch.object(Path, "home", return_value=isolated_home):
-            with pytest.raises(NotImplementedError):
-                # Create manager
-                manager = create_default_catalog_manager()
+            # Create manager
+            manager = create_default_catalog_manager()
 
-                # Get local catalog - should work even if didn't exist before
-                local = manager.get_catalog("local")
-                assert local is not None
+            # Get local catalog - should work even if didn't exist before
+            local = manager.get_catalog("local")
+            assert local is not None
 
-                # Verify file exists
-                local_path = (
-                    isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
-                )
-                assert local_path.exists()
+            # Verify file exists
+            local_path = (
+                isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
+            )
+            assert local_path.exists()
 
     def test_local_catalog_empty_on_first_run(self, isolated_home: Path):
         """Local catalog is empty on first run."""
         with patch.object(Path, "home", return_value=isolated_home):
-            with pytest.raises(NotImplementedError):
-                manager = create_default_catalog_manager()
-                local = manager.get_catalog("local")
+            manager = create_default_catalog_manager()
+            local = manager.get_catalog("local")
 
-                # Should have no servers initially
-                servers = local.list_servers()
-                assert len(servers) == 0
+            # Should have no servers initially
+            servers = local.list_servers()
+            assert len(servers) == 0
 
     def test_official_catalog_always_available(self, isolated_home: Path):
         """Official catalog always available, even if local init fails."""
         with patch.object(Path, "home", return_value=isolated_home):
-            with pytest.raises(NotImplementedError):
-                # Create manager
-                manager = create_default_catalog_manager()
+            # Create manager
+            manager = create_default_catalog_manager()
 
-                # Official catalog should work
-                official = manager.get_catalog("official")
-                assert official is not None
+            # Official catalog should work
+            official = manager.get_catalog("official")
+            assert official is not None
 
-                # Should have servers (from package data)
-                servers = official.list_servers()
-                assert len(servers) > 0
+            # Should have servers (from package data)
+            servers = official.list_servers()
+            assert len(servers) > 0
 
 
 class TestLocalCatalogPersistence:
@@ -153,76 +149,74 @@ class TestLocalCatalogPersistence:
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
 
             # Session 1: Create manager, add server to local catalog
-            with pytest.raises(NotImplementedError):
-                manager1 = create_default_catalog_manager()
-                local1 = manager1.get_catalog("local")
+            manager1 = create_default_catalog_manager()
+            local1 = manager1.get_catalog("local")
 
-                # Manually add a server to local catalog
-                custom_server = {
-                    "my-tool": {
-                        "description": "My custom tool",
-                        "command": "python",
-                        "args": ["-m", "my_tool"],
-                        "categories": ["custom"],
-                    }
+            # Manually add a server to local catalog
+            custom_server = {
+                "my-tool": {
+                    "description": "My custom tool",
+                    "command": "python",
+                    "args": ["-m", "my_tool"],
+                    "categories": ["custom"],
                 }
+            }
 
-                with open(local_path, "w") as f:
-                    json.dump(custom_server, f, indent=2)
+            with open(local_path, "w") as f:
+                json.dump(custom_server, f, indent=2)
 
-                # Session 2: Destroy manager, create new one, verify server exists
-                del manager1, local1
+            # Session 2: Destroy manager, create new one, verify server exists
+            del manager1, local1
 
-                manager2 = create_default_catalog_manager()
-                local2 = manager2.get_catalog("local")
+            manager2 = create_default_catalog_manager()
+            local2 = manager2.get_catalog("local")
 
-                # Server should still be there
-                server = local2.get_server("my-tool")
-                assert server is not None
-                assert server.description == "My custom tool"
+            # Server should still be there
+            server = local2.get_server("my-tool")
+            assert server is not None
+            assert server.description == "My custom tool"
 
     def test_multiple_sessions_accumulate(self, isolated_home: Path):
         """Multiple sessions can add to local catalog."""
         with patch.object(Path, "home", return_value=isolated_home):
             local_path = isolated_home / ".mcpi" / "catalogs" / "local" / "catalog.json"
 
-            with pytest.raises(NotImplementedError):
-                # Session 1: Add first server
-                create_test_catalog_file(
-                    local_path,
-                    {
-                        "server1": {
-                            "description": "Server 1",
-                            "command": "node",
-                            "args": [],
-                        }
+            # Session 1: Add first server
+            create_test_catalog_file(
+                local_path,
+                {
+                    "server1": {
+                        "description": "Server 1",
+                        "command": "node",
+                        "args": [],
+                    }
+                },
+            )
+
+            manager1 = create_default_catalog_manager()
+            local1 = manager1.get_catalog("local")
+            assert len(local1.list_servers()) == 1
+
+            # Session 2: Add second server (simulating user editing file)
+            create_test_catalog_file(
+                local_path,
+                {
+                    "server1": {
+                        "description": "Server 1",
+                        "command": "node",
+                        "args": [],
                     },
-                )
-
-                manager1 = create_default_catalog_manager()
-                local1 = manager1.get_catalog("local")
-                assert len(local1.list_servers()) == 1
-
-                # Session 2: Add second server (simulating user editing file)
-                create_test_catalog_file(
-                    local_path,
-                    {
-                        "server1": {
-                            "description": "Server 1",
-                            "command": "node",
-                            "args": [],
-                        },
-                        "server2": {
-                            "description": "Server 2",
-                            "command": "python",
-                            "args": [],
-                        },
+                    "server2": {
+                        "description": "Server 2",
+                        "command": "python",
+                        "args": [],
                     },
-                )
+                },
+            )
 
-                manager2 = create_default_catalog_manager()
-                local2 = manager2.get_catalog("local")
-                assert len(local2.list_servers()) == 2
+            manager2 = create_default_catalog_manager()
+            local2 = manager2.get_catalog("local")
+            assert len(local2.list_servers()) == 2
 
 
 class TestCompleteWorkflows:
@@ -232,7 +226,7 @@ class TestCompleteWorkflows:
         """Complete workflow: search official, find server, add it."""
         with patch.object(Path, "home", return_value=isolated_home):
             # Search for a server
-            result = cli_runner.invoke(cli, ["search", "filesystem"])
+            result = cli_runner.invoke(cli, ["search", "--query", "@anthropic/filesystem"])
             # May succeed or fail depending on implementation status
             # Just ensure it doesn't crash
             assert result.exit_code in [0, 1, 2] or "error" in result.output.lower()
@@ -260,7 +254,7 @@ class TestCompleteWorkflows:
             )
 
             # Search all catalogs
-            result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
+            result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
             # May not be implemented yet
             if result.exit_code == 0:
                 # Should find servers from both catalogs when implemented
@@ -310,7 +304,7 @@ class TestBackwardCompatibility:
         """Old CLI commands work unchanged."""
         with patch.object(Path, "home", return_value=isolated_home):
             # Old search pattern (no --catalog flag)
-            result = cli_runner.invoke(cli, ["search", "filesystem"])
+            result = cli_runner.invoke(cli, ["search", "--query", "@anthropic/filesystem"])
             assert result.exit_code in [0, 1, 2]
 
             # Old info pattern
@@ -322,7 +316,7 @@ class TestBackwardCompatibility:
         with patch.object(Path, "home", return_value=isolated_home):
             # These commands should work exactly as before
             commands = [
-                ["search", "test"],
+                ["search", "--query", "test"],
                 ["list"],
                 ["info", "filesystem"],
             ]
@@ -412,27 +406,26 @@ class TestErrorHandling:
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter("always")
 
-                    with pytest.raises(NotImplementedError):
-                        # Should not crash
-                        manager = create_default_catalog_manager()
+                    # Should not crash
+                    manager = create_default_catalog_manager()
 
-                        # Manager should still be created
-                        assert manager is not None
+                    # Manager should still be created
+                    assert manager is not None
 
-                        # Official catalog should work
-                        official = manager.get_catalog("official")
-                        assert official is not None
+                    # Official catalog should work
+                    official = manager.get_catalog("official")
+                    assert official is not None
 
-                        # Should have warning about local catalog
-                        assert len(w) > 0
-                        runtime_warnings = [
-                            warning
-                            for warning in w
-                            if issubclass(
-                                warning.category, (RuntimeWarning, UserWarning)
-                            )
-                        ]
-                        # May or may not have warning depending on implementation
+                    # Should have warning about local catalog
+                    assert len(w) > 0
+                    runtime_warnings = [
+                        warning
+                        for warning in w
+                        if issubclass(
+                            warning.category, (RuntimeWarning, UserWarning)
+                        )
+                    ]
+                    # May or may not have warning depending on implementation
         finally:
             # Cleanup: restore permissions
             mcpi_dir.chmod(0o755)
@@ -458,15 +451,14 @@ class TestErrorHandling:
                 with open(local_path, "w") as f:
                     f.write("{invalid json")
 
-                with pytest.raises(NotImplementedError):
-                    manager = create_default_catalog_manager()
+                manager = create_default_catalog_manager()
 
-                    # Official catalog should still work
-                    official = manager.get_catalog("official")
-                    assert official is not None
+                # Official catalog should still work
+                official = manager.get_catalog("official")
+                assert official is not None
 
-                    # Local catalog might fail or be skipped - implementation decides
-                    # This test just ensures official catalog isn't affected
+                # Local catalog might fail or be skipped - implementation decides
+                # This test just ensures official catalog isn't affected
         finally:
             # Cleanup
             shutil.rmtree(isolated_home, ignore_errors=True)
@@ -531,7 +523,7 @@ class TestSearchOrdering:
                     },
                 )
 
-                result = cli_runner.invoke(cli, ["search", "", "--all-catalogs"])
+                result = cli_runner.invoke(cli, ["search", "--query", "", "--all-catalogs"])
 
                 # May not be implemented yet
                 if result.exit_code == 0:
@@ -557,7 +549,7 @@ class TestCLIUsability:
         """Clear error message when using unknown catalog name."""
         with patch.object(Path, "home", return_value=isolated_home):
             result = cli_runner.invoke(
-                cli, ["search", "test", "--catalog", "nonexistent"]
+                cli, ["search", "--query", "test", "--catalog", "nonexistent"]
             )
 
             # May not be implemented yet
@@ -612,6 +604,11 @@ class TestClaudeCLIIntegration:
             or "claude" in result.stdout.lower()
         )
 
+    @pytest.mark.skip(
+        reason="Integration test that requires modifying real user config files. "
+        "Path.home() patch doesn't affect subprocess running 'claude mcp list'. "
+        "This test would need special isolation setup to work correctly."
+    )
     @pytest.mark.skipif(
         shutil.which("claude") is None, reason="claude CLI not installed"
     )
@@ -637,7 +634,7 @@ class TestClaudeCLIIntegration:
 
                 # Add server via mcpi (will fail with NotImplementedError initially)
                 result = cli_runner.invoke(
-                    cli, ["add", "filesystem", "--scope", "user-mcp"]
+                    cli, ["add", "@anthropic/filesystem", "--scope", "user-mcp"]
                 )
 
                 # Once implemented, verify with real claude CLI
@@ -652,11 +649,11 @@ class TestClaudeCLIIntegration:
                     )
 
                     # Server should be visible to Claude CLI
-                    assert "filesystem" in claude_result.stdout.lower()
+                    assert "@anthropic/filesystem" in claude_result.stdout.lower()
 
                     # Remove server via mcpi
                     result = cli_runner.invoke(
-                        cli, ["remove", "filesystem", "--scope", "user-mcp"]
+                        cli, ["remove", "@anthropic/filesystem", "--scope", "user-mcp"]
                     )
 
                     # Verify removed from claude mcp list
@@ -669,7 +666,7 @@ class TestClaudeCLIIntegration:
                     )
 
                     # Server should NOT be visible anymore
-                    assert "filesystem" not in claude_result.stdout.lower()
+                    assert "@anthropic/filesystem" not in claude_result.stdout.lower()
 
         finally:
             # Cleanup
@@ -717,7 +714,7 @@ class TestWithRealProductionCatalog:
         try:
             with patch.object(Path, "home", return_value=isolated_home):
                 # Search should work with real catalog
-                result = cli_runner.invoke(cli, ["search", "filesystem"])
+                result = cli_runner.invoke(cli, ["search", "--query", "@anthropic/filesystem"])
 
                 # May not be implemented yet, but should not crash
                 assert result.exit_code in [0, 1, 2] or "error" in result.output.lower()

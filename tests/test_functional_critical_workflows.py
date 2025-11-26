@@ -346,9 +346,7 @@ class TestCoreUserWorkflows:
         - Cannot pass with in-memory stubs
         """
         # Create a clean test environment
-        mcp_harness.prepopulate_file(
-            "user-mcp", {"mcpEnabled": True, "mcpServers": {}}
-        )
+        mcp_harness.prepopulate_file("user-mcp", {"mcpServers": {}})
 
         plugin = ClaudeCodePlugin(path_overrides=mcp_harness.path_overrides)
         scope_handler = plugin.get_scope_handler("user-mcp")

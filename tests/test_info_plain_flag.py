@@ -93,7 +93,7 @@ class TestInfoDefaultMode:
         - Verifies observable box characters that users see
         - Cannot pass if Rich formatting is removed
         """
-        result = self.runner.invoke(main, ["info", "filesystem"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem"])
 
         # Should succeed (filesystem is a known server in registry)
         assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -131,7 +131,7 @@ class TestInfoDefaultMode:
         - Tests with real server from registry
         - Cannot pass with incomplete output
         """
-        result = self.runner.invoke(main, ["info", "filesystem"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -216,7 +216,7 @@ class TestInfoPlainMode:
         appears in --plain output, this test fails. An AI cannot satisfy
         this by adding stub code or changing unrelated output.
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         # Should succeed
         assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -251,7 +251,7 @@ class TestInfoPlainMode:
         - Cannot pass with partial information
         - Ensures --plain doesn't sacrifice functionality for simplicity
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -291,7 +291,7 @@ class TestInfoPlainMode:
         - Verifies user experience qualities
         - Cannot pass with complex or messy output
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -378,8 +378,8 @@ class TestInfoPlainModeComparison:
         - Ensures feature parity between modes
         """
         # Get both outputs
-        default_result = self.runner.invoke(main, ["info", "filesystem"])
-        plain_result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        default_result = self.runner.invoke(main, ["info", "@anthropic/filesystem"])
+        plain_result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         # Both should succeed
         assert (
@@ -390,7 +390,7 @@ class TestInfoPlainModeComparison:
         # Extract key information from both (removing formatting)
         # We're looking for the actual content, not the formatting
         essential_content = [
-            "filesystem",  # Server ID
+            "@anthropic/filesystem",  # Server ID
             "Access and manage local filesystem operations",  # Actual registry description
             "Command:",
             "Registry Information:",
@@ -425,8 +425,8 @@ class TestInfoPlainModeComparison:
         - Cannot pass without implementing actual formatting difference
         - This test failing means the feature doesn't work
         """
-        default_result = self.runner.invoke(main, ["info", "filesystem"])
-        plain_result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        default_result = self.runner.invoke(main, ["info", "@anthropic/filesystem"])
+        plain_result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         # Both should succeed
         assert default_result.exit_code == 0
@@ -480,7 +480,7 @@ class TestInfoPlainModeFzfIntegration:
         - Verifies output characteristics for narrow display
         - Cannot pass if output requires wide terminal
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -519,7 +519,7 @@ class TestInfoPlainModeFzfIntegration:
         Note: This test allows ANSI color codes (they're fine in fzf),
         but checks they're not malformed.
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -570,7 +570,7 @@ class TestInfoPlainModeEdgeCases:
         - Verifies flag works in natural position
         - Cannot pass if CLI parsing is broken
         """
-        result = self.runner.invoke(main, ["info", "filesystem", "--plain"])
+        result = self.runner.invoke(main, ["info", "@anthropic/filesystem", "--plain"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -599,7 +599,7 @@ class TestInfoPlainModeEdgeCases:
         - Verifies flag order doesn't matter
         - Cannot pass if only one order is supported
         """
-        result = self.runner.invoke(main, ["info", "--plain", "filesystem"])
+        result = self.runner.invoke(main, ["info", "--plain", "@anthropic/filesystem"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 

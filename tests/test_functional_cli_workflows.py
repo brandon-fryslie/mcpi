@@ -160,7 +160,7 @@ class TestCLIBasicCommands:
             mock_get_manager.return_value = manager
 
             # USER ACTION 1: Get info for existing server
-            result = self.runner.invoke(main, ["info", "filesystem"])
+            result = self.runner.invoke(main, ["info", "@anthropic/filesystem"])
 
             # USER OBSERVABLE OUTCOME 1: Command succeeds
             assert result.exit_code == 0, f"Info command failed: {result.output}"

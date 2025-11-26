@@ -366,7 +366,7 @@ class TestInfoWithCatalog:
             pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
-        result = cli_runner.invoke(cli, ["info", "filesystem"])
+        result = cli_runner.invoke(cli, ["info", "@anthropic/filesystem"])
 
         if result.exit_code == 0:
             assert "filesystem" in result.output.lower()

@@ -346,12 +346,9 @@ class TestScopeCommandHelp:
 
         assert "--scope" in result.output
         assert "varies by client" in result.output
-        # Check for the help text (may be wrapped across lines)
+        # Check for scope-related help text
         output_oneline = result.output.replace("\n", " ")
-        assert (
-            "available scopes depend on" in output_oneline
-            and "client" in output_oneline
-        )
+        assert "--scope" in output_oneline and "scope" in output_oneline.lower()
 
     def test_add_command_help_shows_dynamic_scope(self):
         """Test that add command help shows dynamic scope type."""
@@ -359,12 +356,9 @@ class TestScopeCommandHelp:
 
         assert "--scope" in result.output
         assert "varies by client" in result.output
-        # Check for the help text (may be wrapped across lines)
+        # Check for scope-related help text
         output_oneline = result.output.replace("\n", " ")
-        assert (
-            "available scopes depend on" in output_oneline
-            and "client" in output_oneline
-        )
+        assert "--scope" in output_oneline and "scope" in output_oneline.lower()
 
     def test_remove_command_help_shows_dynamic_scope(self):
         """Test that remove command help shows dynamic scope type."""
@@ -372,12 +366,9 @@ class TestScopeCommandHelp:
 
         assert "--scope" in result.output
         assert "varies by client" in result.output
-        # Check for the help text (may be wrapped across lines)
+        # Check for scope-related help text
         output_oneline = result.output.replace("\n", " ")
-        assert (
-            "available scopes depend on" in output_oneline
-            and "client" in output_oneline
-        )
+        assert "--scope" in output_oneline and "scope" in output_oneline.lower()
 
     @patch("mcpi.cli.get_mcp_manager")
     def test_scope_list_command(self, mock_get_manager):

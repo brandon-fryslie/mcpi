@@ -216,5 +216,14 @@
       "tmux-mcp"
     ],
     "repository": "https://github.com/nickgnd/tmux-mcp"
+  },
+  "brandon-fryslie/better-xcode-mcp": {
+    "description": "Enhanced Xcode integration with project management, iOS simulator control, CocoaPods, and Swift Package Manager support",
+    "command": "npx",
+    "args": [
+      "-y",
+      "github:brandon-fryslie/better-xcode-mcp"
+    ],
+    "repository": "https://github.com/brandon-fryslie/better-xcode-mcp"
   }
 }
