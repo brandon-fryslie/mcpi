@@ -17,7 +17,6 @@ from mcpi.clients.types import ServerState
 from mcpi.registry.catalog import (
     MCPServer,
     ServerCatalog,
-    ServerRegistry,
 )
 from mcpi.registry.catalog_manager import create_default_catalog_manager
 
@@ -42,10 +41,6 @@ class FzfAdapter:
     Environment Variables:
     - MCPI_FZF_SCOPE: Current target scope for operations
     """
-
-    def __init__(self):
-        """Initialize the fzf adapter."""
-        pass
 
     def launch(
         self,
@@ -197,13 +192,17 @@ class FzfAdapter:
     ) -> str:
         """Format a server as a line for fzf display.
 
+        Format: server-id<TAB>display_text
+        The server-id is separated by tab so fzf can use --accept-nth=1 to return
+        just the ID, while --with-nth=2 displays only the formatted text.
+
         Args:
             server_id: Server identifier
             server: Server catalog entry
             status: Server status dictionary from _get_server_status
 
         Returns:
-            Formatted line with ANSI color codes
+            Formatted line as "server-id<TAB>display_text" with ANSI color codes
         """
         # ANSI color codes
         GREEN = "\033[32m"
@@ -217,19 +216,19 @@ class FzfAdapter:
         if len(description) > max_desc_length:
             description = description[:max_desc_length] + "..."
 
-        # Format based on status
+        # Format display text based on status
         if status["state"] == ServerState.ENABLED:
-            # Green + bold for enabled
             icon = "✓"
-            return f"{GREEN}{BOLD}[{icon}] {server_id}{RESET} - {description}"
+            display = f"{GREEN}{BOLD}[{icon}] {server_id}{RESET} - {description}"
         elif status["state"] == ServerState.DISABLED:
-            # Yellow + bold for disabled
             icon = "✗"
-            return f"{YELLOW}{BOLD}[{icon}] {server_id}{RESET} - {description}"
+            display = f"{YELLOW}{BOLD}[{icon}] {server_id}{RESET} - {description}"
         else:
-            # Normal for not installed
             icon = " "
-            return f"[{icon}] {server_id} - {description}"
+            display = f"[{icon}] {server_id} - {description}"
+
+        # Return as "server-id<TAB>display" for fzf field separation
+        return f"{server_id}\t{display}"
 
     def _build_server_list(
         self, catalog: ServerCatalog, manager: MCPManager
@@ -326,20 +325,13 @@ class FzfAdapter:
         if current_scope is None:
             current_scope = self._get_current_scope()
 
-        # Extract server ID from fzf selection
-        # Format is "[X] server-id - description"
-        # We use awk to extract the server-id (field 2)
-        extract_id = "awk '{print $2}'"
+        # Server lines are formatted as "server-id<TAB>display_text"
+        # fzf uses --delimiter to split fields:
+        #   --with-nth=2 shows only the display text (field 2)
+        #   {1} in bindings references the server-id (field 1)
 
         # Multi-line header with scope indicator
-        # Line 1: Title with current scope (dynamic width)
-        # Line 2: Scope cycling and operation shortcuts
-        # Line 3: Info/Exit shortcuts
         # Compact header that fits in 60 columns (safe for narrow terminals)
-        # Line 1: Title + scope (max 60 chars with longest scope name)
-        # Line 2: Scope change + server ops (47 chars)
-        # Line 3: State ops (37 chars)
-        # Line 4: Info/exit (25 chars)
         header = (
             f"MCPI | Scope: {current_scope}\n"
             "^S:Chg-Scope ^A:Add ^R:Remove\n"
@@ -350,33 +342,33 @@ class FzfAdapter:
         return [
             "fzf",
             "--ansi",  # Enable ANSI color codes
+            "--delimiter=\t",  # Split on tab
+            "--with-nth=2",  # Display only field 2 (the formatted display text)
             f"--header={header}",
             "--header-lines=0",
             "--layout=reverse",
             "--border",
             "--preview",
-            # Validate server ID before running info to avoid errors during typing
-            # Use --plain flag to avoid box-drawing characters in narrow preview pane
-            f'id=$(echo {{}} | {extract_id}); [ -n "$id" ] && mcpi info "$id" --plain 2>/dev/null || echo \'Select a server to view details\'',
+            # {1} is the server-id (field 1 before the tab)
+            'id={1}; [ -n "$id" ] && mcpi info "$id" --plain 2>/dev/null || echo \'Select a server to view details\'',
             "--preview-window=right:50%:wrap",
             # Scope cycling binding (ctrl-s)
-            # Use Python module execution to avoid PATH issues
             "--bind",
-            f"ctrl-s:reload(python -c 'from mcpi.cli import tui_cycle_scope_entry; tui_cycle_scope_entry()')+clear-query",
-            # Operation bindings with --scope parameter
+            "ctrl-s:reload(python -c 'from mcpi.cli import tui_cycle_scope_entry; tui_cycle_scope_entry()')+clear-query",
+            # Operation bindings - {1} extracts server-id directly
             "--bind",
-            f"ctrl-a:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi add {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            f"ctrl-a:execute(mcpi add {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
             "--bind",
-            f"ctrl-r:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi remove {{}})+reload(mcpi-tui-reload)",
+            "ctrl-r:execute(mcpi remove {1})+reload(mcpi-tui-reload)",
             "--bind",
-            f"ctrl-e:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi enable {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            f"ctrl-e:execute(mcpi enable {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
             "--bind",
-            f"ctrl-d:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi disable {{}} --scope {current_scope})+reload(mcpi-tui-reload)",
-            # Info bindings (no scope needed for read-only operations)
+            f"ctrl-d:execute(mcpi disable {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            # Info bindings
             "--bind",
-            f"ctrl-i:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi info {{}} | less)",
+            "ctrl-i:execute(mcpi info {1} | less)",
             "--bind",
-            f"enter:execute(echo {{}} | {extract_id} | xargs -I {{}} mcpi info {{}} | less)",
+            "enter:execute(mcpi info {1} | less)",
         ]
 
 
@@ -403,25 +395,6 @@ def reload_server_list(
         if catalog is None:
             catalog_manager = create_default_catalog_manager()
             catalog = catalog_manager.get_catalog("official")
-        else:
-            # Catalog was provided (e.g., by tests) - ensure it's marked as loaded
-            # to prevent auto-loading from production file in list_servers()
-            # Tests may set catalog._servers directly (old pattern) or _registry (new pattern)
-            # Handle both cases to maintain test compatibility
-            if hasattr(catalog, "_loaded") and not catalog._loaded:
-                # Case 1: Test set _servers directly on catalog (old pattern, wrong but happens)
-                if (
-                    hasattr(catalog, "_servers")
-                    and catalog._servers
-                    and not catalog._registry
-                ):
-                    # Initialize registry from the servers dict
-                    catalog._registry = ServerRegistry(servers=catalog._servers)
-                    catalog._loaded = True
-                # Case 2: Test properly set _registry with data
-                elif hasattr(catalog, "_registry") and catalog._registry is not None:
-                    # Mark as loaded to prevent auto-load
-                    catalog._loaded = True
 
         if manager is None:
             manager = create_default_manager()

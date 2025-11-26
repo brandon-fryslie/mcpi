@@ -376,3 +376,30 @@ def create_test_catalog(
     return ServerCatalog(
         catalog_path=test_data_path, validate_with_cue=validate_with_cue
     )
+
+
+def create_in_memory_catalog(servers: Dict[str, MCPServer]) -> ServerCatalog:
+    """Create a ServerCatalog with in-memory test data (no file required).
+
+    This is the preferred way to create test catalogs when you don't need
+    file persistence. It properly initializes the internal registry structure.
+
+    Args:
+        servers: Dictionary mapping server_id to MCPServer objects
+
+    Returns:
+        ServerCatalog instance with test data loaded
+
+    Example:
+        catalog = create_in_memory_catalog({
+            "test-server": MCPServer(description="Test", command="npx"),
+        })
+    """
+    # Use a dummy path since we won't be loading from file
+    catalog = ServerCatalog(
+        catalog_path=Path("/dev/null"), validate_with_cue=False
+    )
+    # Properly initialize the registry with test data
+    catalog._registry = ServerRegistry(servers=servers)
+    catalog._loaded = True
+    return catalog

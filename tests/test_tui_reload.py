@@ -23,7 +23,7 @@ from mcpi.clients import MCPManager, ServerConfig
 from mcpi.clients.manager import create_default_manager
 from mcpi.clients.registry import ClientRegistry
 from mcpi.clients.types import ServerInfo, ServerState
-from mcpi.registry.catalog import MCPServer, ServerCatalog, create_default_catalog
+from mcpi.registry.catalog import MCPServer, ServerCatalog, create_in_memory_catalog
 
 # Import CLI after checking if command exists
 from mcpi import cli
@@ -86,16 +86,14 @@ class TestReloadServerListFunction:
         # Pass registry to manager to avoid creating new registry with safety violations
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        # Create REAL catalog (with minimal test data)
-        real_catalog = create_default_catalog()
-        # Add test server to catalog
-        real_catalog._servers = {
+        # Create catalog with test data using the proper factory function
+        real_catalog = create_in_memory_catalog({
             "test-server": MCPServer(
                 description="Test server for reload",
                 command="npx",
                 args=["-y", "test"],
             )
-        }
+        })
 
         # Call the function with our real instances (no mocking needed!)
         # This is the correct way - pass configured instances directly
@@ -161,11 +159,11 @@ class TestReloadServerListFunction:
 
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = create_default_catalog()
-        real_catalog._servers = {
+        # Create catalog with test data using the proper factory function
+        real_catalog = create_in_memory_catalog({
             "server1": MCPServer(description="Server One", command="npx"),
             "server2": MCPServer(description="Server Two", command="node"),
-        }
+        })
 
         # Get expected output from build_server_list
         # build_server_list is now a method on FzfAdapter, use the adapter directly
@@ -196,12 +194,9 @@ class TestReloadServerListFunction:
         # Use empty registry to avoid client detection in test mode
         empty_registry = ClientRegistry(auto_discover=False)
         real_manager = MCPManager(registry=empty_registry, default_client=None)
-        real_catalog = create_default_catalog()
-        # Set up empty registry to avoid loading default registry
-        from mcpi.registry.catalog import ServerRegistry
 
-        real_catalog._registry = ServerRegistry(servers={})
-        real_catalog._loaded = True
+        # Create empty catalog using the proper factory function
+        real_catalog = create_in_memory_catalog({})
 
         # Call the function with our real instances
         reload_server_list(catalog=real_catalog, manager=real_manager)
@@ -267,12 +262,12 @@ class TestReloadServerListFunction:
 
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = create_default_catalog()
-        real_catalog._servers = {
+        # Create catalog with test data using the proper factory function
+        real_catalog = create_in_memory_catalog({
             "enabled-server": MCPServer(description="Enabled", command="npx"),
             "disabled-server": MCPServer(description="Disabled", command="npx"),
             "not-installed": MCPServer(description="Not Installed", command="npx"),
-        }
+        })
 
         # Call the function with our real instances
         reload_server_list(catalog=real_catalog, manager=real_manager)
@@ -375,8 +370,8 @@ class TestTuiReloadCLICommand:
         # Create manager with registry
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        # Create catalog
-        real_catalog = create_default_catalog()
+        # Create empty catalog for the test (we just need a valid catalog object)
+        real_catalog = create_in_memory_catalog({})
 
         runner = CliRunner()
 
@@ -621,7 +616,7 @@ class TestFzfIntegrationWithReload:
 
         # Setup: Create real config file
         config_file = tmp_path / "test_config.json"
-        config_file.write_text(json.dumps({"mcpEnabled": True, "mcpServers": {}}))
+        config_file.write_text(json.dumps({"mcpServers": {}}))
 
         # Create REAL plugin and manager
         real_plugin = ClaudeCodePlugin(path_overrides={"user-mcp": config_file})
@@ -630,14 +625,14 @@ class TestFzfIntegrationWithReload:
 
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = create_default_catalog()
-        real_catalog._servers = {
+        # Create catalog with test data using the proper factory function
+        real_catalog = create_in_memory_catalog({
             "test-server": MCPServer(
                 description="Test Server",
                 command="npx",
                 args=["-y", "test"],
             )
-        }
+        })
 
         # Initial state: server not installed
         state_before = real_manager.get_server_state("test-server")
@@ -730,12 +725,8 @@ class TestReloadEdgeCases:
 
         real_manager = MCPManager(default_client="claude-code", registry=registry)
 
-        real_catalog = create_default_catalog()
-        # Set up empty registry to avoid loading default registry
-        from mcpi.registry.catalog import ServerRegistry
-
-        real_catalog._registry = ServerRegistry(servers={})
-        real_catalog._loaded = True
+        # Create empty catalog using the proper factory function
+        real_catalog = create_in_memory_catalog({})
 
         # Should handle error gracefully
         try:
@@ -772,17 +763,15 @@ class TestReloadPerformance:
         # Use empty registry to avoid client detection in test mode
         empty_registry = ClientRegistry(auto_discover=False)
         real_manager = MCPManager(registry=empty_registry, default_client=None)
-        real_catalog = create_default_catalog()
-        # Add a reasonable number of servers
-        # Clear default servers and add test data (simulate typical use)
-        real_catalog._servers = {
+
+        # Create catalog with test data using the proper factory function
+        real_catalog = create_in_memory_catalog({
             f"server-{i}": MCPServer(
                 description=f"Test Server {i}",
                 command="npx",
             )
             for i in range(50)
-        }
-        real_catalog._loaded = True  # Prevent auto-reload
+        })
 
         import io
         import sys
