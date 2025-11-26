@@ -68,10 +68,6 @@ class ProjectDetector:
         "sqlite": ["sqlite"],
     }
 
-    def __init__(self):
-        """Initialize the project detector."""
-        pass
-
     def detect(self, project_path: Path) -> ProjectContext:
         """Analyze project directory and detect characteristics.
 
