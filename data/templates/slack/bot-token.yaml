@@ -49,7 +49,7 @@ notes: |
     Or use this URL format: https://[workspace].slack.com/admin/settings#team_id
 
   Token format:
-    - Bot tokens: xoxb-0000000000-0000000000-FAKEFAKEFAKEFAKEFAKEFAK
+    - Bot tokens: xoxb-NUMBERS-NUMBERS-ALPHANUMERIC
 
   What the bot can do:
     - Read messages in public channels it's invited to
