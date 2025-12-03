@@ -225,5 +225,14 @@
       "github:brandon-fryslie/better-xcode-mcp"
     ],
     "repository": "https://github.com/brandon-fryslie/better-xcode-mcp"
+  },
+  "bigcodegen/mcp-neovim-server": {
+    "description": "Control Neovim using MCP with text editing, navigation, and Vim commands via node-client",
+    "command": "npx",
+    "args": [
+      "-y",
+      "mcp-neovim-server"
+    ],
+    "repository": "https://github.com/bigcodegen/mcp-neovim-server"
   }
 }
