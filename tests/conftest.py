@@ -6,12 +6,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-try:
-    from mcpi.config.manager import ConfigManager, MCPIConfig, ProfileConfig
-except ImportError:
-    # These may not exist in the new structure
-    ConfigManager = ProfileConfig = MCPIConfig = None
-
 from mcpi.registry.catalog import MCPServer
 
 # Import test harness fixtures - pytest uses these via dependency injection
@@ -138,34 +132,8 @@ def protect_real_user_files():
 
 
 # =============================================================================
-
-
-@pytest.fixture
-def mock_config_manager():
-    """Create a mock ConfigManager with common setup."""
-    return Mock(spec=ConfigManager)
-
-
-@pytest.fixture
-def mock_profile_config():
-    """Create a mock ProfileConfig with common attributes."""
-    profile = Mock(spec=ProfileConfig)
-    profile.target = "claude-code"
-    profile.config_path = "/test/config"
-    profile.install_global = True
-    profile.use_uv = True
-    profile.python_path = None
-    return profile
-
-
-@pytest.fixture
-def mock_mcpi_config():
-    """Create a mock MCPIConfig with common setup."""
-    config = Mock(spec=MCPIConfig)
-    config.general = Mock()
-    config.general.default_profile = "default"
-    config.profiles = {}
-    return config
+# Mock Fixtures
+# =============================================================================
 
 
 @pytest.fixture
@@ -173,7 +141,6 @@ def mock_mcp_server():
     """Create a mock MCPServer with common setup."""
     server = Mock(spec=MCPServer)
 
-    # New structure fields
     server.id = "test-server"
     server.name = "Test Server"
     server.description = "Test description"
@@ -188,31 +155,12 @@ def mock_mcp_server():
     return server
 
 
-def create_mock_profile(**overrides):
-    """Create a mock profile with default values and optional overrides."""
-    defaults = {
-        "target": "claude-code",
-        "config_path": "/test/config",
-        "install_global": True,
-        "use_uv": True,
-        "python_path": None,
-    }
-    defaults.update(overrides)
-
-    profile = Mock()
-    for key, value in defaults.items():
-        setattr(profile, key, value)
-
-    return profile
-
-
 def create_mock_server(
     method="npx", package="test-package", required_config=None, optional_config=None
 ):
     """Create a mock MCP server with specified configuration."""
     server = Mock()
 
-    # New structure
     server.id = "test-server"
     server.name = "Test Server"
     server.description = "Test description"
