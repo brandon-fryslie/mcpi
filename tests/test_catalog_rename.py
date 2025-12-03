@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import warnings
 
 from mcpi.registry.catalog import (
     MCPServer,
@@ -221,6 +222,7 @@ class TestFactoryFunctionRename:
     - Validates path resolution uses catalog naming
     """
 
+    @pytest.mark.filterwarnings("ignore:create_default_catalog.*:DeprecationWarning")
     def test_create_default_catalog_uses_catalog_path(self):
         """Verify create_default_catalog() references catalog.json not registry.json."""
         catalog = create_default_catalog(validate_with_cue=False)
@@ -356,6 +358,7 @@ class TestCatalogValidation:
     - Verifies data integrity end-to-end
     """
 
+    @pytest.mark.filterwarnings("ignore:create_default_catalog.*:DeprecationWarning")
     def test_catalog_loads_with_cue_validation(self):
         """Verify catalog can be loaded with CUE validation enabled."""
         try:

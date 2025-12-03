@@ -19,6 +19,7 @@ These tests are UNGAMEABLE because they:
 
 import json
 import pytest
+import warnings
 from pathlib import Path
 from mcpi.registry.catalog import ServerCatalog, MCPServer
 
@@ -534,6 +535,7 @@ class TestServerCatalogFactoryFunctions:
         registry_path.write_text(json.dumps(registry_data, indent=2))
         return registry_path
 
+    @pytest.mark.filterwarnings("ignore:create_default_catalog.*:DeprecationWarning")
     def test_create_default_catalog_factory_returns_working_instance(self):
         """Test create_default_catalog() factory function returns working catalog.
 

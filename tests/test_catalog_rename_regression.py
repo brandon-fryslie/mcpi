@@ -21,6 +21,7 @@ Gaming Resistance:
 
 import json
 import pytest
+import warnings
 from pathlib import Path
 from mcpi.registry.catalog import (
     ServerCatalog,
@@ -371,6 +372,7 @@ class TestFactoryFunctionsBehavior:
     After rename, these functions will reference catalog.json instead of registry.json.
     """
 
+    @pytest.mark.filterwarnings("ignore:create_default_catalog.*:DeprecationWarning")
     def test_create_default_catalog_loads_production_data(self):
         """Verify create_default_catalog() loads from data/catalog.json.
 
