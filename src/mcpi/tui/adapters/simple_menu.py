@@ -83,25 +83,46 @@ class SimpleMenuAdapter:
         scopes_info = self.manager.get_scopes_for_client(self.manager.default_client)
         return [s for s in scopes_info if not s.get("readonly", False)]
 
-    def _get_default_scope(self) -> Optional[str]:
-        """Get default scope from mcpi.toml config file if present.
+    def _load_config(self) -> dict:
+        """Load mcpi config from global and project files.
 
-        Looks for mcpi.toml file in current directory with format:
-            default_scope = "scope-name"
+        Config files (in order of precedence, later overrides earlier):
+            1. ~/.config/mcpi/mcpi.toml (global)
+            2. ./mcpi.toml (project)
+
+        Returns:
+            Merged config dict
+        """
+        import toml
+
+        config = {}
+
+        # Global config
+        global_config = Path.home() / ".config" / "mcpi" / "mcpi.toml"
+        if global_config.exists():
+            try:
+                config.update(toml.load(global_config))
+            except Exception:
+                pass
+
+        # Project config (overrides global)
+        project_config = Path.cwd() / "mcpi.toml"
+        if project_config.exists():
+            try:
+                config.update(toml.load(project_config))
+            except Exception:
+                pass
+
+        return config
+
+    def _get_default_scope(self) -> Optional[str]:
+        """Get default scope from config.
 
         Returns:
             Default scope name or None
         """
-        import toml
-
-        config_file = Path.cwd() / "mcpi.toml"
-        if config_file.exists():
-            try:
-                config = toml.load(config_file)
-                return config.get("default_scope")
-            except Exception:
-                pass
-        return None
+        config = self._load_config()
+        return config.get("default_scope")
 
     def _select_scope(self, scopes: List[dict]) -> Optional[str]:
         """Prompt user to select a scope.
