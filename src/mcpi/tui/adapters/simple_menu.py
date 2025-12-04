@@ -4,6 +4,7 @@ Pure Python interactive menu for managing MCP servers.
 Uses simple-term-menu for fuzzy search and selection.
 """
 
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from rich.console import Console
@@ -48,10 +49,21 @@ class SimpleMenuAdapter:
             console.print("[red]No writable scopes available[/red]")
             return
 
-        # Select scope
-        if initial_scope and initial_scope in scopes:
+        scope_names = [s["name"] for s in scopes]
+
+        # Try to find a scope: CLI arg > .mcpi config > prompt
+        scope = None
+        if initial_scope and initial_scope in scope_names:
             scope = initial_scope
         else:
+            # Check for project default
+            default_scope = self._get_default_scope()
+            if default_scope and default_scope in scope_names:
+                scope = default_scope
+                console.print(f"[dim]Using default scope from .mcpi: {scope}[/dim]")
+
+        # Still no scope? Prompt user
+        if scope is None:
             scope = self._select_scope(scopes)
             if scope is None:
                 return
@@ -66,28 +78,63 @@ class SimpleMenuAdapter:
                 if new_scope:
                     scope = new_scope
 
-    def _get_writable_scopes(self) -> List[str]:
-        """Get list of writable scope names."""
+    def _get_writable_scopes(self) -> List[dict]:
+        """Get list of writable scopes with their info."""
         scopes_info = self.manager.get_scopes_for_client(self.manager.default_client)
-        return [s["name"] for s in scopes_info if not s.get("readonly", False)]
+        return [s for s in scopes_info if not s.get("readonly", False)]
 
-    def _select_scope(self, scopes: List[str]) -> Optional[str]:
+    def _get_default_scope(self) -> Optional[str]:
+        """Get default scope from .mcpi config file if present.
+
+        Looks for .mcpi file in current directory with format:
+            default_scope = scope-name
+
+        Returns:
+            Default scope name or None
+        """
+        config_file = Path.cwd() / ".mcpi"
+        if config_file.exists():
+            try:
+                content = config_file.read_text()
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("default_scope"):
+                        parts = line.split("=", 1)
+                        if len(parts) == 2:
+                            return parts[1].strip()
+            except OSError:
+                pass
+        return None
+
+    def _select_scope(self, scopes: List[dict]) -> Optional[str]:
         """Prompt user to select a scope.
 
         Args:
-            scopes: Available scope names
+            scopes: Available scope info dicts
 
         Returns:
             Selected scope name or None if cancelled
         """
+        # Format: "scope-name (path)"
+        menu_items = []
+        home = str(Path.home())
+        for s in scopes:
+            path = s.get("path", "")
+            if path:
+                # Shorten home directory
+                path = path.replace(home, "~")
+                menu_items.append(f"{s['name']} ({path})")
+            else:
+                menu_items.append(s["name"])
+
         menu = TerminalMenu(
-            scopes,
+            menu_items,
             title="Select target scope:",
             search_key="/",
             show_search_hint=True,
         )
         index = menu.show()
-        return scopes[index] if index is not None else None
+        return scopes[index]["name"] if index is not None else None
 
     def _main_menu(self, scope: str) -> str:
         """Show main menu and handle selection.
