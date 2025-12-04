@@ -60,7 +60,7 @@ class SimpleMenuAdapter:
             default_scope = self._get_default_scope()
             if default_scope and default_scope in scope_names:
                 scope = default_scope
-                console.print(f"[dim]Using default scope from .mcpi: {scope}[/dim]")
+                console.print(f"[dim]Using default scope from mcpi.toml: {scope}[/dim]")
 
         # Still no scope? Prompt user
         if scope is None:
@@ -84,25 +84,22 @@ class SimpleMenuAdapter:
         return [s for s in scopes_info if not s.get("readonly", False)]
 
     def _get_default_scope(self) -> Optional[str]:
-        """Get default scope from .mcpi config file if present.
+        """Get default scope from mcpi.toml config file if present.
 
-        Looks for .mcpi file in current directory with format:
-            default_scope = scope-name
+        Looks for mcpi.toml file in current directory with format:
+            default_scope = "scope-name"
 
         Returns:
             Default scope name or None
         """
-        config_file = Path.cwd() / ".mcpi"
+        import toml
+
+        config_file = Path.cwd() / "mcpi.toml"
         if config_file.exists():
             try:
-                content = config_file.read_text()
-                for line in content.splitlines():
-                    line = line.strip()
-                    if line.startswith("default_scope"):
-                        parts = line.split("=", 1)
-                        if len(parts) == 2:
-                            return parts[1].strip()
-            except OSError:
+                config = toml.load(config_file)
+                return config.get("default_scope")
+            except Exception:
                 pass
         return None
 
