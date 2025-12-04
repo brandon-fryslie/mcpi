@@ -10,6 +10,15 @@
         "EXAMPLE_ENV_VAR": "EXAMPLE_ENV_VAR_VALUE",
         "EXAMPLE_ENV_VAR2": "EXAMPLE_ENV_VAR_VALUE2"
       }
+    },
+    "upstash/context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {},
+      "type": "stdio"
     }
   }
 }

@@ -355,7 +355,7 @@ class FzfAdapter:
             "--preview-window=right:50%:wrap",
             # Scope cycling binding (ctrl-s)
             "--bind",
-            "ctrl-s:reload(python -c 'from mcpi.cli import tui_cycle_scope_entry; tui_cycle_scope_entry()')+clear-query",
+            "ctrl-s:reload(mcpi-tui-cycle-scope)+clear-query",
             # Operation bindings - {1} extracts server-id directly
             "--bind",
             f"ctrl-a:execute(mcpi add {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
