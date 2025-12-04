@@ -429,6 +429,7 @@ class MCPManager:
                     "path": str(scope.path) if scope.path else None,
                     "is_user_level": scope.is_user_level,
                     "is_project_level": scope.is_project_level,
+                    "readonly": scope.readonly,
                     "exists": client.get_scope_handler(scope.name).exists(),
                 }
                 for scope in scopes

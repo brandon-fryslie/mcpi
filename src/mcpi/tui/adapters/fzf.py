@@ -280,16 +280,17 @@ class FzfAdapter:
         return os.environ.get("MCPI_FZF_SCOPE", "project-mcp")
 
     def _get_available_scopes(self, manager: MCPManager) -> List[str]:
-        """Get list of available scope names for cycling.
+        """Get list of available writable scope names for cycling.
 
         Args:
             manager: MCPManager instance
 
         Returns:
-            List of scope names in cycling order
+            List of writable scope names in cycling order (excludes readonly scopes)
         """
         scopes_info = manager.get_scopes_for_client(manager.default_client)
-        return [scope["name"] for scope in scopes_info]
+        # Filter out readonly scopes (like plugin scope)
+        return [scope["name"] for scope in scopes_info if not scope.get("readonly", False)]
 
     def _set_next_scope(self, current_scope: str, available_scopes: List[str]) -> str:
         """Cycle to next scope in the list.

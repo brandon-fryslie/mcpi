@@ -32,6 +32,7 @@ class ScopeConfig:
     path: Optional[Path] = None
     is_user_level: bool = False
     is_project_level: bool = False
+    readonly: bool = False
 
     def __post_init__(self) -> None:
         """Validate scope configuration."""

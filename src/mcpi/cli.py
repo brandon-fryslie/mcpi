@@ -2771,5 +2771,32 @@ def tui_reload_entry() -> None:
         sys.exit(1)
 
 
+def tui_cycle_scope_entry() -> None:
+    """Entry point for mcpi-tui-cycle-scope console script.
+
+    This function is called when the user presses ctrl-s in fzf to cycle scopes.
+    It cycles to the next writable scope and reloads the server list.
+    """
+    from mcpi.tui import cycle_scope_and_reload
+
+    try:
+        # Create a minimal Click context for initialization
+        ctx = click.Context(main)
+        ctx.ensure_object(dict)
+        ctx.obj["verbose"] = False
+        ctx.obj["dry_run"] = False
+        ctx.obj["debug"] = False
+
+        # Initialize manager and catalog
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+
+        # Call cycle and reload function
+        cycle_scope_and_reload(catalog, manager)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

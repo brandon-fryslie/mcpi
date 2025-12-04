@@ -88,6 +88,7 @@ class ClaudeCodePlugin(MCPClientPlugin):
                 priority=0,
                 path=plugin_settings_path,  # Primary path for exists() checks
                 is_user_level=True,
+                readonly=True,
             ),
             settings_path=plugin_settings_path,
             installed_plugins_path=plugin_installed_path,
