@@ -8,7 +8,11 @@ server preview, and scope cycling.
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# File to store current scope (needed because fzf subprocesses don't share env vars)
+SCOPE_FILE = Path.home() / ".mcpi_fzf_scope"
 
 from rich.console import Console
 
@@ -69,15 +73,16 @@ class FzfAdapter:
 
         # Initialize scope
         if initial_scope:
-            os.environ["MCPI_FZF_SCOPE"] = initial_scope
+            self._write_scope(initial_scope)
         else:
             # Set to first available scope
             available_scopes = self._get_available_scopes(manager)
             if available_scopes:
                 initial_scope = available_scopes[0]
-                os.environ["MCPI_FZF_SCOPE"] = initial_scope
+                self._write_scope(initial_scope)
             else:
                 initial_scope = "project-mcp"
+                self._write_scope(initial_scope)
 
         # Build server list
         server_lines = self._build_server_list(catalog, manager)
@@ -271,13 +276,29 @@ class FzfAdapter:
         # Return just the formatted lines
         return [line for _, line in server_lines]
 
+    def _write_scope(self, scope: str) -> None:
+        """Write current scope to file for fzf subprocess access.
+
+        Args:
+            scope: Scope name to write
+        """
+        try:
+            SCOPE_FILE.write_text(scope)
+        except OSError:
+            pass  # Best effort - fall back to default if can't write
+
     def _get_current_scope(self) -> str:
-        """Get current scope from environment or return default.
+        """Get current scope from file or return default.
 
         Returns:
-            Current scope name (defaults to first available scope)
+            Current scope name (defaults to project-mcp)
         """
-        return os.environ.get("MCPI_FZF_SCOPE", "project-mcp")
+        try:
+            if SCOPE_FILE.exists():
+                return SCOPE_FILE.read_text().strip()
+        except OSError:
+            pass
+        return "project-mcp"
 
     def _get_available_scopes(self, manager: MCPManager) -> List[str]:
         """Get list of available writable scope names for cycling.
@@ -309,8 +330,8 @@ class FzfAdapter:
             # If current scope not found or list empty, use first scope
             next_scope = available_scopes[0] if available_scopes else "project-mcp"
 
-        # Store in environment for next reload
-        os.environ["MCPI_FZF_SCOPE"] = next_scope
+        # Store in file for fzf subprocess access
+        self._write_scope(next_scope)
         return next_scope
 
     def _build_fzf_command(self, current_scope: Optional[str] = None) -> List[str]:
@@ -357,14 +378,15 @@ class FzfAdapter:
             "--bind",
             "ctrl-s:reload(mcpi-tui-cycle-scope)+clear-query",
             # Operation bindings - {1} extracts server-id directly
+            # Read scope from file so scope changes are reflected immediately
             "--bind",
-            f"ctrl-a:execute(mcpi add {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            'ctrl-a:execute(mcpi add {1} --scope "$(cat ~/.mcpi_fzf_scope)")+reload(mcpi-tui-reload)',
             "--bind",
             "ctrl-r:execute(mcpi remove {1})+reload(mcpi-tui-reload)",
             "--bind",
-            f"ctrl-e:execute(mcpi enable {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            'ctrl-e:execute(mcpi enable {1} --scope "$(cat ~/.mcpi_fzf_scope)")+reload(mcpi-tui-reload)',
             "--bind",
-            f"ctrl-d:execute(mcpi disable {{1}} --scope {current_scope})+reload(mcpi-tui-reload)",
+            'ctrl-d:execute(mcpi disable {1} --scope "$(cat ~/.mcpi_fzf_scope)")+reload(mcpi-tui-reload)',
             # Info bindings
             "--bind",
             "ctrl-i:execute(mcpi info {1} | less)",
