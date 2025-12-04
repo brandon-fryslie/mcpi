@@ -7,6 +7,7 @@ Uses simple-term-menu for fuzzy search and selection.
 from typing import List, Optional, Tuple
 
 from rich.console import Console
+from simple_term_menu import TerminalMenu
 
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.types import ServerState
@@ -41,13 +42,6 @@ class SimpleMenuAdapter:
         Args:
             initial_scope: Starting scope (prompts if not provided)
         """
-        try:
-            from simple_term_menu import TerminalMenu
-        except ImportError:
-            console.print("[red]simple-term-menu not installed[/red]")
-            console.print("Install with: pip install simple-term-menu")
-            return
-
         # Get writable scopes
         scopes = self._get_writable_scopes()
         if not scopes:
@@ -86,8 +80,6 @@ class SimpleMenuAdapter:
         Returns:
             Selected scope name or None if cancelled
         """
-        from simple_term_menu import TerminalMenu
-
         menu = TerminalMenu(
             scopes,
             title="Select target scope:",
@@ -106,8 +98,6 @@ class SimpleMenuAdapter:
         Returns:
             "quit", "change_scope", or "continue"
         """
-        from simple_term_menu import TerminalMenu
-
         # Build server list with status indicators
         servers = self._get_servers_with_status()
         if not servers:
@@ -194,8 +184,6 @@ class SimpleMenuAdapter:
         Returns:
             "continue" to keep looping
         """
-        from simple_term_menu import TerminalMenu
-
         # Build available actions based on state
         actions = []
         action_map = {}

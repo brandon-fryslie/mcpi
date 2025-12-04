@@ -2635,10 +2635,6 @@ def menu(ctx: click.Context, scope: Optional[str]) -> None:
 
         launch_menu(manager, catalog, scope)
 
-    except ImportError as e:
-        console.print(f"[red]Missing dependency: {e}[/red]")
-        console.print("Install with: pip install simple-term-menu")
-        ctx.exit(1)
     except Exception as e:
         if ctx.obj.get("verbose", False):
             console.print(f"[red]Error launching menu: {e}[/red]")
