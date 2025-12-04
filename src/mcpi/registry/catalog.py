@@ -351,8 +351,8 @@ def create_default_catalog(validate_with_cue: bool = True) -> ServerCatalog:
         stacklevel=2,
     )
 
-    # Calculate production catalog path
-    package_dir = Path(__file__).parent.parent.parent.parent
+    # Calculate production catalog path - now inside the package
+    package_dir = Path(__file__).parent.parent
     catalog_path = package_dir / "data" / "catalog.json"
 
     return ServerCatalog(catalog_path=catalog_path, validate_with_cue=validate_with_cue)

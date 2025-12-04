@@ -13,8 +13,8 @@ class CUEValidator:
     def __init__(self, schema_path: Optional[Path] = None):
         """Initialize with CUE schema path."""
         if schema_path is None:
-            # Default to package data directory
-            package_dir = Path(__file__).parent.parent.parent.parent
+            # Default to package data directory (now inside the package)
+            package_dir = Path(__file__).parent.parent
             schema_path = package_dir / "data" / "catalog.cue"
 
         self.schema_path = schema_path

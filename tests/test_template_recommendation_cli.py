@@ -670,7 +670,7 @@ class TestRecommendationIntegrationWithRealTemplates:
     def template_dir(self) -> Path:
         """Get actual template directory."""
         # Assuming tests run from project root
-        return Path(__file__).parent.parent / "data" / "templates"
+        return Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates"
 
     def test_cli_recommends_from_actual_postgres_templates(
         self, cli_runner, tmp_path, template_dir

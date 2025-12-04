@@ -57,7 +57,15 @@ include = ["mcpi*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-mcpi = ["py.typed", "clients/schemas/*.yaml", "clients/schemas/*.json"]
+mcpi = [
+    "py.typed",
+    "clients/schemas/*.yaml",
+    "clients/schemas/*.json",
+    "data/*.json",
+    "data/*.cue",
+    "data/bundles/*.json",
+    "data/templates/**/*.yaml"
+]
 
 # Use strict mode for editable installs to handle paths with spaces
 [tool.setuptools.dynamic]

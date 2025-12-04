@@ -151,8 +151,8 @@ def create_default_template_manager() -> TemplateManager:
     Returns:
         TemplateManager configured with package's template directory
     """
-    # Navigate from this file to package root, then to data/templates
-    package_dir = Path(__file__).parent.parent.parent.parent
+    # Navigate from this file to package data/templates (now inside the package)
+    package_dir = Path(__file__).parent.parent
     template_dir = package_dir / "data" / "templates"
     return TemplateManager(template_dir=template_dir)
 

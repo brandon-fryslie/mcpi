@@ -218,8 +218,8 @@ def create_default_catalog_manager() -> CatalogManager:
     Raises:
         FileNotFoundError: If official catalog doesn't exist
     """
-    # Official catalog (existing location in package data)
-    package_dir = Path(__file__).parent.parent.parent.parent
+    # Official catalog (now inside the package)
+    package_dir = Path(__file__).parent.parent
     official_path = package_dir / "data" / "catalog.json"
 
     if not official_path.exists():

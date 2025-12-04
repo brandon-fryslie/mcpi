@@ -44,7 +44,7 @@ class TestCatalogFileRename:
         """Verify data/catalog.json exists (renamed from registry.json)."""
         # Calculate expected path
         project_root = Path(__file__).parent.parent
-        catalog_path = project_root / "data" / "catalog.json"
+        catalog_path = project_root / "src" / "mcpi" / "data" / "catalog.json"
 
         # Verify file exists
         assert catalog_path.exists(), (
@@ -66,7 +66,7 @@ class TestCatalogFileRename:
     def test_catalog_cue_schema_exists(self):
         """Verify data/catalog.cue exists (renamed from registry.cue)."""
         project_root = Path(__file__).parent.parent
-        cue_path = project_root / "data" / "catalog.cue"
+        cue_path = project_root / "src" / "mcpi" / "data" / "catalog.cue"
 
         assert cue_path.exists(), (
             f"Expected catalog.cue at {cue_path}. "
@@ -82,8 +82,8 @@ class TestCatalogFileRename:
         """Verify old registry.json and registry.cue no longer exist."""
         project_root = Path(__file__).parent.parent
 
-        old_json_path = project_root / "data" / "registry.json"
-        old_cue_path = project_root / "data" / "registry.cue"
+        old_json_path = project_root / "src" / "mcpi" / "data" / "registry.json"
+        old_cue_path = project_root / "src" / "mcpi" / "data" / "registry.cue"
 
         assert not old_json_path.exists(), (
             f"Old registry.json still exists at {old_json_path}. "

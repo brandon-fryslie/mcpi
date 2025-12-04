@@ -101,8 +101,8 @@ def create_default_bundle_catalog() -> BundleCatalog:
     Returns:
         BundleCatalog instance configured with production bundles directory
     """
-    # Calculate production bundles directory path
-    package_dir = Path(__file__).parent.parent.parent.parent
+    # Calculate production bundles directory path (now inside the package)
+    package_dir = Path(__file__).parent.parent
     bundles_dir = package_dir / "data" / "bundles"
 
     catalog = BundleCatalog(bundles_dir=bundles_dir)

@@ -592,7 +592,7 @@ class TestTemplateRecommendation:
         (project_dir / "package.json").write_text('{"name": "app"}')
 
         # WHEN: Recommendation system processes this project
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -642,7 +642,7 @@ class TestTemplateRecommendation:
         (project_dir / "manage.py").write_text("# Django management script\n")
 
         # WHEN: Recommendation runs
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -693,7 +693,7 @@ class TestTemplateRecommendation:
         (project_dir / ".env").write_text("DATABASE_URL=postgresql://localhost/dev\n")
 
         # WHEN: Get all recommendations
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -745,7 +745,7 @@ class TestTemplateRecommendation:
         (project_dir / "docker-compose.yml").write_text(yaml.dump(docker_compose))
 
         # WHEN: Request postgres recommendations
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -797,7 +797,7 @@ class TestTemplateRecommendation:
         (project_dir / "package.json").write_text('{"name": "app"}')
 
         # WHEN: Scoring happens
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -850,7 +850,7 @@ class TestTemplateRecommendation:
         (project_dir / "docker-compose.yml").write_text(yaml.dump(docker_compose))
 
         # WHEN: Get recommendation with reasons
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
         recommendations = recommender.recommend("postgres", project_dir)
 
@@ -1027,7 +1027,7 @@ class TestEndToEndWorkflows:
         context = detector.detect(project_dir)
 
         # Step 2: Load templates (from actual template files)
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         templates = template_manager.list_templates("postgres")
 
         # Step 3: Recommendation
@@ -1092,7 +1092,7 @@ class TestEndToEndWorkflows:
         (project_dir / "docs").mkdir()
 
         # WHEN: Request recommendations for different servers
-        template_manager = create_test_template_manager(Path("data/templates"))
+        template_manager = create_test_template_manager(Path(__file__).parent.parent / "src" / "mcpi" / "data" / "templates")
         recommender = TemplateRecommender(template_manager)
 
         github_recommendations = recommender.recommend("github", project_dir)

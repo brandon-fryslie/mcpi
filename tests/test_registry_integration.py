@@ -21,8 +21,8 @@ from mcpi.registry.cue_validator import CUEValidator
 from mcpi.registry.validation import RegistryValidator
 
 # Path to actual registry file
-REGISTRY_PATH = Path(__file__).parent.parent / "data" / "catalog.json"
-CUE_SCHEMA_PATH = Path(__file__).parent.parent / "data" / "catalog.cue"
+REGISTRY_PATH = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
+CUE_SCHEMA_PATH = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.cue"
 
 
 class TestActualRegistryValidation:

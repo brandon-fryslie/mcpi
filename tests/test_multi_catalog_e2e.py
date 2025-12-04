@@ -686,7 +686,7 @@ class TestWithRealProductionCatalog:
         """Can load real catalog.json from package data."""
         # Find package directory
         package_dir = Path(__file__).parent.parent / "src" / "mcpi"
-        real_catalog = package_dir.parent.parent / "data" / "catalog.json"
+        real_catalog = package_dir / "data" / "catalog.json"
 
         # Verify it exists
         assert real_catalog.exists(), f"Production catalog not found at {real_catalog}"

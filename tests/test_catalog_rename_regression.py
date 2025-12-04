@@ -441,11 +441,11 @@ class TestProductionDataIntegrity:
         ASSERTION: Same - file exists
         """
         # BEFORE RENAME
-        registry_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        registry_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         assert registry_path.exists(), "Production registry file must exist"
 
         # AFTER RENAME:
-        # catalog_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        # catalog_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         # assert catalog_path.exists(), "Production catalog file must exist"
 
     def test_production_registry_is_valid_json(self):
@@ -456,10 +456,10 @@ class TestProductionDataIntegrity:
         ASSERTION: Same - valid JSON
         """
         # BEFORE RENAME
-        registry_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        registry_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
 
         # AFTER RENAME:
-        # catalog_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        # catalog_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
 
         with open(registry_path, encoding="utf-8") as f:
             data = json.load(f)
@@ -475,12 +475,12 @@ class TestProductionDataIntegrity:
         ASSERTION: Same - data loads successfully
         """
         # BEFORE RENAME
-        registry_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        registry_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         catalog = ServerCatalog(catalog_path=registry_path, validate_with_cue=False)
         catalog.load_catalog()
 
         # AFTER RENAME:
-        # catalog_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        # catalog_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         # catalog = ServerCatalog(catalog_path=catalog_path, validate_with_cue=False)
         # catalog.load_catalog()
 
@@ -504,12 +504,12 @@ class TestProductionDataIntegrity:
         ASSERTION: Same - all servers valid
         """
         # BEFORE RENAME
-        registry_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        registry_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         catalog = ServerCatalog(catalog_path=registry_path, validate_with_cue=False)
         catalog.load_catalog()
 
         # AFTER RENAME:
-        # catalog_path = Path(__file__).parent.parent / "data" / "catalog.json"
+        # catalog_path = Path(__file__).parent.parent / "src" / "mcpi" / "data" / "catalog.json"
         # catalog = ServerCatalog(catalog_path=catalog_path, validate_with_cue=False)
         # catalog.load_catalog()
 
