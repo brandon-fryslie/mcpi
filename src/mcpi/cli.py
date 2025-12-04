@@ -2609,33 +2609,62 @@ def install_bundle(
         ctx.exit(1)
 
 
-# FZF TUI COMMAND
+# INTERACTIVE MENU COMMAND
+
+
+@main.command()
+@click.option("--scope", "-s", help="Initial scope to use")
+@click.pass_context
+def menu(ctx: click.Context, scope: Optional[str]) -> None:
+    """Interactive menu for managing MCP servers.
+
+    Launches a terminal menu with fuzzy search (press / to search).
+
+    Flow:
+        1. Select target scope
+        2. Browse/search servers
+        3. Select server → choose action (add/remove/enable/disable)
+
+    Use arrow keys or j/k to navigate, Enter to select, Esc to go back.
+    """
+    try:
+        from mcpi.tui.adapters.simple_menu import launch_menu
+
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+
+        launch_menu(manager, catalog, scope)
+
+    except ImportError as e:
+        console.print(f"[red]Missing dependency: {e}[/red]")
+        console.print("Install with: pip install simple-term-menu")
+        ctx.exit(1)
+    except Exception as e:
+        if ctx.obj.get("verbose", False):
+            console.print(f"[red]Error launching menu: {e}[/red]")
+            import traceback
+
+            console.print(traceback.format_exc())
+        else:
+            console.print(f"[red]Failed to launch menu: {e}[/red]")
+        ctx.exit(1)
+
+
+# FZF TUI COMMAND (legacy, kept for backward compatibility)
 
 
 @main.command()
 @click.pass_context
 def fzf(ctx: click.Context) -> None:
-    """Interactive fuzzy finder for managing MCP servers.
+    """Interactive fuzzy finder using fzf (legacy).
 
-    Launches an fzf-based TUI that allows you to:
-    - Browse all available MCP servers
-    - View installed servers (highlighted in green/yellow)
-    - Add, remove, enable, disable servers with keyboard shortcuts
-    - View detailed server information
-
-    Keyboard shortcuts:
-        ctrl-a: Add server (interactive scope selection)
-        ctrl-r: Remove server
-        ctrl-e: Enable server
-        ctrl-d: Disable server
-        ctrl-i/enter: Show detailed server info
-        esc: Exit
+    Note: Consider using 'mcpi menu' instead - it's pure Python
+    and doesn't require fzf to be installed.
 
     Requirements:
         fzf must be installed (brew install fzf)
     """
     try:
-        # Import here to avoid circular dependency
         from mcpi.tui import launch_fzf_interface
 
         manager = get_mcp_manager(ctx)
@@ -2644,8 +2673,8 @@ def fzf(ctx: click.Context) -> None:
         launch_fzf_interface(manager, catalog)
 
     except RuntimeError as e:
-        # Handle fzf not installed error
         console.print(f"[red]{e}[/red]")
+        console.print("\n[yellow]Tip: Try 'mcpi menu' instead - no fzf required[/yellow]")
         ctx.exit(1)
     except Exception as e:
         if ctx.obj.get("verbose", False):

@@ -23,6 +23,7 @@ dependencies = [
     "markdownify>=0.11.0",
     "typer>=0.20.0",
     "referencing<0.37.0",  # 0.37+ requires Python 3.13+
+    "simple-term-menu>=1.6.6",
 ]
 
 [project.optional-dependencies]
