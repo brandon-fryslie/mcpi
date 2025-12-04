@@ -1,0 +1,42 @@
+Agent: iterative-implementer | 20251204-030420
+Completed: Move data directory into package | Files: 34 | Commits: 1
+Status: complete
+
+Summary:
+Fixed PyPI publishing blocker by moving data/ directory into the package structure.
+The data files (catalog.json, templates/, bundles/) are now properly included in
+the wheel distribution.
+
+Changes Made:
+1. Moved /Users/bmf/code/mcpi/data/ to /Users/bmf/code/mcpi/src/mcpi/data/
+2. Updated pyproject.toml package_data to include:
+   - data/*.json
+   - data/*.cue
+   - data/bundles/*.json
+   - data/templates/**/*.yaml
+3. Updated all source code path references (5 files):
+   - src/mcpi/registry/catalog.py
+   - src/mcpi/registry/catalog_manager.py
+   - src/mcpi/registry/cue_validator.py
+   - src/mcpi/templates/template_manager.py
+   - src/mcpi/bundles/catalog.py
+4. Updated test path references (6 files):
+   - tests/test_catalog_manager.py
+   - tests/test_catalog_rename.py
+   - tests/test_catalog_rename_regression.py
+   - tests/test_multi_catalog_e2e.py
+   - tests/test_registry_integration.py
+   - tests/test_template_discovery_functional.py
+
+Verification:
+- All 947 tests pass
+- Built wheel with uv build successfully
+- Verified data files are included in wheel (19 data files)
+- Git recognized moves as renames (preserving history)
+
+Commit: 836e525 "fix: Move data directory into package for PyPI distribution"
+
+Next Steps:
+The package is now ready for PyPI publication. Run:
+  uv build
+  twine upload dist/*
