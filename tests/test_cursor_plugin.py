@@ -668,11 +668,15 @@ class TestCursorPlugin:
         from mcpi.clients.cursor import CursorPlugin
 
         user_config_path = tmp_path / "user" / "mcp.json"
+        user_disabled_path = tmp_path / "user" / "mcp_disabled.json"
         project_config_path = tmp_path / "project" / ".cursor" / "mcp.json"
+        project_disabled_path = tmp_path / "project" / ".cursor" / "mcp_disabled.json"
 
         path_overrides = {
             "user": user_config_path,
+            "user-disabled": user_disabled_path,
             "project": project_config_path,
+            "project-disabled": project_disabled_path,
         }
 
         # First instance: add servers to both scopes
@@ -699,11 +703,15 @@ class TestCursorPlugin:
         from mcpi.clients.cursor import CursorPlugin
 
         user_config_path = tmp_path / "user" / "mcp.json"
+        user_disabled_path = tmp_path / "user" / "mcp_disabled.json"
         project_config_path = tmp_path / "project" / ".cursor" / "mcp.json"
+        project_disabled_path = tmp_path / "project" / ".cursor" / "mcp_disabled.json"
 
         path_overrides = {
             "user": user_config_path,
+            "user-disabled": user_disabled_path,
             "project": project_config_path,
+            "project-disabled": project_disabled_path,
         }
 
         # First instance: add and disable servers in both scopes
@@ -947,14 +955,18 @@ class TestCursorPluginDiscovery:
         from mcpi.clients.manager import MCPManager
         from mcpi.clients.registry import ClientRegistry
 
-        # Create isolated plugin instance
+        # Create isolated plugin instance with ALL required paths
         user_config_path = tmp_path / "user" / "mcp.json"
+        user_disabled_path = tmp_path / "user" / "mcp_disabled.json"
         project_config_path = tmp_path / "project" / ".cursor" / "mcp.json"
+        project_disabled_path = tmp_path / "project" / ".cursor" / "mcp_disabled.json"
 
         plugin = CursorPlugin(
             path_overrides={
                 "user": user_config_path,
+                "user-disabled": user_disabled_path,
                 "project": project_config_path,
+                "project-disabled": project_disabled_path,
             }
         )
 
