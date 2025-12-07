@@ -19,14 +19,15 @@ Essential clients with large user bases and mature MCP implementations.
 - **Status**: Full support implemented
 - **Notes**: Primary development target, 6 scope hierarchy
 
-### 2. Claude Desktop
+### 2. Claude Desktop ✅ IMPLEMENTED
 - **Type**: Desktop application
 - **Developer**: Anthropic
 - **Config Location**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 - **Config Format**: JSON with `mcpServers` object
-- **Status**: 🔴 Not implemented
+- **Status**: Full support implemented (commit aa2e4ab)
 - **Priority**: HIGH - Anthropic's flagship consumer product
 - **Complexity**: Low - simple single-file config
+- **Notes**: Single "user" scope, 43 comprehensive tests
 - **Sources**: [Anthropic announcement](https://www.anthropic.com/news/model-context-protocol)
 
 ### 3. Cursor
@@ -174,9 +175,9 @@ Notable clients with smaller or specialized user bases.
 
 ## Implementation Strategy
 
-### Phase 1: Anthropic Ecosystem
+### Phase 1: Anthropic Ecosystem ✅ COMPLETE
 1. ✅ Claude Code (complete)
-2. Claude Desktop (low complexity, same vendor)
+2. ✅ Claude Desktop (complete - commit aa2e4ab)
 
 ### Phase 2: Popular IDEs
 3. Cursor (large user base, simple config)
