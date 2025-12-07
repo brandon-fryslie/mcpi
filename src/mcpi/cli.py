@@ -1352,6 +1352,19 @@ def add(
 
             if result.success:
                 console.print(f"[green]✓ Successfully added {server_id}[/green]")
+
+                # Track in mcpi.toml
+                from mcpi.config import add_server_to_config
+
+                tracked, track_msg = add_server_to_config(
+                    server_id,
+                    scope,
+                    client=client,
+                    env=config.env if config.env else None,
+                    args=config.args if config.args else None,
+                )
+                if tracked:
+                    console.print(f"[dim]  {track_msg}[/dim]")
             else:
                 console.print(
                     f"[red]✗ Failed to add {server_id}: {result.message}[/red]"
@@ -1424,6 +1437,15 @@ def remove(
 
             if result.success:
                 console.print(f"[green]✓ Successfully removed {server_id}[/green]")
+
+                # Remove from mcpi.toml tracking
+                from mcpi.config import remove_server_from_config
+
+                removed, remove_msg = remove_server_from_config(
+                    server_id, scope, client=client
+                )
+                if removed:
+                    console.print(f"[dim]  {remove_msg}[/dim]")
             else:
                 console.print(
                     f"[red]✗ Failed to remove {server_id}: {result.message}[/red]"
@@ -1482,6 +1504,17 @@ def enable(
 
             if result.success:
                 console.print(f"[green]✓ Successfully enabled {server_id}[/green]")
+
+                # Update mcpi.toml tracking (move from disabled to servers)
+                from mcpi.config import enable_server_in_config
+
+                server_info = manager.get_server_info(server_id, client)
+                if server_info:
+                    enabled, enable_msg = enable_server_in_config(
+                        server_id, server_info.scope
+                    )
+                    if enabled:
+                        console.print(f"[dim]  {enable_msg}[/dim]")
             else:
                 console.print(
                     f"[red]✗ Failed to enable {server_id}: {result.message}[/red]"
@@ -1531,6 +1564,9 @@ def disable(
             console.print(f"[yellow]Server '{server_id}' is already disabled[/yellow]")
             return
 
+        # Get server info before disabling (to get scope)
+        server_info = manager.get_server_info(server_id, client)
+
         # Disable the server
         if ctx.obj.get("dry_run", False):
             console.print(f"[blue]Would disable: {server_id}[/blue]")
@@ -1540,6 +1576,16 @@ def disable(
 
             if result.success:
                 console.print(f"[green]✓ Successfully disabled {server_id}[/green]")
+
+                # Update mcpi.toml tracking (move from servers to disabled)
+                from mcpi.config import disable_server_in_config
+
+                if server_info:
+                    disabled, disable_msg = disable_server_in_config(
+                        server_id, server_info.scope
+                    )
+                    if disabled:
+                        console.print(f"[dim]  {disable_msg}[/dim]")
             else:
                 console.print(
                     f"[red]✗ Failed to disable {server_id}: {result.message}[/red]"
@@ -2764,6 +2810,139 @@ def completion(ctx: click.Context, shell: Optional[str]) -> None:
         )
         console.print("[yellow]eval (env _MCPI_COMPLETE=fish_source mcpi)[/yellow]\n")
         console.print("[dim]Then restart your shell[/dim]\n")
+
+
+# CONFIG SYNC COMMAND
+
+
+@main.command()
+@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
+@click.option("--config", "config_path", type=click.Path(exists=True), help="Path to mcpi.toml")
+@click.option(
+    "--client",
+    shell_complete=complete_client_names,
+    help="Sync servers for specific client only",
+)
+@click.pass_context
+def sync(
+    ctx: click.Context, dry_run: bool, config_path: Optional[str], client: Optional[str]
+) -> None:
+    """Sync MCP servers from mcpi.toml configuration.
+
+    Installs servers defined in mcpi.toml that aren't already installed.
+    Config files are loaded from:
+      1. ~/.config/mcpi/mcpi.toml (global defaults)
+      2. ./mcpi.toml (project-specific, overrides global)
+
+    Example mcpi.toml:
+
+    \b
+        default_scope = "project-mcp"
+
+        # Shared servers (uses default_client)
+        servers = ["@anthropic/filesystem"]
+
+        # Per-client: simple list format
+        [clients.cursor]
+        servers = ["@anthropic/sqlite"]
+        scope = "user-global"
+
+        # Per-client: dict format (allows env overrides)
+        [clients.claude-code.servers]
+        "@anthropic/fetch" = {}
+        "github" = { env = { GITHUB_TOKEN = "xxx" } }
+    """
+    from mcpi.config import (
+        get_configured_clients,
+        get_servers_from_config,
+        load_mcpi_config,
+        sync_servers,
+    )
+
+    try:
+        # Load config
+        if config_path:
+            config = load_mcpi_config(Path(config_path).parent)
+        else:
+            config = load_mcpi_config()
+
+        if not config:
+            console.print("[yellow]No mcpi.toml found[/yellow]")
+            console.print("[dim]Create one with:[/dim]")
+            console.print('  servers = ["@anthropic/filesystem"]')
+            return
+
+        # Count servers
+        top_level_servers = get_servers_from_config(config)
+        configured_clients = get_configured_clients(config)
+
+        total_servers = len(top_level_servers)
+        for c in configured_clients:
+            total_servers += len(get_servers_from_config(config, c))
+
+        if total_servers == 0:
+            console.print("[yellow]No servers defined in config[/yellow]")
+            return
+
+        # Show what we found
+        if client:
+            client_servers = get_servers_from_config(config, client)
+            if not client_servers:
+                console.print(f"[yellow]No servers defined for client: {client}[/yellow]")
+                return
+            console.print(f"[dim]Found {len(client_servers)} server(s) for {client}[/dim]")
+        else:
+            console.print(f"[dim]Found {total_servers} server(s) in config[/dim]")
+            if top_level_servers:
+                console.print(f"[dim]  • {len(top_level_servers)} shared server(s)[/dim]")
+            for c in configured_clients:
+                count = len(get_servers_from_config(config, c))
+                console.print(f"[dim]  • {count} server(s) for {c}[/dim]")
+
+        if dry_run:
+            console.print("\n[cyan]Dry run - would install:[/cyan]")
+
+        # Get dependencies
+        manager = get_mcp_manager(ctx)
+        catalog = get_catalog(ctx)
+
+        # Run sync
+        results = sync_servers(manager, catalog, config, dry_run=dry_run, client=client)
+
+        # Report results
+        if results["added"]:
+            verb = "Would install" if dry_run else "Installed"
+            console.print(f"\n[green]{verb}:[/green]")
+            for server_id in results["added"]:
+                console.print(f"  [green]✓[/green] {server_id}")
+
+        if results["skipped"]:
+            console.print(f"\n[dim]Already installed ({len(results['skipped'])}):[/dim]")
+            for server_id in results["skipped"]:
+                console.print(f"  [dim]•[/dim] {server_id}")
+
+        if results["errors"]:
+            console.print("\n[red]Errors:[/red]")
+            for error in results["errors"]:
+                console.print(f"  [red]✗[/red] {error}")
+
+        # Summary
+        if not dry_run:
+            total_added = len(results["added"])
+            if total_added:
+                console.print(f"\n[green]✓ Synced {total_added} server(s)[/green]")
+            elif not results["errors"]:
+                console.print("\n[dim]All servers already installed[/dim]")
+
+    except Exception as e:
+        if ctx.obj.get("verbose", False):
+            console.print(f"[red]Error syncing servers: {e}[/red]")
+            import traceback
+
+            console.print(traceback.format_exc())
+        else:
+            console.print(f"[red]Error: {e}[/red]")
+        ctx.exit(1)
 
 
 # TUI RELOAD ENTRY POINT (for mcpi-tui-reload console script)

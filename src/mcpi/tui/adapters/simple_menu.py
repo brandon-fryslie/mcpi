@@ -12,6 +12,7 @@ from simple_term_menu import TerminalMenu
 
 from mcpi.clients.manager import MCPManager
 from mcpi.clients.types import ServerState
+from mcpi.config import load_mcpi_config
 from mcpi.registry.catalog import MCPServer, ServerCatalog
 
 console = Console()
@@ -83,45 +84,13 @@ class SimpleMenuAdapter:
         scopes_info = self.manager.get_scopes_for_client(self.manager.default_client)
         return [s for s in scopes_info if not s.get("readonly", False)]
 
-    def _load_config(self) -> dict:
-        """Load mcpi config from global and project files.
-
-        Config files (in order of precedence, later overrides earlier):
-            1. ~/.config/mcpi/mcpi.toml (global)
-            2. ./mcpi.toml (project)
-
-        Returns:
-            Merged config dict
-        """
-        import toml
-
-        config = {}
-
-        # Global config
-        global_config = Path.home() / ".config" / "mcpi" / "mcpi.toml"
-        if global_config.exists():
-            try:
-                config.update(toml.load(global_config))
-            except Exception:
-                pass
-
-        # Project config (overrides global)
-        project_config = Path.cwd() / "mcpi.toml"
-        if project_config.exists():
-            try:
-                config.update(toml.load(project_config))
-            except Exception:
-                pass
-
-        return config
-
     def _get_default_scope(self) -> Optional[str]:
         """Get default scope from config.
 
         Returns:
             Default scope name or None
         """
-        config = self._load_config()
+        config = load_mcpi_config()
         return config.get("default_scope")
 
     def _select_scope(self, scopes: List[dict]) -> Optional[str]:
@@ -302,12 +271,12 @@ class SimpleMenuAdapter:
             if action == "add":
                 # Get server config from catalog
                 server = self.catalog.get_server(server_id)
-                if server and server.config:
+                if server and server.command:
                     from mcpi.clients.types import ServerConfig
                     config = ServerConfig(
-                        command=server.config.command,
-                        args=server.config.args or [],
-                        env=server.config.env or {},
+                        command=server.command,
+                        args=server.args or [],
+                        env={},  # MCPServer doesn't have env, user must provide via config
                     )
                     result = self.manager.add_server(server_id, config, scope)
                 else:
@@ -351,20 +320,14 @@ class SimpleMenuAdapter:
         console.print(f"\n[bold]{server_id}[/bold]")
         console.print(f"[dim]{server.description}[/dim]\n")
 
-        if server.config:
+        if server.command:
             console.print("[bold]Configuration:[/bold]")
-            console.print(f"  Command: {server.config.command}")
-            if server.config.args:
-                console.print(f"  Args: {' '.join(server.config.args)}")
-            if server.config.env:
-                console.print("  Environment:")
-                for key, val in server.config.env.items():
-                    # Mask sensitive values
-                    display_val = "***" if "key" in key.lower() or "token" in key.lower() else val
-                    console.print(f"    {key}={display_val}")
+            console.print(f"  Command: {server.command}")
+            if server.args:
+                console.print(f"  Args: {' '.join(server.args)}")
 
-        if server.homepage:
-            console.print(f"\n[link={server.homepage}]{server.homepage}[/link]")
+        if server.repository:
+            console.print(f"\n[link={server.repository}]{server.repository}[/link]")
 
         console.print("\n[dim]Press Enter to continue...[/dim]")
         input()

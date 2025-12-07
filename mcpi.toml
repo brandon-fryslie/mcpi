@@ -1,0 +1,7 @@
+[servers.test-server]
+
+[servers.postgres]
+args = [ "-y", "@modelcontextprotocol/server-postgres",]
+
+[servers.postgres.env]
+POSTGRES_DB = "mydb"

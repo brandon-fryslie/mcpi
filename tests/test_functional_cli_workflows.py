@@ -41,7 +41,7 @@ GAMING RESISTANCE:
 - Cannot be satisfied by mocked responses or hardcoded output
 """
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -86,8 +86,14 @@ class TestCLIBasicCommands:
         # Create a custom plugin with our test data
         plugin = ClaudeCodePlugin(path_overrides=prepopulated_harness.path_overrides)
 
-        # Patch the CLI to use our test plugin
-        with patch("mcpi.cli.get_mcp_manager") as mock_get_manager:
+        # Create a mock user config to avoid toml import in test isolation
+        mock_user_config = Mock()
+        mock_user_config.default_scope = None
+        mock_user_config.default_client = None
+
+        # Patch the CLI to use our test plugin and mock user config
+        with patch("mcpi.cli.get_mcp_manager") as mock_get_manager, \
+             patch("mcpi.cli.get_user_config", return_value=mock_user_config):
             # Create a real manager with our test plugin
             registry = ClientRegistry(auto_discover=False)
             registry.inject_client_instance("claude-code", plugin)
