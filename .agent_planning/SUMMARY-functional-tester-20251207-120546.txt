@@ -1,0 +1,27 @@
+Agent: functional-tester | 2025-12-07 12:05:46
+Tests: 45 added (test_cursor_plugin.py) | Workflows: 11 covered
+E2E: real file I/O, real plugin instances, real manager integration | Status: failing (as expected - no implementation)
+
+Workflows covered:
+1. Install server to user scope
+2. Install server to project scope
+3. Remove servers from both scopes
+4. Scope priority (project overrides user)
+5. Enable/disable in user scope
+6. Enable/disable in project scope
+7. Cross-scope isolation (disable in one doesn't affect other)
+8. Config persistence across plugin restarts
+9. Auto-discovery by registry
+10. Integration with MCPManager
+11. Error handling (invalid scope, missing server, validation)
+
+Key test characteristics:
+- Zero mocks of user-facing functionality
+- Real file operations via tmp_path
+- Verifies actual JSON file contents
+- Tests scope priority by checking metadata
+- Cannot be satisfied by stubs or hardcoding
+- Tests fail when users would experience failure
+
+Implementation blocker: Module 'mcpi.clients.cursor' does not exist yet
+Next step: Implement cursor.py plugin to make these tests pass
