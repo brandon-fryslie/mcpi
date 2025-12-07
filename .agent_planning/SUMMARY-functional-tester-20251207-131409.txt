@@ -1,0 +1,32 @@
+Agent: functional-tester | 20251207-131409
+Tests: 45 added ([test_get_name, test_initialize_scopes_creates_two_scopes, test_user_scope_is_user_level, test_workspace_scope_is_project_level, test_both_scopes_are_writable, test_workspace_scope_has_higher_priority_than_user, test_add_server_to_user_scope_creates_config_file, test_add_server_to_user_scope_appears_in_list, test_add_server_to_user_scope_has_correct_metadata, test_remove_server_from_user_scope, test_add_server_to_workspace_scope_creates_config_file, test_add_server_to_workspace_scope_appears_in_list, test_add_server_to_workspace_scope_has_correct_metadata, test_remove_server_from_workspace_scope, test_server_in_both_scopes_shows_both_entries, test_workspace_scope_has_higher_precedence_than_user, test_listing_specific_scope_shows_only_that_scope, test_workspace_config_isolated_from_user_config, test_disable_server_in_user_scope_moves_to_disabled_file, test_disabled_server_in_user_scope_shows_disabled_state, test_enable_disabled_server_in_user_scope, test_disable_server_in_workspace_scope_moves_to_disabled_file, test_disabled_server_in_workspace_scope_shows_disabled_state, test_enable_disabled_server_in_workspace_scope, test_disabling_server_in_one_scope_does_not_affect_other_scope, test_auto_detect_scope_for_disable_when_in_single_scope, test_auto_detect_scope_for_enable_when_in_single_scope, test_user_config_file_has_correct_json_structure, test_workspace_config_file_has_correct_json_structure, test_config_persists_across_plugin_instances, test_disabled_state_persists_across_plugin_instances, test_list_servers_empty_when_no_configs_exist, test_add_server_to_invalid_scope_fails, test_remove_nonexistent_server_fails_gracefully, test_disable_nonexistent_server_fails, test_enable_nonexistent_server_fails, test_add_server_validates_config, test_handles_empty_config_files_gracefully, test_get_server_state_for_nonexistent_server, test_update_server_modifies_config, test_requires_path_overrides_in_test_mode, test_allows_instantiation_without_overrides_in_production, test_plugin_discovered_by_registry, test_plugin_instantiated_by_registry, test_plugin_works_through_manager]) | Workflows: 8 covered
+E2E: real [file I/O, JSON parsing, state persistence] | Status: failing (as expected - plugin not implemented)
+
+Workflows Covered:
+1. Add server to user scope -> verify file creation -> list -> verify metadata
+2. Add server to workspace scope -> verify file creation -> list -> verify metadata
+3. Remove server from both scopes -> verify actual deletion from files
+4. Disable/enable servers in both scopes -> verify file-move mechanism -> verify state
+5. Scope priority: workspace overrides user -> verify isolation and precedence
+6. Config persistence across plugin restarts -> verify filesystem persistence
+7. Cross-scope operations -> verify scope isolation for enable/disable
+8. Error handling -> invalid scopes, missing servers, validation failures
+
+Critical Validations:
+- REAL file I/O (no mocks of user-facing layers)
+- JSON structure uses "servers" key (NOT "mcpServers" like Cursor)
+- Workspace scope priority (10) < user scope priority (40)
+- FileMoveEnableDisableHandler for both scopes
+- Platform-specific user paths validated
+- Test safety mechanism (requires path_overrides in test mode)
+
+Gaming Resistance:
+- Cannot pass with stub implementations (reads actual files)
+- Cannot hardcode responses (verifies JSON structure in files)
+- Cannot fake state (creates new plugin instances to verify persistence)
+- Enforces real VS Code config format ("servers" not "mcpServers")
+
+Next Steps:
+1. Implement VSCodePlugin (src/mcpi/clients/vscode.py)
+2. Run tests -> should all pass
+3. Integration test with real VS Code installation (manual)
