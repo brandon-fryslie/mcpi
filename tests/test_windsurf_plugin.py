@@ -519,7 +519,11 @@ class TestWindsurfPlugin:
         from mcpi.clients.windsurf import WindsurfPlugin
 
         config_path = tmp_path / "mcp_config.json"
-        path_overrides = {"user": config_path}
+        disabled_path = tmp_path / "mcp_config_disabled.json"
+        path_overrides = {
+            "user": config_path,
+            "user-disabled": disabled_path,
+        }
 
         # First instance: add server
         plugin1 = WindsurfPlugin(path_overrides=path_overrides)
@@ -543,7 +547,11 @@ class TestWindsurfPlugin:
         from mcpi.clients.windsurf import WindsurfPlugin
 
         config_path = tmp_path / "mcp_config.json"
-        path_overrides = {"user": config_path}
+        disabled_path = tmp_path / "mcp_config_disabled.json"
+        path_overrides = {
+            "user": config_path,
+            "user-disabled": disabled_path,
+        }
 
         # First instance: add and disable server
         plugin1 = WindsurfPlugin(path_overrides=path_overrides)
