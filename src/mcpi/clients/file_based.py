@@ -159,6 +159,7 @@ class FileBasedScope(ScopeHandler):
         validator: Optional[SchemaValidator] = None,
         schema_path: Optional[Path] = None,
         enable_disable_handler: Optional[EnableDisableHandler] = None,
+        top_level_key: str = "mcpServers",
     ) -> None:
         """Initialize file-based scope handler.
 
@@ -169,6 +170,7 @@ class FileBasedScope(ScopeHandler):
             validator: Schema validator (optional)
             schema_path: Path to schema file (optional)
             enable_disable_handler: Handler for enable/disable operations (optional)
+            top_level_key: JSON key for servers object (defaults to "mcpServers")
         """
         super().__init__(config)
 
@@ -181,6 +183,7 @@ class FileBasedScope(ScopeHandler):
         self.validator = validator
         self.schema_path = schema_path
         self.enable_disable_handler = enable_disable_handler
+        self.top_level_key = top_level_key
 
     def exists(self) -> bool:
         """Check if configuration file exists.
@@ -206,7 +209,7 @@ class FileBasedScope(ScopeHandler):
         try:
             # Get servers from active file
             data = self.reader.read(self.path)
-            servers = data.get("mcpServers", {})
+            servers = data.get(self.top_level_key, {})
 
             # If using FileMoveEnableDisableHandler, also include disabled servers
             # Only FileMoveEnableDisableHandler stores server configs in separate files
@@ -256,17 +259,17 @@ class FileBasedScope(ScopeHandler):
             # Load existing data or create new structure
             data = self.reader.read(self.path) if self.exists() else {}
 
-            if "mcpServers" not in data:
-                data["mcpServers"] = {}
+            if self.top_level_key not in data:
+                data[self.top_level_key] = {}
 
             # Check if server already exists
-            if server_id in data["mcpServers"]:
+            if server_id in data[self.top_level_key]:
                 return OperationResult.failure_result(
                     f"Server '{server_id}' already exists in scope '{self.config.name}'"
                 )
 
             # Add server configuration
-            data["mcpServers"][server_id] = config.to_dict()
+            data[self.top_level_key][server_id] = config.to_dict()
 
             # Validate against schema if available
             if self.validator and self.schema_path:
@@ -308,13 +311,13 @@ class FileBasedScope(ScopeHandler):
         try:
             data = self.reader.read(self.path)
 
-            if "mcpServers" not in data or server_id not in data["mcpServers"]:
+            if self.top_level_key not in data or server_id not in data[self.top_level_key]:
                 return OperationResult.failure_result(
                     f"Server '{server_id}' not found in scope '{self.config.name}'"
                 )
 
             # Remove the server
-            del data["mcpServers"][server_id]
+            del data[self.top_level_key][server_id]
 
             # Write the updated configuration
             self.writer.write(self.path, data)
@@ -349,13 +352,13 @@ class FileBasedScope(ScopeHandler):
         try:
             data = self.reader.read(self.path)
 
-            if "mcpServers" not in data or server_id not in data["mcpServers"]:
+            if self.top_level_key not in data or server_id not in data[self.top_level_key]:
                 return OperationResult.failure_result(
                     f"Server '{server_id}' not found in scope '{self.config.name}'"
                 )
 
             # Update server configuration
-            data["mcpServers"][server_id] = config.to_dict()
+            data[self.top_level_key][server_id] = config.to_dict()
 
             # Validate against schema if available
             if self.validator and self.schema_path:

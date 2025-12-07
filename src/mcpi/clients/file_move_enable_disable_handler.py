@@ -46,6 +46,7 @@ class FileMoveEnableDisableHandler:
         disabled_file_path: Path,
         reader: ConfigReader,
         writer: ConfigWriter,
+        top_level_key: str = "mcpServers",
     ) -> None:
         """Initialize the file-move handler.
 
@@ -54,11 +55,13 @@ class FileMoveEnableDisableHandler:
             disabled_file_path: Path to disabled config file (e.g., ~/.claude/disabled-mcp.json)
             reader: Configuration file reader
             writer: Configuration file writer
+            top_level_key: JSON key for servers object (defaults to "mcpServers")
         """
         self.active_file_path = active_file_path
         self.disabled_file_path = disabled_file_path
         self.reader = reader
         self.writer = writer
+        self.top_level_key = top_level_key
 
     def is_disabled(self, server_id: str) -> bool:
         """Check if a server is disabled.
@@ -76,7 +79,7 @@ class FileMoveEnableDisableHandler:
 
         try:
             disabled_data = self.reader.read(self.disabled_file_path)
-            disabled_servers = disabled_data.get("mcpServers", {})
+            disabled_servers = disabled_data.get(self.top_level_key, {})
             return server_id in disabled_servers
         except Exception:
             return False
@@ -96,7 +99,7 @@ class FileMoveEnableDisableHandler:
                 return False  # Can't disable if active file doesn't exist
 
             active_data = self.reader.read(self.active_file_path)
-            active_servers = active_data.get("mcpServers", {})
+            active_servers = active_data.get(self.top_level_key, {})
 
             # Step 2: Verify server exists in active file
             if server_id not in active_servers:
@@ -107,19 +110,19 @@ class FileMoveEnableDisableHandler:
 
             # Step 4: Remove from active file
             del active_servers[server_id]
-            active_data["mcpServers"] = active_servers
+            active_data[self.top_level_key] = active_servers
 
             # Step 5: Read or create disabled file
             if self.disabled_file_path.exists():
                 disabled_data = self.reader.read(self.disabled_file_path)
             else:
-                disabled_data = {"mcpServers": {}}
+                disabled_data = {self.top_level_key: {}}
 
-            disabled_servers = disabled_data.get("mcpServers", {})
+            disabled_servers = disabled_data.get(self.top_level_key, {})
 
             # Step 6: Add to disabled file
             disabled_servers[server_id] = server_config
-            disabled_data["mcpServers"] = disabled_servers
+            disabled_data[self.top_level_key] = disabled_servers
 
             # Step 7: Write both files
             self.writer.write(self.active_file_path, active_data)
@@ -147,7 +150,7 @@ class FileMoveEnableDisableHandler:
                 return False  # Can't enable if disabled file doesn't exist
 
             disabled_data = self.reader.read(self.disabled_file_path)
-            disabled_servers = disabled_data.get("mcpServers", {})
+            disabled_servers = disabled_data.get(self.top_level_key, {})
 
             # Step 2: Verify server exists in disabled file
             if server_id not in disabled_servers:
@@ -158,20 +161,20 @@ class FileMoveEnableDisableHandler:
 
             # Step 4: Remove from disabled file
             del disabled_servers[server_id]
-            disabled_data["mcpServers"] = disabled_servers
+            disabled_data[self.top_level_key] = disabled_servers
 
             # Step 5: Read active file
             if self.active_file_path.exists():
                 active_data = self.reader.read(self.active_file_path)
             else:
                 # Should not happen in practice, but handle gracefully
-                active_data = {"mcpEnabled": True, "mcpServers": {}}
+                active_data = {"mcpEnabled": True, self.top_level_key: {}}
 
-            active_servers = active_data.get("mcpServers", {})
+            active_servers = active_data.get(self.top_level_key, {})
 
             # Step 6: Add to active file
             active_servers[server_id] = server_config
-            active_data["mcpServers"] = active_servers
+            active_data[self.top_level_key] = active_servers
 
             # Step 7: Write both files
             self.writer.write(self.active_file_path, active_data)
@@ -197,6 +200,6 @@ class FileMoveEnableDisableHandler:
 
         try:
             disabled_data = self.reader.read(self.disabled_file_path)
-            return disabled_data.get("mcpServers", {})
+            return disabled_data.get(self.top_level_key, {})
         except Exception:
             return {}
