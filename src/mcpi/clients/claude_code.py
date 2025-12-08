@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .base import MCPClientPlugin, ScopeHandler
 from .enable_disable_handlers import (
+    ApprovalRequiredEnableDisableHandler,
     ArrayBasedEnableDisableHandler,
 )
 from .file_based import (
@@ -95,11 +96,11 @@ class ClaudeCodePlugin(MCPClientPlugin):
         )
 
         # Project-level MCP configuration (.mcp.json)
-        # Uses FileMoveEnableDisableHandler:
-        # - Active file: .mcp.json (ENABLED servers)
-        # - Disabled file: .mcp.disabled.json (DISABLED servers)
-        # - disable operation: MOVE server config from active to disabled file
-        # - enable operation: MOVE server config from disabled to active file
+        # Uses ApprovalRequiredEnableDisableHandler:
+        # - Config file: .mcp.json (server definitions)
+        # - Approval file: .claude/settings.local.json (approval arrays)
+        # - Arrays: enabledMcpjsonServers (ENABLED), disabledMcpjsonServers (DISABLED)
+        # - Missing from both arrays = UNAPPROVED (functionally disabled)
         project_mcp_path = self._get_scope_path("project-mcp", Path.cwd() / ".mcp.json")
         project_mcp_disabled_path = self._get_scope_path(
             "project-mcp-disabled", Path.cwd() / ".mcp.disabled.json"
@@ -120,9 +121,9 @@ class ClaudeCodePlugin(MCPClientPlugin):
             writer=json_writer,
             validator=YAMLSchemaValidator(),
             schema_path=schemas_dir / "mcp-config-schema.yaml",
-            enable_disable_handler=FileMoveEnableDisableHandler(
-                active_file_path=project_mcp_path,
-                disabled_file_path=project_mcp_disabled_path,
+            enable_disable_handler=ApprovalRequiredEnableDisableHandler(
+                mcp_json_path=project_mcp_path,
+                settings_local_path=project_local_path,
                 reader=json_reader,
                 writer=json_writer,
             ),

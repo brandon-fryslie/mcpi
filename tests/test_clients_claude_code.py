@@ -405,10 +405,10 @@ class TestClaudeCodePlugin:
         """Test getting state of unapproved server in project-mcp scope.
 
         Servers in .mcp.json that haven't been through Claude's approval process
-        (not in enabledMcpjsonServers or disabledMcpjsonServers) should be UNAPPROVED.
+        (not in enabledMcpjsonServers or disabledMcpjsonServers) should be DISABLED
+        (unapproved servers are functionally disabled).
         """
-        # Prepopulate server in project-mcp (active file)
-        # Servers in the active file are ENABLED by default
+        # Prepopulate server in project-mcp without approval
         mcp_harness.prepopulate_file(
             "project-mcp",
             {
@@ -420,14 +420,22 @@ class TestClaudeCodePlugin:
                 }
             },
         )
+        # Create empty settings.local.json (no approval)
+        mcp_harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": []
+            },
+        )
 
-        # With file-move mechanism, servers in active file are ENABLED
+        # With approval mechanism, servers not in approval arrays are DISABLED
         state = plugin.get_server_state("test-server")
-        assert state == ServerState.ENABLED
+        assert state == ServerState.DISABLED
 
     def test_project_mcp_server_in_active_file_is_enabled(self, plugin, mcp_harness):
-        """Test that a server in the active .mcp.json file shows as ENABLED."""
-        # Prepopulate server in project-mcp (active file)
+        """Test that a server in .mcp.json with approval shows as ENABLED."""
+        # Prepopulate server in project-mcp
         mcp_harness.prepopulate_file(
             "project-mcp",
             {
@@ -439,25 +447,27 @@ class TestClaudeCodePlugin:
                 }
             },
         )
+        # Approve the server in settings.local.json
+        mcp_harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": ["active-server"],
+                "disabledMcpjsonServers": []
+            },
+        )
 
         state = plugin.get_server_state("active-server")
         assert state == ServerState.ENABLED
 
     def test_enable_disabled_server(self, plugin, mcp_harness):
-        """Test enabling a DISABLED server moves it from disabled to active file.
+        """Test enabling a DISABLED server adds it to enabledMcpjsonServers array.
 
-        With file-move mechanism, enabling moves the server config from
-        .mcp.disabled.json to .mcp.json.
+        With approval mechanism, enabling adds the server ID to enabledMcpjsonServers
+        in .claude/settings.local.json.
         """
-        # Prepopulate empty active file (required for scope to exist)
+        # Prepopulate server in project-mcp
         mcp_harness.prepopulate_file(
             "project-mcp",
-            {"mcpServers": {}},
-        )
-
-        # Prepopulate server in disabled file
-        mcp_harness.prepopulate_file(
-            "project-mcp-disabled",
             {
                 "mcpServers": {
                     "disabled-server": {
@@ -465,6 +475,14 @@ class TestClaudeCodePlugin:
                         "args": ["-m", "test_server"],
                     }
                 }
+            },
+        )
+        # Mark it as explicitly disabled in settings.local.json
+        mcp_harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": ["disabled-server"]
             },
         )
 
@@ -483,8 +501,8 @@ class TestClaudeCodePlugin:
         assert state_after == ServerState.ENABLED
 
     def test_project_mcp_enabled_server(self, plugin, mcp_harness):
-        """Test that a server in the active project-mcp file shows as ENABLED."""
-        # Prepopulate server in project-mcp (active file)
+        """Test that a server in project-mcp with approval shows as ENABLED."""
+        # Prepopulate server in project-mcp
         mcp_harness.prepopulate_file(
             "project-mcp",
             {
@@ -496,25 +514,27 @@ class TestClaudeCodePlugin:
                 }
             },
         )
+        # Approve the server
+        mcp_harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": ["enabled-server"],
+                "disabledMcpjsonServers": []
+            },
+        )
 
         state = plugin.get_server_state("enabled-server")
         assert state == ServerState.ENABLED
 
     def test_project_mcp_disabled_server(self, plugin, mcp_harness):
-        """Test that a server in the disabled file shows as DISABLED.
+        """Test that a server in disabledMcpjsonServers shows as DISABLED.
 
-        With file-move mechanism, disabled servers are stored in .mcp.disabled.json
-        instead of using approval arrays in settings.local.json.
+        With approval mechanism, disabled servers are marked in disabledMcpjsonServers
+        array in .claude/settings.local.json.
         """
-        # Prepopulate empty active file (required for scope to exist)
+        # Prepopulate server in project-mcp
         mcp_harness.prepopulate_file(
             "project-mcp",
-            {"mcpServers": {}},
-        )
-
-        # Prepopulate server in disabled file (not active file)
-        mcp_harness.prepopulate_file(
-            "project-mcp-disabled",
             {
                 "mcpServers": {
                     "disabled-server": {
@@ -522,6 +542,14 @@ class TestClaudeCodePlugin:
                         "args": ["-m", "test_server"],
                     }
                 }
+            },
+        )
+        # Mark it as disabled in settings.local.json
+        mcp_harness.prepopulate_file(
+            "project-local",
+            {
+                "enabledMcpjsonServers": [],
+                "disabledMcpjsonServers": ["disabled-server"]
             },
         )
 

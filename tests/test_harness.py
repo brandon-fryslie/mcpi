@@ -357,7 +357,15 @@ def prepopulated_harness(mcp_harness):
                     "type": "stdio",
                 }
             },
-            "enabledMcpServers": ["project-tool"],
+        },
+    )
+
+    # Approve the project-tool server in project-local settings
+    mcp_harness.prepopulate_file(
+        "project-local",
+        {
+            "enabledMcpjsonServers": ["project-tool"],
+            "disabledMcpjsonServers": [],
         },
     )
 
