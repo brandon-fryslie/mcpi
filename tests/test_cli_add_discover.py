@@ -149,17 +149,24 @@ class TestDiscoveryModeDetection:
         """
         # Mock Claude CLI to avoid actual subprocess call
         def mock_run(args, **kwargs):
-            if args[0] == "claude":
+            if args[0] == "cue":
+                # Mock CUE to avoid "not found" warning
+                return subprocess.CompletedProcess(args, 0, "cue version v0.5.0", "")
+            elif args[0] == "claude":
                 if "--version" in args:
                     return subprocess.CompletedProcess(args, 0, "1.0.0", "")
                 else:
-                    # Claude discovers a server
-                    return subprocess.CompletedProcess(
-                        args,
-                        0,
-                        "Discovered server: new-mcp-server\nInstalling...",
-                        "",
-                    )
+                    # Claude discovers a server - return valid JSON
+                    import json
+                    response = json.dumps({
+                        "id": "user/new-mcp-server",
+                        "description": "A new MCP server",
+                        "command": "npx",
+                        "args": ["-y", "@user/new-mcp-server"],
+                        "env": {},
+                        "repository": "https://github.com/user/new-mcp-server"
+                    })
+                    return subprocess.CompletedProcess(args, 0, response, "")
             raise FileNotFoundError("Command not found")
 
         with patch("subprocess.run", side_effect=mock_run):
@@ -200,7 +207,6 @@ class TestSuccessfulDiscoveryAndInstall:
         """Set up CLI test runner and temp directories."""
         self.runner = CliRunner()
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_successful_discovery_and_install(self, tmp_path):
         """Test complete workflow: discovery -> install -> verify.
 
@@ -230,32 +236,31 @@ class TestSuccessfulDiscoveryAndInstall:
         scope_paths = harness.setup_scope_files()
 
         # Create a real MCP manager with test paths
-        registry = ClientRegistry()
-        plugin = ClaudeCodePlugin()
-
-        # Override plugin paths to use test directory
-        for scope_name, scope_handler in plugin.scopes.items():
-            if scope_name in harness.path_overrides:
-                # Override the file path for this scope
-                scope_handler._file_path = harness.path_overrides[scope_name]
-
-        registry.register("claude-code", plugin)
+        registry = ClientRegistry(auto_discover=False)
+        plugin = ClaudeCodePlugin(path_overrides=harness.path_overrides)
+        registry.register_plugin(ClaudeCodePlugin)
+        registry.inject_client_instance("claude-code", plugin)
         manager = MCPManager(registry)
 
         # Mock Claude CLI to return discovered server info
         discovered_server_config = {
+            "id": "user/awesome-mcp",
+            "description": "An awesome MCP server",
             "command": "npx",
             "args": ["-y", "@user/awesome-mcp"],
-            "env": {}
+            "env": {},
+            "repository": "https://github.com/user/awesome-mcp"
         }
 
         def mock_run(args, **kwargs):
-            if args[0] == "claude":
+            if args[0] == "cue":
+                # Mock CUE to avoid warnings
+                return subprocess.CompletedProcess(args, 0, "cue version v0.5.0", "")
+            elif args[0] == "claude":
                 if "--version" in args:
                     return subprocess.CompletedProcess(args, 0, "1.0.0", "")
                 else:
                     # Simulate Claude discovering and returning server config
-                    # In real implementation, this would be parsed from Claude's response
                     return subprocess.CompletedProcess(
                         args,
                         0,
@@ -328,7 +333,6 @@ class TestDiscoveryModeDryRun:
         """Set up CLI test runner."""
         self.runner = CliRunner()
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_discovery_mode_dry_run(self, tmp_path):
         """Test --dry-run shows what would be installed without changes.
 
@@ -360,21 +364,41 @@ class TestDiscoveryModeDryRun:
         if config_file.exists():
             config_file.unlink()
 
+        # Create a real MCP manager with test paths
+        registry = ClientRegistry(auto_discover=False)
+        plugin = ClaudeCodePlugin(path_overrides=harness.path_overrides)
+        registry.register_plugin(ClaudeCodePlugin)
+        registry.inject_client_instance("claude-code", plugin)
+        manager = MCPManager(registry)
+
         # Mock Claude CLI
         def mock_run(args, **kwargs):
-            if args[0] == "claude":
+            if args[0] == "cue":
+                # Mock CUE to avoid warnings
+                return subprocess.CompletedProcess(args, 0, "cue version v0.5.0", "")
+            elif args[0] == "claude":
                 if "--version" in args:
                     return subprocess.CompletedProcess(args, 0, "1.0.0", "")
                 else:
-                    return subprocess.CompletedProcess(
-                        args,
-                        0,
-                        "Would add server: awesome-mcp",
-                        "",
-                    )
+                    # Return valid JSON with discovered server info
+                    import json
+                    response = json.dumps({
+                        "id": "user/awesome-mcp",
+                        "description": "An awesome MCP server",
+                        "command": "npx",
+                        "args": ["-y", "@user/awesome-mcp"],
+                        "env": {},
+                        "repository": "https://github.com/user/awesome-mcp"
+                    })
+                    return subprocess.CompletedProcess(args, 0, response, "")
             raise FileNotFoundError("Command not found")
 
-        with patch("subprocess.run", side_effect=mock_run):
+        # Inject test manager into CLI context
+        def mock_get_manager(ctx):
+            return manager
+
+        with patch("subprocess.run", side_effect=mock_run), \
+             patch("mcpi.cli.get_mcp_manager", side_effect=mock_get_manager):
             # USER ACTION: Dry run discovery
             result = self.runner.invoke(
                 main,
@@ -458,7 +482,6 @@ class TestDiscoveryModeErrorHandling:
             assert result.exit_code != 0, "Should fail when Claude not available"
             assert "claude" in output, "Should mention Claude CLI"
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_claude_cannot_determine_server_info(self):
         """Test error when Claude cannot determine server details.
 
@@ -508,7 +531,6 @@ class TestDiscoveryModeErrorHandling:
             assert "cannot determine" in output or "error" in output, \
                 "Should show error about unable to determine info"
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_claude_cli_timeout(self):
         """Test error when Claude CLI times out.
 
@@ -570,7 +592,6 @@ class TestDiscoveryModeIntegration:
         """Set up CLI test runner."""
         self.runner = CliRunner()
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_discovery_with_specific_client(self, tmp_path):
         """Test discovery with --client option.
 
@@ -594,7 +615,6 @@ class TestDiscoveryModeIntegration:
         # and verify discovery targets the right one
         pass
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_discovery_with_specific_scope(self, tmp_path):
         """Test discovery with --scope option.
 
@@ -618,7 +638,6 @@ class TestDiscoveryModeIntegration:
         # and verify discovery targets the right one
         pass
 
-    @pytest.mark.skip(reason="Discovery mode not yet implemented")
     def test_discovery_with_client_and_scope(self, tmp_path):
         """Test discovery with both --client and --scope options.
 

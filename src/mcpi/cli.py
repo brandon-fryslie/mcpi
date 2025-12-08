@@ -1,6 +1,8 @@
 """New CLI implementation using the plugin architecture."""
 
 import sys
+import json
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Optional
@@ -17,7 +19,7 @@ from mcpi.bundles.catalog import BundleCatalog
 from mcpi.bundles.installer import BundleInstaller
 from mcpi.clients import ServerConfig, ServerState
 from mcpi.clients.manager import MCPManager, create_default_manager
-from mcpi.registry.catalog import ServerCatalog, create_default_catalog
+from mcpi.registry.catalog import MCPServer, ServerCatalog, create_default_catalog
 from mcpi.registry.catalog_manager import CatalogManager, create_default_catalog_manager
 
 console = Console()
@@ -55,6 +57,200 @@ def shorten_path(path: Optional[str]) -> str:
             # Not relative to home either, return as-is
             return str(path)
 
+
+
+
+def discover_server_via_claude(
+    ctx: click.Context, server_text: str, dry_run: bool = False
+) -> Optional[tuple[str, "MCPServer", dict]]:
+    """Discover MCP server information using Claude CLI.
+
+    Args:
+        ctx: Click context
+        server_text: Text to search for (URL, description, etc.)
+        dry_run: If True, show what would be discovered without making changes
+
+    Returns:
+        Tuple of (server_id, MCPServer, env_dict) with discovered information, or None if discovery fails
+    """
+    from mcpi.registry.catalog import MCPServer
+
+    verbose = ctx.obj.get("verbose", False)
+
+    console.print("[blue]Entering discovery mode...[/blue]")
+
+    # Check if Claude CLI is available
+    try:
+        version_result = subprocess.run(
+            ["claude", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if version_result.returncode != 0:
+            console.print(
+                "[red]Error: Claude CLI not found or not working properly[/red]"
+            )
+            console.print(
+                "[dim]Install Claude CLI: https://docs.anthropic.com/en/docs/claude-code[/dim]"
+            )
+            return None
+    except FileNotFoundError:
+        console.print("[red]Error: Claude CLI not found[/red]")
+        console.print(
+            "[dim]Install Claude CLI: https://docs.anthropic.com/en/docs/claude-code[/dim]"
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: Claude CLI check timed out[/red]")
+        return None
+
+    # Build the prompt for Claude
+    prompt = f"""Discover information about this MCP server and provide the configuration.
+
+Source: {server_text}
+
+Instructions:
+1. Analyze the provided source (URL, git repo, package name, or description)
+2. Discover the MCP server's:
+   - Unique server ID (following the pattern: owner/name or @scope/name)
+   - Description of what the server does
+   - Command to run it (e.g., npx, python, node)
+   - Arguments for the command
+   - Environment variables (if any)
+
+3. Return ONLY a JSON object with this exact structure:
+{{
+  "id": "server-id",
+  "description": "Brief description of functionality",
+  "command": "npx",
+  "args": ["-y", "@package/server-name"],
+  "env": {{}},
+  "repository": "https://github.com/owner/repo"
+}}
+
+IMPORTANT:
+- Return ONLY valid JSON, no markdown code blocks or extra text
+- If you cannot determine the server details, return an error in this format: {{"error": "explanation"}}
+- Validate the server information is accurate
+- The "env" field should be an empty object {{}} if no environment variables are needed
+- The "repository" field is optional
+
+{"DRY RUN MODE: Show what would be discovered but do not perform installation." if dry_run else ""}"""
+
+    console.print("[dim]Analyzing with Claude CLI...[/dim]")
+
+    # Run Claude in non-interactive mode
+    try:
+        result = subprocess.run(
+            [
+                "claude",
+                "--print",  # Non-interactive mode, print response
+                prompt,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minute timeout
+        )
+
+        if result.returncode != 0:
+            console.print(f"[red]Error: Claude failed with code {result.returncode}[/red]")
+            if result.stderr:
+                console.print(f"[red]{result.stderr}[/red]")
+            return None
+
+        # Parse Claude's response
+        if not result.stdout:
+            console.print("[red]Error: Claude returned empty response[/red]")
+            return None
+
+        # Try to extract JSON from the response
+        response_text = result.stdout.strip()
+
+        # Remove markdown code blocks if present
+        if response_text.startswith("```"):
+            lines_list = response_text.split("\n")
+            # Remove first and last lines (``` markers)
+            if lines_list[0].startswith("```"):
+                lines_list = lines_list[1:]
+            if lines_list and lines_list[-1].strip() == "```":
+                lines_list = lines_list[:-1]
+            response_text = "\n".join(lines_list)
+
+        try:
+            server_info = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            console.print(f"[red]Error: Could not parse Claude's response as JSON[/red]")
+            if verbose:
+                console.print(f"[dim]Parse error: {e}[/dim]")
+                console.print(f"[dim]Response: {response_text[:200]}...[/dim]")
+            return None
+
+        # Check if Claude returned an error
+        if "error" in server_info:
+            console.print(
+                f"[red]Claude could not determine server information:[/red] {server_info['error']}"
+            )
+            return None
+
+        # Validate required fields
+        required_fields = ["id", "description", "command"]
+        missing_fields = [f for f in required_fields if f not in server_info]
+        if missing_fields:
+            console.print(
+                f"[red]Error: Claude's response missing required fields: {', '.join(missing_fields)}[/red]"
+            )
+            if verbose:
+                console.print(f"[dim]Response: {server_info}[/dim]")
+            return None
+
+        # Extract and validate fields
+        server_id = server_info.get("id", "").strip()
+        description = server_info.get("description", "").strip()
+        command = server_info.get("command", "").strip()
+        args = server_info.get("args", [])
+        env = server_info.get("env", {})
+        repository = server_info.get("repository", "")
+
+        if not server_id or not description or not command:
+            console.print("[red]Error: Claude returned incomplete server information[/red]")
+            return None
+
+        # Display discovered information
+        console.print("\n[bold green]Discovered server information:[/bold green]")
+        console.print(f"[bold]ID:[/bold] {server_id}")
+        console.print(f"[bold]Description:[/bold] {description}")
+        console.print(f"[bold]Command:[/bold] {command}")
+        if args:
+            console.print(f"[bold]Args:[/bold] {' '.join(args)}")
+        if env:
+            console.print(f"[bold]Environment:[/bold] {json.dumps(env, indent=2)}")
+        if repository:
+            console.print(f"[bold]Repository:[/bold] {repository}")
+        console.print()
+
+        # Create MCPServer object (without id and env, which are stored separately)
+        mcp_server = MCPServer(
+            description=description,
+            command=command,
+            args=args,
+            repository=repository,
+            categories=[],  # Discovery doesn't determine categories
+        )
+
+        # Return tuple of (server_id, MCPServer, env_dict)
+        return (server_id, mcp_server, env)
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: Claude command timed out after 2 minutes[/red]")
+        console.print("[dim]Try providing more specific information[/dim]")
+        return None
+    except Exception as e:
+        console.print(f"[red]Error running Claude: {e}[/red]")
+        if verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        return None
 
 def get_user_config(ctx: click.Context):
     """Lazy initialization of user configuration."""
@@ -1184,10 +1380,20 @@ def add(
         # Get server info from catalog
         server = cat.get_server(server_id)
         if not server:
-            console.print(
-                f"[red]Server '{server_id}' not found in {catalog or 'official'} catalog[/red]"
-            )
-            return
+            # Server not found in catalog - enter discovery mode
+            discovery_result = discover_server_via_claude(ctx, server_id, dry_run)
+
+            if not discovery_result:
+                # Discovery failed, exit
+                ctx.exit(1)
+
+            # Unpack discovered information
+            discovered_id, server, discovered_env = discovery_result
+            # Update server_id to match what was discovered
+            server_id = discovered_id
+            # Store env for later use in config
+            discovered_server_env = discovered_env
+
 
         # Handle --list-templates flag
         if list_templates:
@@ -1326,8 +1532,10 @@ def add(
 
         # Create server configuration (if not already created by template)
         if config is None:
+            # Use discovered env if available, otherwise empty dict
+            env_vars = discovered_server_env if 'discovered_server_env' in locals() else {}
             config = ServerConfig(
-                command=server.command, args=server.args, env={}, type="stdio"
+                command=server.command, args=server.args, env=env_vars, type="stdio"
             )
 
         # Show server info
