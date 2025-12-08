@@ -1379,8 +1379,21 @@ def add(
 
         # Get server info from catalog
         server = cat.get_server(server_id)
+        discovered_server_env: dict = {}  # Initialize for discovered servers
+
         if not server:
-            # Server not found in catalog - enter discovery mode
+            # Server not found in catalog
+            # If template-related options are used, templates require catalog servers
+            if list_templates or template:
+                console.print(
+                    f"[red]Server '{server_id}' not found in {catalog or 'official'} catalog[/red]"
+                )
+                console.print(
+                    "[dim]Templates are only available for servers in the catalog.[/dim]"
+                )
+                return
+
+            # Enter discovery mode for non-template installs
             discovery_result = discover_server_via_claude(ctx, server_id, dry_run)
 
             if not discovery_result:
@@ -1388,12 +1401,9 @@ def add(
                 ctx.exit(1)
 
             # Unpack discovered information
-            discovered_id, server, discovered_env = discovery_result
+            discovered_id, server, discovered_server_env = discovery_result
             # Update server_id to match what was discovered
             server_id = discovered_id
-            # Store env for later use in config
-            discovered_server_env = discovered_env
-
 
         # Handle --list-templates flag
         if list_templates:
