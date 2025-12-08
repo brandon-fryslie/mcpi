@@ -1,0 +1,3 @@
+Agent: functional-tester | 20251208-022425
+Tests: 10 added ([test_known_server_uses_catalog_mode, test_unknown_server_triggers_discovery_mode, test_successful_discovery_and_install, test_discovery_mode_dry_run, test_claude_cli_not_available, test_claude_cannot_determine_server_info, test_claude_cli_timeout, test_discovery_with_specific_client, test_discovery_with_specific_scope, test_discovery_with_client_and_scope]) | Workflows: 5 covered
+E2E: real [catalog manager, MCP manager, subprocess mocking] | Status: 1 passing, 9 skipped (awaiting implementation)
