@@ -2,6 +2,7 @@
 
 import sys
 import json
+import hashlib
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -61,7 +62,7 @@ def shorten_path(path: Optional[str]) -> str:
 
 
 def discover_server_via_claude(
-    ctx: click.Context, server_text: str, dry_run: bool = False
+    ctx: click.Context, server_text: str, dry_run: bool = False, cache_dir: Optional[Path] = None
 ) -> Optional[tuple[str, "MCPServer", dict]]:
     """Discover MCP server information using Claude CLI.
 
@@ -69,6 +70,7 @@ def discover_server_via_claude(
         ctx: Click context
         server_text: Text to search for (URL, description, etc.)
         dry_run: If True, show what would be discovered without making changes
+        cache_dir: Cache directory path (uses default if None)
 
     Returns:
         Tuple of (server_id, MCPServer, env_dict) with discovered information, or None if discovery fails
@@ -78,6 +80,59 @@ def discover_server_via_claude(
     verbose = ctx.obj.get("verbose", False)
 
     console.print("[blue]Entering discovery mode...[/blue]")
+
+    # Get cache directory
+    if cache_dir is None:
+        cache_dir = get_cache_dir()
+
+    # Check cache first
+    cache_key = hashlib.sha256(server_text.encode()).hexdigest()
+    cache_file = cache_dir / f"{cache_key}.json"
+
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                server_info = json.load(f)
+            console.print("[dim]Using cached discovery result...[/dim]")
+            
+            # Validate cached data has required fields
+            required_fields = ["id", "description", "command"]
+            if all(f in server_info for f in required_fields):
+                # Extract fields from cache
+                server_id = server_info.get("id", "").strip()
+                description = server_info.get("description", "").strip()
+                command = server_info.get("command", "").strip()
+                args = server_info.get("args", [])
+                env = server_info.get("env", {})
+                repository = server_info.get("repository", "")
+
+                # Display cached information
+                console.print("\n[bold green]Discovered server information (cached):[/bold green]")
+                console.print(f"[bold]ID:[/bold] {server_id}")
+                console.print(f"[bold]Description:[/bold] {description}")
+                console.print(f"[bold]Command:[/bold] {command}")
+                if args:
+                    console.print(f"[bold]Args:[/bold] {' '.join(args)}")
+                if env:
+                    console.print(f"[bold]Environment:[/bold] {json.dumps(env, indent=2)}")
+                if repository:
+                    console.print(f"[bold]Repository:[/bold] {repository}")
+                console.print()
+
+                # Create MCPServer object
+                mcp_server = MCPServer(
+                    description=description,
+                    command=command,
+                    args=args,
+                    repository=repository,
+                    categories=[],
+                )
+
+                return (server_id, mcp_server, env)
+        except (json.JSONDecodeError, KeyError, Exception) as e:
+            # Cache file corrupted or invalid, continue to Claude call
+            if verbose:
+                console.print(f"[dim]Cache read failed: {e}, will call Claude...[/dim]")
 
     # Check if Claude CLI is available
     try:
@@ -204,6 +259,17 @@ IMPORTANT:
                 console.print(f"[dim]Response: {server_info}[/dim]")
             return None
 
+        # Cache the successful result
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(server_info, f, indent=2, ensure_ascii=False)
+            if verbose:
+                console.print(f"[dim]Cached discovery result to {cache_file}[/dim]")
+        except Exception as e:
+            # Cache write failure is not fatal
+            if verbose:
+                console.print(f"[dim]Warning: Could not cache result: {e}[/dim]")
+
         # Extract and validate fields
         server_id = server_info.get("id", "").strip()
         description = server_info.get("description", "").strip()
@@ -259,6 +325,18 @@ def get_user_config(ctx: click.Context):
 
         ctx.obj["user_config"] = create_default_config()
     return ctx.obj["user_config"]
+
+
+
+def get_cache_dir() -> Path:
+    """Get the cache directory for discovery results.
+    
+    Returns:
+        Path to ~/.mcpi/cache/discovery/
+    """
+    cache_dir = Path.home() / ".mcpi" / "cache" / "discovery"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 
 def get_default_scope(ctx: click.Context, provided_scope: Optional[str]) -> Optional[str]:
@@ -1393,17 +1471,55 @@ def add(
                 )
                 return
 
-            # Enter discovery mode for non-template installs
-            discovery_result = discover_server_via_claude(ctx, server_id, dry_run)
+            # Try local catalog before discovery
+            if not catalog or catalog.lower() == "official":
+                try:
+                    catalog_manager = get_catalog_manager(ctx)
+                    local_catalog = catalog_manager.get_catalog("local")
+                    if local_catalog:
+                        server = local_catalog.get_server(server_id)
+                        if server:
+                            if verbose:
+                                console.print(f"[dim]Found '{server_id}' in local catalog[/dim]")
+                            # Don't enter discovery mode, use catalog entry
+                            # Continue with normal flow
+                except Exception as e:
+                    # Non-fatal, continue to discovery if local check fails
+                    if verbose:
+                        console.print(f"[dim]Local catalog check failed: {e}[/dim]")
+            
+            # Only discover if still not found
+            if not server:
+                # Enter discovery mode for non-template installs
+                discovery_result = discover_server_via_claude(ctx, server_id, dry_run)
 
-            if not discovery_result:
-                # Discovery failed, exit
-                ctx.exit(1)
+                if not discovery_result:
+                    # Discovery failed, exit
+                    ctx.exit(1)
 
-            # Unpack discovered information
-            discovered_id, server, discovered_server_env = discovery_result
-            # Update server_id to match what was discovered
-            server_id = discovered_id
+                # Unpack discovered information
+                discovered_id, server, discovered_server_env = discovery_result
+                # Update server_id to match what was discovered
+                server_id = discovered_id
+
+                # Add discovered server to local catalog
+                try:
+                    catalog_manager = get_catalog_manager(ctx)
+                    local_catalog = catalog_manager.get_catalog("local")
+                    if local_catalog:
+                        # Add server to local catalog
+                        if local_catalog.add_server(server_id, server):
+                            # Save the catalog to disk
+                            local_catalog.save_catalog()
+                            if verbose:
+                                console.print(f"[dim]Added '{server_id}' to local catalog[/dim]")
+                        elif verbose:
+                            console.print(f"[dim]Server '{server_id}' already in local catalog[/dim]")
+                except Exception as e:
+                    # Non-fatal: catalog persistence failure shouldn't stop installation
+                    if verbose:
+                        console.print(f"[dim]Warning: Could not add to local catalog: {e}[/dim]")
+
 
         # Handle --list-templates flag
         if list_templates:

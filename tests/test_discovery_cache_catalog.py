@@ -159,7 +159,15 @@ class TestDiscoveryToCatalogPersistence:
         def mock_get_mcp_manager(ctx):
             return mcp_manager
 
-        with patch("subprocess.run", side_effect=mock_run), \
+        # Set up cache directory
+        cache_dir = tmp_path / "cache" / "discovery"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        def mock_get_cache_dir():
+            return cache_dir
+
+        with patch("mcpi.cli.get_cache_dir", side_effect=mock_get_cache_dir), \
+             patch("subprocess.run", side_effect=mock_run), \
              patch("mcpi.cli.get_catalog_manager", side_effect=mock_get_catalog_manager), \
              patch("mcpi.cli.get_mcp_manager", side_effect=mock_get_mcp_manager):
 
@@ -280,7 +288,15 @@ class TestDiscoveryToCatalogPersistence:
         def mock_get_mcp_manager(ctx):
             return mcp_manager
 
-        with patch("subprocess.run", side_effect=mock_run), \
+        # Set up cache directory
+        cache_dir = tmp_path / "cache" / "discovery"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        def mock_get_cache_dir():
+            return cache_dir
+
+        with patch("mcpi.cli.get_cache_dir", side_effect=mock_get_cache_dir), \
+             patch("subprocess.run", side_effect=mock_run), \
              patch("mcpi.cli.get_catalog_manager", side_effect=mock_get_catalog_manager), \
              patch("mcpi.cli.get_mcp_manager", side_effect=mock_get_mcp_manager):
 
