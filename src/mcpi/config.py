@@ -94,8 +94,100 @@ def load_config_file(config_path: Path) -> Dict[str, Any]:
         return {}
 
 
+# =============================================================================
+# Inline TOML Formatting
+# =============================================================================
+
+
+def _format_toml_value(value: Any) -> str:
+    """Format a value for TOML inline table format.
+
+    Args:
+        value: Value to format
+
+    Returns:
+        TOML-formatted string representation
+    """
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        items = [f"{k} = {_format_toml_value(v)}" for k, v in value.items()]
+        return "{ " + ", ".join(items) + " }"
+    elif isinstance(value, list):
+        if not value:
+            return "[]"
+        items = [_format_toml_value(v) for v in value]
+        return "[" + ", ".join(items) + "]"
+    elif isinstance(value, str):
+        # Escape strings properly
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    elif isinstance(value, bool):
+        return "true" if value else "false"
+    elif isinstance(value, (int, float)):
+        return str(value)
+    else:
+        return str(value)
+
+
+def _format_servers_section(servers: Dict[str, Dict[str, Any]]) -> str:
+    """Format the [servers] section with inline tables.
+
+    Args:
+        servers: Dict mapping server IDs to their config
+
+    Returns:
+        Formatted TOML string for the servers section
+    """
+    if not servers:
+        return ""
+
+    lines = ["[servers]"]
+    for server_id, config in servers.items():
+        # Quote server IDs that need it
+        if " " in server_id or "/" in server_id or "@" in server_id:
+            quoted_id = f'"{server_id}"'
+        else:
+            quoted_id = server_id
+
+        if not config:
+            lines.append(f"{quoted_id} = {{}}")
+        else:
+            lines.append(f"{quoted_id} = {_format_toml_value(config)}")
+
+    return "\n".join(lines)
+
+
+def _format_disabled_section(disabled: Dict[str, Dict[str, Any]]) -> str:
+    """Format the [disabled] section with inline tables.
+
+    Args:
+        disabled: Dict mapping server IDs to their config
+
+    Returns:
+        Formatted TOML string for the disabled section
+    """
+    if not disabled:
+        return ""
+
+    lines = ["[disabled]"]
+    for server_id, config in disabled.items():
+        # Quote server IDs that need it
+        if " " in server_id or "/" in server_id or "@" in server_id:
+            quoted_id = f'"{server_id}"'
+        else:
+            quoted_id = server_id
+
+        if not config:
+            lines.append(f"{quoted_id} = {{}}")
+        else:
+            lines.append(f"{quoted_id} = {_format_toml_value(config)}")
+
+    return "\n".join(lines)
+
+
 def save_config_file(config_path: Path, config: Dict[str, Any]) -> None:
-    """Save config to a file.
+    """Save config to a file with inline table formatting.
 
     Args:
         config_path: Path to write to
@@ -104,9 +196,35 @@ def save_config_file(config_path: Path, config: Dict[str, Any]) -> None:
     # Ensure parent directory exists
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Extract servers and disabled sections for custom formatting
+    servers = config.get("servers", {})
+    disabled = config.get("disabled", {})
+
+    # Build config without servers/disabled for standard toml.dump
+    config_without_custom = {
+        k: v for k, v in config.items() if k not in ("servers", "disabled")
+    }
+
     # Write config
     with open(config_path, "w") as f:
-        toml.dump(config, f)
+        # Write standard sections first
+        if config_without_custom:
+            toml.dump(config_without_custom, f)
+            f.write("\n")
+
+        # Write custom-formatted servers section
+        if servers:
+            servers_toml = _format_servers_section(servers)
+            f.write(servers_toml)
+            f.write("\n")
+
+        # Write custom-formatted disabled section
+        if disabled:
+            if servers or config_without_custom:
+                f.write("\n")
+            disabled_toml = _format_disabled_section(disabled)
+            f.write(disabled_toml)
+            f.write("\n")
 
 
 # =============================================================================
@@ -118,6 +236,7 @@ def add_server_to_config(
     server_id: str,
     scope: str,
     client: Optional[str] = None,
+    command: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
     args: Optional[List[str]] = None,
 ) -> Tuple[bool, str]:
@@ -127,6 +246,7 @@ def add_server_to_config(
         server_id: Server identifier
         scope: Target scope (determines project vs global config)
         client: Optional client name for per-client tracking
+        command: Optional command to execute the server
         env: Optional environment variables
         args: Optional arguments
 
@@ -138,10 +258,12 @@ def add_server_to_config(
 
     # Build server entry
     server_entry: Dict[str, Any] = {}
-    if env:
-        server_entry["env"] = env
+    if command:
+        server_entry["command"] = command
     if args:
         server_entry["args"] = args
+    if env:
+        server_entry["env"] = env
 
     if client:
         # Per-client tracking
@@ -492,9 +614,7 @@ def get_configured_clients(config: Dict[str, Any]) -> List[str]:
         List of client names with server configs
     """
     clients_config = config.get("clients", {})
-    return [
-        name for name, cfg in clients_config.items() if cfg.get("servers")
-    ]
+    return [name for name, cfg in clients_config.items() if cfg.get("servers")]
 
 
 def get_client_scope(config: Dict[str, Any], client: str) -> str:

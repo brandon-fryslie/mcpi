@@ -59,10 +59,11 @@ def shorten_path(path: Optional[str]) -> str:
             return str(path)
 
 
-
-
 def discover_server_via_claude(
-    ctx: click.Context, server_text: str, dry_run: bool = False, cache_dir: Optional[Path] = None
+    ctx: click.Context,
+    server_text: str,
+    dry_run: bool = False,
+    cache_dir: Optional[Path] = None,
 ) -> Optional[tuple[str, "MCPServer", dict]]:
     """Discover MCP server information using Claude CLI.
 
@@ -91,10 +92,10 @@ def discover_server_via_claude(
 
     if cache_file.exists():
         try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
+            with open(cache_file, "r", encoding="utf-8") as f:
                 server_info = json.load(f)
             console.print("[dim]Using cached discovery result...[/dim]")
-            
+
             # Validate cached data has required fields
             required_fields = ["id", "description", "command"]
             if all(f in server_info for f in required_fields):
@@ -107,14 +108,18 @@ def discover_server_via_claude(
                 repository = server_info.get("repository", "")
 
                 # Display cached information
-                console.print("\n[bold green]Discovered server information (cached):[/bold green]")
+                console.print(
+                    "\n[bold green]Discovered server information (cached):[/bold green]"
+                )
                 console.print(f"[bold]ID:[/bold] {server_id}")
                 console.print(f"[bold]Description:[/bold] {description}")
                 console.print(f"[bold]Command:[/bold] {command}")
                 if args:
                     console.print(f"[bold]Args:[/bold] {' '.join(args)}")
                 if env:
-                    console.print(f"[bold]Environment:[/bold] {json.dumps(env, indent=2)}")
+                    console.print(
+                        f"[bold]Environment:[/bold] {json.dumps(env, indent=2)}"
+                    )
                 if repository:
                     console.print(f"[bold]Repository:[/bold] {repository}")
                 console.print()
@@ -209,7 +214,9 @@ IMPORTANT:
         )
 
         if result.returncode != 0:
-            console.print(f"[red]Error: Claude failed with code {result.returncode}[/red]")
+            console.print(
+                f"[red]Error: Claude failed with code {result.returncode}[/red]"
+            )
             if result.stderr:
                 console.print(f"[red]{result.stderr}[/red]")
             return None
@@ -235,7 +242,9 @@ IMPORTANT:
         try:
             server_info = json.loads(response_text)
         except json.JSONDecodeError as e:
-            console.print(f"[red]Error: Could not parse Claude's response as JSON[/red]")
+            console.print(
+                f"[red]Error: Could not parse Claude's response as JSON[/red]"
+            )
             if verbose:
                 console.print(f"[dim]Parse error: {e}[/dim]")
                 console.print(f"[dim]Response: {response_text[:200]}...[/dim]")
@@ -261,7 +270,7 @@ IMPORTANT:
 
         # Cache the successful result
         try:
-            with open(cache_file, 'w', encoding='utf-8') as f:
+            with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(server_info, f, indent=2, ensure_ascii=False)
             if verbose:
                 console.print(f"[dim]Cached discovery result to {cache_file}[/dim]")
@@ -279,7 +288,9 @@ IMPORTANT:
         repository = server_info.get("repository", "")
 
         if not server_id or not description or not command:
-            console.print("[red]Error: Claude returned incomplete server information[/red]")
+            console.print(
+                "[red]Error: Claude returned incomplete server information[/red]"
+            )
             return None
 
         # Display discovered information
@@ -315,8 +326,10 @@ IMPORTANT:
         console.print(f"[red]Error running Claude: {e}[/red]")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         return None
+
 
 def get_user_config(ctx: click.Context):
     """Lazy initialization of user configuration."""
@@ -327,10 +340,9 @@ def get_user_config(ctx: click.Context):
     return ctx.obj["user_config"]
 
 
-
 def get_cache_dir() -> Path:
     """Get the cache directory for discovery results.
-    
+
     Returns:
         Path to ~/.mcpi/cache/discovery/
     """
@@ -339,7 +351,9 @@ def get_cache_dir() -> Path:
     return cache_dir
 
 
-def get_default_scope(ctx: click.Context, provided_scope: Optional[str]) -> Optional[str]:
+def get_default_scope(
+    ctx: click.Context, provided_scope: Optional[str]
+) -> Optional[str]:
     """Get scope with fallback to config default.
 
     Args:
@@ -356,7 +370,9 @@ def get_default_scope(ctx: click.Context, provided_scope: Optional[str]) -> Opti
     return config.default_scope
 
 
-def get_default_client(ctx: click.Context, provided_client: Optional[str]) -> Optional[str]:
+def get_default_client(
+    ctx: click.Context, provided_client: Optional[str]
+) -> Optional[str]:
     """Get client with fallback to config default.
 
     Args:
@@ -834,13 +850,15 @@ def complete_server_ids(
                         ServerState.NOT_INSTALLED: "not installed",
                     }
                     state_colors = {
-                        ServerState.ENABLED: "\033[32m",    # green
-                        ServerState.DISABLED: "\033[33m",   # yellow
-                        ServerState.UNAPPROVED: "\033[36m", # cyan
+                        ServerState.ENABLED: "\033[32m",  # green
+                        ServerState.DISABLED: "\033[33m",  # yellow
+                        ServerState.UNAPPROVED: "\033[36m",  # cyan
                         ServerState.NOT_INSTALLED: "\033[31m",  # red
                     }
                     state_label = state_labels.get(info.state, info.state.name.lower())
-                    state_color = state_colors.get(info.state, "\033[37m")  # default white
+                    state_color = state_colors.get(
+                        info.state, "\033[37m"
+                    )  # default white
                     reset = "\033[0m"
                     dim = "\033[2m"
                     cyan = "\033[36m"
@@ -1219,7 +1237,9 @@ def config_show(ctx: click.Context) -> None:
     cfg = create_default_config()
 
     if not cfg.is_loaded:
-        console.print(f"[yellow]No configuration file found at {cfg.config_path}[/yellow]")
+        console.print(
+            f"[yellow]No configuration file found at {cfg.config_path}[/yellow]"
+        )
         console.print("\n[dim]Use 'mcpi config set' to create configuration.[/dim]")
         return
 
@@ -1253,7 +1273,9 @@ def config_get(ctx: click.Context, key: str) -> None:
     try:
         section, key_name = key.split(".", 1)
     except ValueError:
-        console.print(f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]")
+        console.print(
+            f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]"
+        )
         sys.exit(1)
 
     value = cfg.get(section, key_name)
@@ -1285,7 +1307,9 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     try:
         section, key_name = key.split(".", 1)
     except ValueError:
-        console.print(f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]")
+        console.print(
+            f"[red]Error: KEY must be in format 'section.key' (e.g., 'defaults.scope')[/red]"
+        )
         sys.exit(1)
 
     cfg.set(section, key_name, value)
@@ -1480,14 +1504,16 @@ def add(
                         server = local_catalog.get_server(server_id)
                         if server:
                             if verbose:
-                                console.print(f"[dim]Found '{server_id}' in local catalog[/dim]")
+                                console.print(
+                                    f"[dim]Found '{server_id}' in local catalog[/dim]"
+                                )
                             # Don't enter discovery mode, use catalog entry
                             # Continue with normal flow
                 except Exception as e:
                     # Non-fatal, continue to discovery if local check fails
                     if verbose:
                         console.print(f"[dim]Local catalog check failed: {e}[/dim]")
-            
+
             # Only discover if still not found
             if not server:
                 # Enter discovery mode for non-template installs
@@ -1512,14 +1538,19 @@ def add(
                             # Save the catalog to disk
                             local_catalog.save_catalog()
                             if verbose:
-                                console.print(f"[dim]Added '{server_id}' to local catalog[/dim]")
+                                console.print(
+                                    f"[dim]Added '{server_id}' to local catalog[/dim]"
+                                )
                         elif verbose:
-                            console.print(f"[dim]Server '{server_id}' already in local catalog[/dim]")
+                            console.print(
+                                f"[dim]Server '{server_id}' already in local catalog[/dim]"
+                            )
                 except Exception as e:
                     # Non-fatal: catalog persistence failure shouldn't stop installation
                     if verbose:
-                        console.print(f"[dim]Warning: Could not add to local catalog: {e}[/dim]")
-
+                        console.print(
+                            f"[dim]Warning: Could not add to local catalog: {e}[/dim]"
+                        )
 
         # Handle --list-templates flag
         if list_templates:
@@ -1659,7 +1690,9 @@ def add(
         # Create server configuration (if not already created by template)
         if config is None:
             # Use discovered env if available, otherwise empty dict
-            env_vars = discovered_server_env if 'discovered_server_env' in locals() else {}
+            env_vars = (
+                discovered_server_env if "discovered_server_env" in locals() else {}
+            )
             config = ServerConfig(
                 command=server.command, args=server.args, env=env_vars, type="stdio"
             )
@@ -1694,6 +1727,7 @@ def add(
                     server_id,
                     scope,
                     client=client,
+                    command=config.command if config.command else None,
                     env=config.env if config.env else None,
                     args=config.args if config.args else None,
                 )
@@ -2532,7 +2566,9 @@ def catalog_list(ctx: click.Context, catalog: str, summary: bool) -> None:
             table.add_column("Description", style="white")
 
             for cat in catalogs:
-                table.add_row(cat.name, cat.type, str(cat.server_count), cat.description)
+                table.add_row(
+                    cat.name, cat.type, str(cat.server_count), cat.description
+                )
 
             console.print(table)
             console.print(f"\nUse [cyan]mcpi catalog info <name>[/cyan] for details")
@@ -2550,9 +2586,7 @@ def catalog_list(ctx: click.Context, catalog: str, summary: bool) -> None:
             cat = manager.get_catalog(cat_name)
             if cat:
                 for server_id, server in cat.list_servers():
-                    all_servers.append(
-                        (server_id, server.description or "", cat_name)
-                    )
+                    all_servers.append((server_id, server.description or "", cat_name))
 
         if not all_servers:
             console.print("[yellow]No servers found in catalogs[/yellow]")
@@ -2774,7 +2808,9 @@ IMPORTANT:
         )
 
         if result.returncode != 0:
-            console.print(f"[red]Error: Claude failed with code {result.returncode}[/red]")
+            console.print(
+                f"[red]Error: Claude failed with code {result.returncode}[/red]"
+            )
             if result.stderr:
                 console.print(f"[red]{result.stderr}[/red]")
             ctx.exit(1)
@@ -3050,7 +3086,9 @@ def fzf(ctx: click.Context) -> None:
 
     except RuntimeError as e:
         console.print(f"[red]{e}[/red]")
-        console.print("\n[yellow]Tip: Try 'mcpi menu' instead - no fzf required[/yellow]")
+        console.print(
+            "\n[yellow]Tip: Try 'mcpi menu' instead - no fzf required[/yellow]"
+        )
         ctx.exit(1)
     except Exception as e:
         if ctx.obj.get("verbose", False):
@@ -3150,8 +3188,12 @@ def completion(ctx: click.Context, shell: Optional[str]) -> None:
 
 
 @main.command()
-@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
-@click.option("--config", "config_path", type=click.Path(exists=True), help="Path to mcpi.toml")
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be done without making changes"
+)
+@click.option(
+    "--config", "config_path", type=click.Path(exists=True), help="Path to mcpi.toml"
+)
 @click.option(
     "--client",
     shell_complete=complete_client_names,
@@ -3222,13 +3264,19 @@ def sync(
         if client:
             client_servers = get_servers_from_config(config, client)
             if not client_servers:
-                console.print(f"[yellow]No servers defined for client: {client}[/yellow]")
+                console.print(
+                    f"[yellow]No servers defined for client: {client}[/yellow]"
+                )
                 return
-            console.print(f"[dim]Found {len(client_servers)} server(s) for {client}[/dim]")
+            console.print(
+                f"[dim]Found {len(client_servers)} server(s) for {client}[/dim]"
+            )
         else:
             console.print(f"[dim]Found {total_servers} server(s) in config[/dim]")
             if top_level_servers:
-                console.print(f"[dim]  • {len(top_level_servers)} shared server(s)[/dim]")
+                console.print(
+                    f"[dim]  • {len(top_level_servers)} shared server(s)[/dim]"
+                )
             for c in configured_clients:
                 count = len(get_servers_from_config(config, c))
                 console.print(f"[dim]  • {count} server(s) for {c}[/dim]")
@@ -3251,7 +3299,9 @@ def sync(
                 console.print(f"  [green]✓[/green] {server_id}")
 
         if results["skipped"]:
-            console.print(f"\n[dim]Already installed ({len(results['skipped'])}):[/dim]")
+            console.print(
+                f"\n[dim]Already installed ({len(results['skipped'])}):[/dim]"
+            )
             for server_id in results["skipped"]:
                 console.print(f"  [dim]•[/dim] {server_id}")
 
