@@ -54,20 +54,16 @@ publish:
         exit 0
     fi
 
-    # Generate release notes from tag annotation or commits
     echo "Creating GitHub release for $latest_tag..."
 
-    # Get the previous tag for changelog
-    previous_tag=$(git describe --tags --abbrev=0 "$latest_tag^" 2>/dev/null || echo "")
+    # Use tag annotation as release notes if available
+    tag_message=$(git tag -l --format='%(contents)' "$latest_tag" 2>/dev/null || echo "")
 
-    if [[ -n "$previous_tag" ]]; then
-        echo "Generating changelog from $previous_tag to $latest_tag"
+    if [[ -n "$tag_message" ]]; then
         gh release create "$latest_tag" \
             --title "$latest_tag" \
-            --generate-notes \
-            --notes-start-tag "$previous_tag"
+            --notes "$tag_message"
     else
-        echo "No previous tag found, creating release with tag annotation"
         gh release create "$latest_tag" \
             --title "$latest_tag" \
             --generate-notes

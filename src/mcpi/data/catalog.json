@@ -242,5 +242,14 @@
       "blender-mcp"
     ],
     "repository": "https://github.com/ahujasid/blender-mcp"
+  },
+  "chromedevtools/chrome-devtools-mcp": {
+    "description": "Control and inspect Chrome browser with DevTools capabilities for automation, performance tracing, and debugging",
+    "command": "npx",
+    "args": [
+      "-y",
+      "chrome-devtools-mcp@latest"
+    ],
+    "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
   }
 }
