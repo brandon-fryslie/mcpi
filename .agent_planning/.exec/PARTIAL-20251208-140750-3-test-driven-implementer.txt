@@ -1,0 +1,35 @@
+EXECUTION: 20251208-140750
+SEQUENCE: 3
+AGENT: test-driven-implementer
+STARTED: 2025-12-08 14:07:50
+COMPLETED: 2025-12-08 14:46:51
+STATUS: success
+
+## Work Performed
+- Changed project-mcp scope to use ApprovalRequiredEnableDisableHandler instead of FileMoveEnableDisableHandler
+- Updated imports to include ApprovalRequiredEnableDisableHandler
+- Modified 5 failing tests to align with new approval-based behavior
+- Fixed prepopulated_harness to create approval arrays in correct scope (project-local)
+
+## Key Findings
+- The bug was that project-mcp scope was using FileMoveEnableDisableHandler which treated all servers in .mcp.json as ENABLED
+- The correct behavior requires servers to be explicitly approved via enabledMcpjsonServers array in .claude/settings.local.json
+- ApprovalRequiredEnableDisableHandler already existed and implements the correct approval logic
+- Several existing tests needed to be updated to add approval entries for servers to show as ENABLED
+
+## Artifacts Created
+- tests/test_cli_auto_approval.py - New test file with 4 comprehensive tests for approval mechanism
+- Modified src/mcpi/clients/claude_code.py - Changed project-mcp scope handler
+- Modified tests/test_clients_claude_code.py - Updated 5 tests to use approval mechanism
+- Modified tests/test_harness.py - Fixed prepopulated_harness to use correct scope for approval arrays
+
+## Issues Encountered
+- Initial fix caused 6 existing tests to fail because they expected old file-move behavior
+- Tests had to be updated to explicitly approve servers in project-local scope
+- Prepopulated test harness was creating approval arrays in wrong file (project-mcp instead of project-local)
+
+## Handoff Notes
+- All 4 new tests in test_cli_auto_approval.py are passing
+- Full test suite passing: 1249 passed, 82 skipped
+- Changes committed: 7466f9e
+- Bug MCPI-0fb is now fixed - servers in project-mcp scope correctly show approval state

@@ -30,36 +30,41 @@ Essential clients with large user bases and mature MCP implementations.
 - **Notes**: Single "user" scope, 43 comprehensive tests
 - **Sources**: [Anthropic announcement](https://www.anthropic.com/news/model-context-protocol)
 
-### 3. Cursor
+### 3. Cursor ✅ IMPLEMENTED
 - **Type**: IDE (VS Code fork)
 - **Developer**: Cursor Inc.
 - **Config Location**: `~/.cursor/mcp.json` or project `.cursor/mcp.json`
 - **Config Format**: JSON with `mcpServers` object
 - **Transport**: Supports SSE protocol (easier remote MCP setup)
-- **Status**: 🔴 Not implemented
+- **Status**: Full support implemented (commit fe2b455)
 - **Priority**: HIGH - Extremely popular AI coding IDE
 - **Complexity**: Low-Medium
+- **Notes**: 2-scope model (user + project), 45 comprehensive tests
 - **Sources**: [DataCamp Top MCP Clients](https://www.datacamp.com/blog/top-mcp-servers-and-clients)
 
-### 4. VS Code (GitHub Copilot)
+### 4. VS Code (GitHub Copilot) ✅ IMPLEMENTED
 - **Type**: IDE extension
 - **Developer**: Microsoft
-- **Config Location**: `.vscode/mcp.json` or VS Code settings
-- **Config Format**: JSON
-- **Status**: 🔴 Not implemented
+- **Config Location**:
+  - User: Platform-specific (~/Library/Application Support/Code/User/mcp.json on macOS)
+  - Workspace: `.vscode/mcp.json`
+- **Config Format**: JSON with `"servers"` object (NOT "mcpServers")
+- **Status**: Full support implemented (commit 56f578e)
 - **Priority**: HIGH - Largest IDE user base, native MCP in VS Code 1.101+
-- **Complexity**: Medium - settings integration
-- **Notes**: MCP stabilized in VS Code 1.102
+- **Complexity**: Medium - 2-scope model, different JSON key
+- **Notes**: CRITICAL - Uses "servers" key instead of "mcpServers". Required FileBasedScope enhancement.
+- **Test Coverage**: 45 comprehensive tests
 - **Sources**: [VS Code MCP Docs](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
 
-### 5. Windsurf
+### 5. Windsurf ✅ IMPLEMENTED
 - **Type**: IDE
 - **Developer**: Codeium
-- **Config Location**: Settings panel with one-click MCP setup
-- **Transport**: Supports SSE protocol
-- **Status**: 🔴 Not implemented
+- **Config Location**: `~/.codeium/windsurf/mcp_config.json` (all platforms)
+- **Config Format**: JSON with `mcpServers` object
+- **Status**: Full support implemented (commit ace05f8)
 - **Priority**: HIGH - Popular alternative to Cursor
-- **Complexity**: Medium - need to investigate config format
+- **Complexity**: Low - single-scope model, same path on all platforms
+- **Notes**: Single "user" scope, 44 comprehensive tests
 - **Sources**: [Windsurf](https://windsurf.com/)
 
 ---
@@ -68,30 +73,34 @@ Essential clients with large user bases and mature MCP implementations.
 
 Significant user bases, active development, strong MCP support.
 
-### 6. Cline
+### 6. Cline ✅ IMPLEMENTED
 - **Type**: VS Code extension
 - **Developer**: Open source (Saoud Rizwan)
-- **Config Location**: `cline_mcp_settings.json`
+- **Config Location**: VS Code extension globalStorage
+  - macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+  - Windows: `%APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+  - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - **Config Format**: JSON with `mcpServers`
 - **Transport**: Supports Streamable HTTP and SSE
 - **User Base**: 4M+ developers, 30k GitHub stars
-- **Status**: 🔴 Not implemented
+- **Status**: Full support implemented (commit ca32c2a)
 - **Priority**: MEDIUM-HIGH
-- **Complexity**: Low - JSON config similar to Claude
+- **Complexity**: Low - single-scope model with InlineEnableDisableHandler
+- **Notes**: Single "user" scope, 46 comprehensive tests, first client using InlineEnableDisableHandler pattern
 - **Sources**: [Cline](https://cline.bot/), [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev)
 
-### 7. Roo Code
+### 7. Roo Code ✅ IMPLEMENTED
 - **Type**: VS Code extension (Cline fork)
 - **Developer**: Roo Code Inc.
 - **Config Location**:
-  - Global: `mcp_settings.json`
+  - User: VS Code globalStorage (`rooveterinaryinc.roo-cline/settings/mcp_settings.json`)
   - Project: `.roo/mcp.json`
-- **Config Format**: JSON
+- **Config Format**: JSON with `mcpServers` object
 - **User Base**: 750k VS Code installs, 18k GitHub stars
-- **Status**: 🔴 Not implemented
+- **Status**: Full support implemented (commit e52632f)
 - **Priority**: MEDIUM
-- **Complexity**: Low - familiar JSON format
-- **Notes**: Project config takes precedence over global
+- **Complexity**: Low - 2-scope model with InlineEnableDisableHandler
+- **Notes**: Combines Cline's inline disable pattern with 2-scope model, 57 comprehensive tests
 - **Sources**: [Roo Code Docs](https://docs.roocode.com/features/mcp/using-mcp-in-roo), [GitHub](https://github.com/RooCodeInc/Roo-Code)
 
 ### 8. Zed
@@ -179,14 +188,14 @@ Notable clients with smaller or specialized user bases.
 1. ✅ Claude Code (complete)
 2. ✅ Claude Desktop (complete - commit aa2e4ab)
 
-### Phase 2: Popular IDEs
-3. Cursor (large user base, simple config)
-4. VS Code/Copilot (largest IDE, strategic importance)
-5. Windsurf (growing popularity)
+### Phase 2: Popular IDEs ✅ COMPLETE
+3. ✅ Cursor (complete - commit fe2b455)
+4. ✅ VS Code/Copilot (complete - commit 56f578e)
+5. ✅ Windsurf (complete - commit ace05f8)
 
-### Phase 3: VS Code Extensions
-6. Cline (huge open source community)
-7. Roo Code (Cline fork, similar config)
+### Phase 3: VS Code Extensions ✅ COMPLETE
+6. ✅ Cline (complete - commit ca32c2a)
+7. ✅ Roo Code (complete - commit e52632f)
 
 ### Phase 4: Alternative Editors & CLIs
 8. Zed (native MCP support, modern editor)

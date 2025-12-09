@@ -1,0 +1,33 @@
+Agent: functional-tester | 20251208-000948
+Tests: 57 added (TestRooCodePlugin, TestRooCodePluginDiscovery) | Workflows: 10 covered
+E2E: real filesystem (temp dirs, JSON I/O) | Status: failing (as expected)
+
+Test Breakdown:
+- Plugin Identity: 6 tests (name, scopes, priority)
+- User Scope CRUD: 6 tests (add, list, remove, update)
+- Project Scope CRUD: 5 tests (add, list, remove, multiple servers)
+- Scope Priority: 4 tests (isolation, precedence, filtering)
+- User Enable/Disable: 10 tests (InlineEnableDisableHandler)
+- Project Enable/Disable: 4 tests (InlineEnableDisableHandler)
+- Cross-Scope: 2 tests (isolation, auto-detection)
+- Persistence: 3 tests (config format, restart, atomicity)
+- Error Handling: 8 tests (edge cases, validation)
+- Integration: 6 tests (safety, registry, manager)
+
+Key Characteristics:
+- 2-scope model (user priority 50, project priority 30)
+- InlineEnableDisableHandler (like Cline, NOT FileMoveEnableDisableHandler)
+- path_overrides with user/project only (no disabled paths needed)
+- Standard JSON with "mcpServers" key
+- Combines Cursor's 2-scope + Cline's InlineHandler patterns
+
+STATUS Gaps Addressed:
+- Phase 3.2 Roo Code test coverage (next implementation target)
+- Validates 2-scope + InlineHandler combination (new pattern)
+- Provides comprehensive test suite for Cline fork architecture
+
+PLAN Items Validated:
+- P0: Multi-scope server management
+- P1: Enable/disable functionality via inline field
+- P1: Config persistence across scopes
+- P2: Error handling and validation

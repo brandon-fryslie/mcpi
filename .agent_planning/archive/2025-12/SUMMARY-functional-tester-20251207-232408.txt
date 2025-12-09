@@ -1,0 +1,3 @@
+Agent: functional-tester | 20251207-232408
+Tests: 46 added ([test_cline_plugin.py]) | Workflows: 6 covered
+E2E: real file I/O | Status: failing (as expected - no implementation)

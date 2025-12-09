@@ -1,0 +1,9 @@
+Agent: project-evaluator | 2025-12-08-012000
+Feature: Discovery mode for mcpi add command
+Test Quality: EXCELLENT (5/5 criteria met)
+Test Count: 10 (1 active, 9 skipped pending implementation)
+Implementation Status: NOT STARTED
+Workflow: PAUSE - Add security tests first (2-4 hours)
+Blockers: 1 HIGH priority gap (security validation tests missing)
+Ready: Tests define clear contract, ready for implementation after security tests added
+-> Add security tests → Implement feature → Run tests to validate

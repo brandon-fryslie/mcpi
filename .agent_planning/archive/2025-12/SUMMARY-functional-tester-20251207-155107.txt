@@ -1,0 +1,34 @@
+Agent: functional-tester | 2025-12-07 15:51:07
+Tests: 44 added | Workflows: 5 covered | E2E: real file operations
+Status: failing (expected - no implementation yet)
+
+Test Categories:
+- Plugin identity/initialization (5 tests)
+- Server CRUD operations (10 tests)
+- Enable/disable functionality (10 tests)
+- Config persistence (4 tests)
+- Platform-specific paths (4 tests)
+- Error handling (8 tests)
+- Test safety mechanisms (2 tests)
+- Plugin discovery (3 tests)
+
+Critical User Workflows Covered:
+1. Install server -> config file created -> server appears in list
+2. Disable server -> config moved to shadow file -> shows DISABLED
+3. Enable server -> config moved back -> shows ENABLED
+4. Remove server -> config deleted -> server gone from list
+5. Config persists across plugin restarts
+
+Un-gameable Test Characteristics:
+- Uses REAL file I/O (temp directories, not mocks)
+- Verifies actual file contents on disk
+- Tests complete user journey (not implementation details)
+- Cannot be satisfied by stubs or hardcoding
+
+Windsurf Plugin Specifications (from research):
+- Config location: ~/.codeium/windsurf/mcp_config.json (ALL platforms)
+- JSON key: mcpServers (standard, same as Claude Desktop/Cursor)
+- Single scope: user-level (priority 50)
+- Enable/disable: FileMoveEnableDisableHandler (mcp_config_disabled.json)
+
+Next: Implement WindsurfPlugin to make tests pass

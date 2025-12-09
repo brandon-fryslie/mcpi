@@ -1,0 +1,35 @@
+Agent: test-driven-implementer | 20251207-232823
+Tests: 46 passing, 0 failing | Files: 1 | Commits: 0
+Status: complete
+
+Implementation Summary:
+Created Cline MCP client plugin (src/mcpi/clients/cline.py) implementing support for the Cline VS Code extension.
+
+Key Features Implemented:
+1. Plugin name: "cline"
+2. Single user-level scope (priority 50)
+3. Platform-specific config paths:
+   - macOS: ~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+   - Windows: %APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+   - Linux: ~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+4. InlineEnableDisableHandler for enable/disable operations (adds/removes "disabled" field)
+5. Full CRUD operations: add, update, remove, enable, disable, list
+6. Test safety: requires path_overrides in MCPI_TEST_MODE
+7. Auto-discovery via ClientRegistry
+
+Technical Details:
+- Uses InlineEnableDisableHandler (NOT FileMoveEnableDisableHandler like Windsurf)
+- Disable operation: adds "disabled": true to server config
+- Enable operation: removes "disabled" field from server config
+- Single config file (no separate disabled file needed)
+- Standard mcpServers JSON key
+- Platform-specific path resolution via platform.system()
+
+Test Results:
+- All 46 Cline plugin tests passing
+- All 1170 total project tests passing
+- Plugin auto-discovered by ClientRegistry
+- Code formatted and validated
+
+Files Modified:
+- src/mcpi/clients/cline.py (created, 558 lines)

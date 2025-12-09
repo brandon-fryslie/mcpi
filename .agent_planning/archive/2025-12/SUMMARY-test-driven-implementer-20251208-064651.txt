@@ -1,0 +1,26 @@
+Agent: test-driven-implementer | 2025-12-08T06:46:51Z
+Tests: 8 passing, 0 failing | Files: 2 | Commits: 1
+Status: complete
+Next: Features ready for integration testing and user validation
+
+Implementation Summary:
+- Feature 1 (Caching): Discovery results cached to ~/.mcpi/cache/discovery/
+- Feature 2 (Catalog Persistence): Discovered servers saved to local catalog
+- Both features working together to optimize discovery performance
+- All test requirements met with proper isolation
+
+Modified Files:
+- /Users/bmf/code/mcpi/src/mcpi/cli.py
+- /Users/bmf/code/mcpi/tests/test_discovery_cache_catalog.py
+
+Test Results (test_discovery_cache_catalog.py):
+✓ test_discovered_server_added_to_local_catalog
+✓ test_subsequent_add_finds_server_in_catalog
+✓ test_first_discovery_creates_cache
+✓ test_cached_discovery_avoids_claude_call
+✓ test_different_queries_create_separate_caches
+✓ test_cache_can_be_cleared
+✓ test_discovery_creates_both_cache_and_catalog_entry
+✓ test_catalog_hit_bypasses_both_cache_and_claude
+
+Commit: 8b15668 - "feat(discovery): Add caching and local catalog persistence for discovered servers"

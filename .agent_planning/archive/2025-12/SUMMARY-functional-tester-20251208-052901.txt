@@ -1,0 +1,4 @@
+Agent: functional-tester | 2025-12-08T05:32:00
+Tests: 8 added (test_discovered_server_added_to_local_catalog, test_subsequent_add_finds_server_in_catalog, test_first_discovery_creates_cache, test_cached_discovery_avoids_claude_call, test_different_queries_create_separate_caches, test_cache_can_be_cleared, test_discovery_creates_both_cache_and_catalog_entry, test_catalog_hit_bypasses_both_cache_and_claude) | Workflows: discovery persistence, cache optimization, catalog integration
+E2E: real catalog manager, real file I/O, real cache operations | Status: failing (as expected - features not implemented)
+Next: Implement features to make tests pass - catalog persistence + discovery caching

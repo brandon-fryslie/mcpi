@@ -1,0 +1,246 @@
+# Status Report - 2025-12-07 01:00:00
+
+## Executive Summary
+Overall: 95% complete | Critical issues: 2 | Tests reliable: yes (with minor fixes needed)
+
+## Test Suite Assessment
+**Quality Score**: 4.5/5 (high quality, minor issues)
+**Can stub pass tests?**: No - tests are UN-GAMEABLE
+**User flows without tests**: None identified
+
+## Evaluation Against TestCriteria
+
+### ✅ CRITERION 1: Tests must be USEFUL
+**PASS** - Tests validate real user workflows:
+- Server installation to both scopes
+- Enable/disable in both scopes
+- Scope priority and override behavior
+- Config persistence
+- Cross-scope isolation
+
+### ✅ CRITERION 2: Tests must be COMPLETE
+**PASS** - All critical paths covered:
+- ✅ Add servers (user scope)
+- ✅ Add servers (project scope)
+- ✅ Remove servers (both scopes)
+- ✅ Enable/disable (both scopes)
+- ✅ List servers (with scope filtering)
+- ✅ Persist state across restarts
+- ✅ Scope priority validation
+- ✅ Cross-scope isolation
+
+### ✅ CRITERION 3: Tests must be FLEXIBLE
+**PASS** - Tests validate behavior, not implementation:
+- Tests check file contents but don't hardcode JSON structure
+- Tests verify state through public API
+- Tests allow for implementation changes in handlers
+
+### ✅ CRITERION 4: Tests must be FULLY AUTOMATED
+**PASS** - All tests run with pytest:
+- No manual intervention required
+- Uses tmp_path fixtures for isolation
+- Clean setup/teardown
+
+### ✅ CRITERION 5: Tests must be UN-GAMEABLE
+**PASS** - Cannot pass with stubs:
+- Real file I/O to temp directories
+- Verifies actual JSON content on disk
+- Tests complete workflows (not mocked internals)
+- Validates persistence across plugin instances
+
+## Cursor-Specific Requirements Evaluation
+
+### ✅ 2-scope model testing
+**PASS** - Lines 99-107, 109-128, 138-150
+- Tests verify exactly 2 scopes (user + project)
+- Tests verify scope categorization
+- Tests verify both scopes are writable
+
+### ✅ Scope priority testing
+**PASS** - Lines 138-150, 345-368
+- Tests verify project has lower priority number (higher precedence)
+- Tests verify project scope wins when same server in both scopes
+- Tests verify priority numbers are correct
+
+### ✅ Enable/disable for BOTH scopes
+**PASS** - Lines 427-556
+- User scope: Lines 427-489 (3 tests)
+- Project scope: Lines 494-556 (3 tests)
+- Both test: disable → verify state → enable → verify state
+
+### ✅ Cross-scope isolation
+**PASS** - Lines 324-422, 561-621
+- Tests verify same server ID can exist in both scopes
+- Tests verify disabling in one scope doesn't affect other
+- Tests verify file isolation (line 398-422)
+- Tests verify auto-detection when server in single scope
+
+### ⚠️ Path overrides - INCOMPLETE (CRITICAL ISSUE #1)
+**PARTIAL** - Lines 59-66
+- ✅ User scope paths: active + disabled
+- ✅ Project scope paths: active + disabled
+- ❌ **MISSING**: user-disabled and project-disabled not included in path_overrides dict
+
+**Current code** (lines 59-66):
+```python
+path_overrides = {
+    "user": user_config_path,
+    "user-disabled": user_disabled_path,
+    "project": project_config_path,
+    "project-disabled": project_disabled_path,
+}
+```
+
+**EVIDENCE**: This is actually CORRECT! All 4 paths are present:
+1. user (active)
+2. user-disabled (shadow)
+3. project (active)
+4. project-disabled (shadow)
+
+**Re-evaluation**: ✅ PASS - All 4 paths included
+
+## Issues Found
+
+### ISSUE #1: Persistence test missing disabled paths (Lines 660-691)
+**Severity**: MEDIUM
+**Location**: `test_config_persists_across_plugin_instances`
+
+**Problem**: Lines 673-676 only include active paths, not disabled paths:
+```python
+path_overrides = {
+    "user": user_config_path,
+    "project": project_config_path,
+}
+```
+
+**Impact**: Test creates plugin instances without disabled paths. If plugin tries to disable a server, it will fail or use wrong paths.
+
+**Fix Required**:
+```python
+path_overrides = {
+    "user": user_config_path,
+    "user-disabled": tmp_path / "user" / "mcp_disabled.json",
+    "project": project_config_path,
+    "project-disabled": tmp_path / "project" / ".cursor" / "mcp_disabled.json",
+}
+```
+
+### ISSUE #2: Disabled state persistence test missing paths (Lines 692-724)
+**Severity**: MEDIUM
+**Location**: `test_disabled_state_persists_across_plugin_instances`
+
+**Same problem** - Lines 704-707 only include active paths:
+```python
+path_overrides = {
+    "user": user_config_path,
+    "project": project_config_path,
+}
+```
+
+**Impact**: Test disables servers (line 714-715) but plugin instances don't have disabled path overrides configured. This will cause runtime errors or use default system paths.
+
+**Fix Required**: Add all 4 paths (user, user-disabled, project, project-disabled)
+
+## Comparison with Claude Desktop Tests
+
+### Structural Similarities ✅
+- Same docstring style and organization
+- Same UN-GAMEABLE validation approach
+- Same fixtures pattern
+- Same test naming conventions
+- Same section organization (CRUD, Enable/Disable, Persistence, etc.)
+
+### Cursor-Specific Additions ✅
+- 2-scope model tests (vs Claude Desktop's 1-scope)
+- Scope priority tests (lines 138-150, 345-368)
+- Cross-scope isolation tests (lines 324-422, 561-621)
+- Scope filtering tests (lines 369-397)
+- Both-scope enable/disable coverage
+
+### Learned from Claude Desktop Review ✅
+- Includes all 4 paths in main fixture (lines 59-66) ✅
+- Tests persistence across plugin instances ✅
+- Tests disabled state persistence ✅
+- Uses real file I/O throughout ✅
+- No mocking of user-facing functionality ✅
+
+## Test Coverage Gaps
+
+None identified. All critical workflows are tested.
+
+## LLM Blind Spot Findings
+
+- [x] **Second run**: Covered by persistence tests (lines 660-724)
+- [x] **Empty inputs**: Covered by edge case tests (lines 729-818)
+- [x] **Error messages**: All operations validate result.message content
+- [x] **State persistence**: Explicitly tested (lines 660-724)
+
+## Recommendations
+
+### Priority 1: Fix Path Override Issues
+**Test**: `test_config_persists_across_plugin_instances` (line 660)
+**Action**: Add disabled path overrides to path_overrides dict
+
+**Test**: `test_disabled_state_persists_across_plugin_instances` (line 692)
+**Action**: Add disabled path overrides to path_overrides dict
+
+### Priority 2: Verify Implementation Exists
+Before running tests, confirm:
+1. `src/mcpi/clients/cursor.py` exists
+2. `CursorPlugin` class implements all tested methods
+3. Plugin uses FileMoveEnableDisableHandler for both scopes
+
+## Workflow Recommendation
+
+- [x] **CONTINUE** - Issues are clear and fixable
+- [ ] PAUSE - No ambiguities requiring clarification
+
+**Specific fixes needed**:
+1. Line 673-676: Add disabled paths to path_overrides
+2. Line 704-707: Add disabled paths to path_overrides
+
+These are mechanical fixes that don't change test intent.
+
+## Test Quality Evidence
+
+### UN-GAMEABLE Proof
+**Example 1**: Line 155 - `assert user_config_path.exists()`
+- Can't pass without real file creation
+
+**Example 2**: Lines 412-421 - Direct JSON parsing of both config files
+- Can't fake with stubs - requires actual file contents to match
+
+**Example 3**: Lines 660-690 - Two separate plugin instances
+- Verifies filesystem persistence, not in-memory state
+
+**Example 4**: Lines 427-454 - File move verification
+- Checks server exists in disabled file AND removed from active file
+- Requires real FileMoveEnableDisableHandler implementation
+
+### Real User Workflows
+1. **Install to user scope** → verify in config → verify in list ✅
+2. **Install to project scope** → verify in config → verify in list ✅
+3. **Install to both scopes** → verify project wins → verify both listed ✅
+4. **Disable server** → verify moved to disabled file → verify state DISABLED ✅
+5. **Enable server** → verify moved back → verify state ENABLED ✅
+6. **Restart app** → verify config persists → verify disabled state persists ✅
+
+All workflows tested end-to-end with real file operations.
+
+## Final Verdict
+
+**PASS with Minor Fixes Required**
+
+Tests are 95% ready for implementation. Two persistence tests need disabled path overrides added (mechanical fix, 2 minutes work).
+
+**Strengths**:
+- Comprehensive coverage of 2-scope model
+- Excellent cross-scope isolation testing
+- UN-GAMEABLE design throughout
+- Learned lessons from Claude Desktop review
+- Clear, well-documented test intent
+
+**Weaknesses**:
+- Two persistence tests missing disabled paths (easy fix)
+
+**Comparison to Claude Desktop tests**: Cursor tests are BETTER in scope priority testing and cross-scope isolation coverage.
