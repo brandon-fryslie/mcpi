@@ -1630,54 +1630,9 @@ def add(
             # No template - flag to create default config below
             config = None
 
-        # If no scope specified, show interactive menu (unless in dry-run mode)
+        # Default to project-mcp if no scope specified
         if not scope:
-            # Get available scopes for the target client
-            target_client = client or manager.default_client
-            scopes_info = manager.get_scopes_for_client(target_client)
-
-            if not scopes_info:
-                console.print(
-                    f"[red]No scopes available for client '{target_client}'[/red]"
-                )
-                ctx.exit(1)
-
-            # In dry-run mode, just use the first available scope
-            if ctx.obj.get("dry_run", False):
-                scope = scopes_info[0]["name"]
-                console.print(f"[dim]Dry-run: Would use scope '{scope}'[/dim]")
-            else:
-                # Build a list of scope choices with descriptions
-                console.print(
-                    f"\n[bold cyan]Select a scope for '{server_id}':[/bold cyan]"
-                )
-                console.print(f"[dim]Client: {target_client}[/dim]\n")
-
-                # Display scope options
-                scope_choices = []
-                for i, scope_info in enumerate(scopes_info, 1):
-                    scope_name = scope_info["name"]
-                    scope_desc = scope_info["description"]
-                    scope_type = "User" if scope_info["is_user_level"] else "Project"
-                    exists = "✓" if scope_info["exists"] else "✗"
-
-                    # Show the option
-                    console.print(
-                        f"  [{i}] [cyan]{scope_name}[/cyan] - {scope_type} scope {exists}"
-                    )
-                    console.print(f"      [dim]{scope_desc}[/dim]")
-                    scope_choices.append(scope_name)
-
-                # Get user's choice
-                console.print()
-                choice = Prompt.ask(
-                    "Enter the number of your choice",
-                    choices=[str(i) for i in range(1, len(scope_choices) + 1)],
-                    default="1",
-                )
-
-                scope = scope_choices[int(choice) - 1]
-                console.print(f"[green]Selected scope: {scope}[/green]\n")
+            scope = "project-mcp"
 
         # Check if server already exists
         existing_info = manager.get_server_info(server_id, client)

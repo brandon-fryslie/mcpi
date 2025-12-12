@@ -54,7 +54,8 @@ class TestReloadServerListFunction:
         This test uses a real temporary directory and verifies actual output,
         not mocked return values. Cannot be gamed with stubs.
         """
-        from mcpi.tui import reload_server_list, build_server_list
+        from mcpi.tui import reload_server_list
+        from mcpi.tui.adapters.fzf import FzfAdapter
         from mcpi.clients.claude_code import ClaudeCodePlugin
         from mcpi.clients.registry import ClientRegistry
 
@@ -126,7 +127,8 @@ class TestReloadServerListFunction:
         This ensures consistency between initial launch and reload.
         Cannot be gamed - compares actual function outputs.
         """
-        from mcpi.tui import reload_server_list, build_server_list
+        from mcpi.tui import reload_server_list
+        from mcpi.tui.adapters.fzf import FzfAdapter
         from mcpi.clients.claude_code import ClaudeCodePlugin
         from mcpi.clients.registry import ClientRegistry
 
@@ -506,9 +508,9 @@ class TestFzfIntegrationWithReload:
 
         Checks that the fzf command structure includes reload() calls.
         """
-        from mcpi.tui import build_fzf_command
+        from mcpi.tui.adapters.fzf import FzfAdapter
 
-        fzf_cmd = build_fzf_command()
+        fzf_cmd = FzfAdapter()._build_fzf_command()
         cmd_str = " ".join(fzf_cmd)
 
         # Verify reload commands are present in bindings
@@ -521,9 +523,9 @@ class TestFzfIntegrationWithReload:
 
         Checks the exact binding structure for the add operation.
         """
-        from mcpi.tui import build_fzf_command
+        from mcpi.tui.adapters.fzf import FzfAdapter
 
-        fzf_cmd = build_fzf_command()
+        fzf_cmd = FzfAdapter()._build_fzf_command()
 
         # Find ctrl-a binding
         ctrl_a_binding = None
@@ -543,9 +545,9 @@ class TestFzfIntegrationWithReload:
 
     def test_reload_called_in_remove_binding(self):
         """Verify ctrl-r (remove) binding calls reload."""
-        from mcpi.tui import build_fzf_command
+        from mcpi.tui.adapters.fzf import FzfAdapter
 
-        fzf_cmd = build_fzf_command()
+        fzf_cmd = FzfAdapter()._build_fzf_command()
 
         # Find ctrl-r binding
         ctrl_r_binding = None
@@ -562,9 +564,9 @@ class TestFzfIntegrationWithReload:
 
     def test_reload_called_in_enable_binding(self):
         """Verify ctrl-e (enable) binding calls reload."""
-        from mcpi.tui import build_fzf_command
+        from mcpi.tui.adapters.fzf import FzfAdapter
 
-        fzf_cmd = build_fzf_command()
+        fzf_cmd = FzfAdapter()._build_fzf_command()
 
         # Find ctrl-e binding
         ctrl_e_binding = None
@@ -581,9 +583,9 @@ class TestFzfIntegrationWithReload:
 
     def test_reload_called_in_disable_binding(self):
         """Verify ctrl-d (disable) binding calls reload."""
-        from mcpi.tui import build_fzf_command
+        from mcpi.tui.adapters.fzf import FzfAdapter
 
-        fzf_cmd = build_fzf_command()
+        fzf_cmd = FzfAdapter()._build_fzf_command()
 
         # Find ctrl-d binding
         ctrl_d_binding = None

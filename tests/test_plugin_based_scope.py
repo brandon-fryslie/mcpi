@@ -356,3 +356,122 @@ class TestPluginBasedScopeEdgeCases:
         """Test has_server method works correctly."""
         assert plugin_scope.has_server("test-plugin:server1") is True
         assert plugin_scope.has_server("nonexistent:server") is False
+
+
+class TestPluginBasedScopeArrayFormat:
+    """Tests for installed_plugins.json array format (version 2).
+
+    The production format stores plugin installations as arrays to support
+    multiple versions/scopes per plugin:
+
+        "plugins": {
+            "plugin@marketplace": [
+                {"installPath": "...", "version": "1.0.0", "scope": "user"}
+            ]
+        }
+
+    This was a bug where we assumed dict format instead of array format.
+    """
+
+    @pytest.fixture
+    def array_format_env(self, tmp_path):
+        """Create environment using production array format."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+
+        settings = {
+            "enabledPlugins": {
+                "my-plugin@loom99": True,
+            }
+        }
+        settings_path = claude_dir / "settings.json"
+        settings_path.write_text(json.dumps(settings))
+
+        plugins_dir = claude_dir / "plugins"
+        plugins_dir.mkdir()
+
+        # Create plugin directory
+        plugin_dir = plugins_dir / "cache" / "loom99" / "my-plugin" / "1.0.0"
+        plugin_dir.mkdir(parents=True)
+
+        claude_plugin_dir = plugin_dir / ".claude-plugin"
+        claude_plugin_dir.mkdir()
+
+        plugin_json = {
+            "name": "my-plugin",
+            "version": "1.0.0",
+            "mcpServers": {
+                "test-server": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    "env": {},
+                }
+            },
+        }
+        (claude_plugin_dir / "plugin.json").write_text(json.dumps(plugin_json))
+
+        # Use ARRAY format (version 2) - this is what production uses
+        installed_plugins = {
+            "version": 2,
+            "plugins": {
+                "my-plugin@loom99": [
+                    {
+                        "scope": "user",
+                        "installPath": str(plugin_dir),
+                        "version": "1.0.0",
+                        "installedAt": "2025-01-01T00:00:00.000Z",
+                        "lastUpdated": "2025-01-01T00:00:00.000Z",
+                    }
+                ]
+            },
+        }
+        (plugins_dir / "installed_plugins.json").write_text(
+            json.dumps(installed_plugins)
+        )
+
+        return {
+            "settings_path": settings_path,
+            "installed_plugins_path": plugins_dir / "installed_plugins.json",
+        }
+
+    def test_discovers_servers_with_array_format(self, array_format_env):
+        """Test that servers are discovered when installed_plugins uses array format.
+
+        This is a regression test for the bug where we assumed:
+            plugins[id] = {"installPath": ...}  # dict
+        but production uses:
+            plugins[id] = [{"installPath": ...}]  # array
+        """
+        scope = PluginBasedScope(
+            config=ScopeConfig(
+                name="plugin",
+                description="Test",
+                priority=0,
+                path=array_format_env["settings_path"],
+                is_user_level=True,
+            ),
+            settings_path=array_format_env["settings_path"],
+            installed_plugins_path=array_format_env["installed_plugins_path"],
+        )
+
+        servers = scope.get_servers()
+        assert "my-plugin:test-server" in servers
+        assert servers["my-plugin:test-server"]["command"] == "node"
+
+    def test_exists_with_array_format(self, array_format_env):
+        """Test exists() works with array format installed_plugins.json."""
+        scope = PluginBasedScope(
+            config=ScopeConfig(
+                name="plugin",
+                description="Test",
+                priority=0,
+                path=array_format_env["settings_path"],
+                is_user_level=True,
+            ),
+            settings_path=array_format_env["settings_path"],
+            installed_plugins_path=array_format_env["installed_plugins_path"],
+        )
+
+        # This would fail before the fix with:
+        # AttributeError: 'list' object has no attribute 'get'
+        assert scope.exists() is True

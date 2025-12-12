@@ -133,9 +133,21 @@ class PluginBasedScope(ScopeHandler):
                 continue
 
             # Get install info for this plugin
-            install_info = installed_plugins.get(plugin_id)
-            if not install_info:
+            # Note: installed_plugins.json stores an array of installations per plugin
+            install_entries = installed_plugins.get(plugin_id)
+            if not install_entries:
                 logger.debug(f"Plugin {plugin_id} is enabled but not installed")
+                continue
+
+            # Get the first (most recent) installation entry
+            if isinstance(install_entries, list):
+                install_info = install_entries[0] if install_entries else None
+            else:
+                # Fallback for legacy format where it might be a single dict
+                install_info = install_entries
+
+            if not install_info:
+                logger.debug(f"Plugin {plugin_id} has empty install entries")
                 continue
 
             install_path = install_info.get("installPath")

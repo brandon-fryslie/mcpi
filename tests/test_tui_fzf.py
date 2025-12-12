@@ -8,13 +8,12 @@ import pytest
 
 from mcpi.clients.types import ServerInfo, ServerState
 from mcpi.registry.catalog import MCPServer
-from mcpi.tui import (
-    build_fzf_command,
-    build_server_list,
-    check_fzf_installed,
-    format_server_line,
-    get_server_status,
-)
+from mcpi.tui.adapters.fzf import FzfAdapter
+
+
+# Test helper: create adapter instance for calling internal methods
+def _adapter():
+    return FzfAdapter()
 
 
 class TestCheckFzfInstalled:
@@ -24,7 +23,7 @@ class TestCheckFzfInstalled:
         """Test when fzf is installed."""
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0)
-            assert check_fzf_installed() is True
+            assert _adapter()._check_fzf_installed() is True
             mock_run.assert_called_once()
             # Verify we're checking for fzf
             args = mock_run.call_args[0][0]
@@ -34,13 +33,13 @@ class TestCheckFzfInstalled:
         """Test when fzf is not installed."""
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
-            assert check_fzf_installed() is False
+            assert _adapter()._check_fzf_installed() is False
 
     def test_fzf_check_error(self):
         """Test when fzf check returns error."""
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=1)
-            assert check_fzf_installed() is False
+            assert _adapter()._check_fzf_installed() is False
 
 
 class TestGetServerStatus:
@@ -58,7 +57,7 @@ class TestGetServerStatus:
             state=ServerState.ENABLED,
         )
 
-        status = get_server_status(mock_manager, "test-server")
+        status = _adapter()._get_server_status(mock_manager, "test-server")
 
         assert status["installed"] is True
         assert status["state"] == ServerState.ENABLED
@@ -76,7 +75,7 @@ class TestGetServerStatus:
             state=ServerState.DISABLED,
         )
 
-        status = get_server_status(mock_manager, "test-server")
+        status = _adapter()._get_server_status(mock_manager, "test-server")
 
         assert status["installed"] is True
         assert status["state"] == ServerState.DISABLED
@@ -87,7 +86,7 @@ class TestGetServerStatus:
         mock_manager.get_server_state.return_value = ServerState.NOT_INSTALLED
         mock_manager.get_server_info.return_value = None
 
-        status = get_server_status(mock_manager, "test-server")
+        status = _adapter()._get_server_status(mock_manager, "test-server")
 
         assert status["installed"] is False
         assert status["state"] == ServerState.NOT_INSTALLED
@@ -116,7 +115,7 @@ class TestFormatServerLine:
             ),
         }
 
-        line = format_server_line("test-server", server, status)
+        line = _adapter()._format_server_line("test-server", server, status)
 
         # Should have green checkmark and bold
         assert "[✓]" in line or "✓" in line
@@ -144,7 +143,7 @@ class TestFormatServerLine:
             ),
         }
 
-        line = format_server_line("test-server", server, status)
+        line = _adapter()._format_server_line("test-server", server, status)
 
         # Should have yellow X and bold
         assert "[✗]" in line or "✗" in line
@@ -166,7 +165,7 @@ class TestFormatServerLine:
             "info": None,
         }
 
-        line = format_server_line("test-server", server, status)
+        line = _adapter()._format_server_line("test-server", server, status)
 
         # Should have empty brackets and normal color
         assert "[ ]" in line
@@ -186,7 +185,7 @@ class TestFormatServerLine:
             "info": None,
         }
 
-        line = format_server_line("test-server", server, status)
+        line = _adapter()._format_server_line("test-server", server, status)
 
         # Description should be truncated
         assert "..." in line
@@ -203,7 +202,7 @@ class TestBuildServerList:
         mock_catalog.list_servers.return_value = []
         mock_manager = Mock()
 
-        lines = build_server_list(mock_catalog, mock_manager)
+        lines = _adapter()._build_server_list(mock_catalog, mock_manager)
 
         assert lines == []
 
@@ -246,7 +245,7 @@ class TestBuildServerList:
         mock_manager.get_server_state.side_effect = get_state
         mock_manager.get_server_info.side_effect = get_info
 
-        lines = build_server_list(mock_catalog, mock_manager)
+        lines = _adapter()._build_server_list(mock_catalog, mock_manager)
 
         # Should have 3 lines
         assert len(lines) == 3
@@ -264,7 +263,7 @@ class TestBuildFzfCommand:
 
     def test_build_fzf_command_basic(self):
         """Test building basic fzf command."""
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
 
         assert cmd[0] == "fzf"
         assert "--ansi" in cmd
@@ -301,7 +300,7 @@ class TestBuildFzfCommand:
 
     def test_fzf_command_has_bindings(self):
         """Test that fzf command has all required bindings."""
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
 
         cmd_str = " ".join(cmd)
 
@@ -315,7 +314,7 @@ class TestBuildFzfCommand:
 
     def test_fzf_command_has_preview(self):
         """Test that fzf command has preview configured."""
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
 
         cmd_str = " ".join(cmd)
 
@@ -350,7 +349,7 @@ class TestFzfHeaderMultiline:
         3. Any change to header format is tested against real requirements
 
         Args:
-            cmd: The fzf command list returned by build_fzf_command()
+            cmd: The fzf command list returned by _adapter()._build_fzf_command()
 
         Returns:
             The header content string
@@ -377,7 +376,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by removing newlines from test assertion
         - User-visible behavior: header must span multiple lines
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         # Header must contain newlines for multi-line display
@@ -394,7 +393,7 @@ class TestFzfHeaderMultiline:
         - Enforces specific format: title+scope, scope cycling+ops, ops, info/exit
         - Cannot pass by changing assertion - must match requirement
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -412,7 +411,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by making lines longer - would break on real terminals
         - Tests observable user experience (no truncation on standard terminal)
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -430,7 +429,7 @@ class TestFzfHeaderMultiline:
         - Verifies logical grouping: title + scope indicator
         - Cannot pass by moving title elsewhere - requirement is specific
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -455,7 +454,7 @@ class TestFzfHeaderMultiline:
         - Verifies logical grouping: scope management + operations
         - Cannot pass by omitting shortcuts - users need these operations
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -482,7 +481,7 @@ class TestFzfHeaderMultiline:
         - Verifies logical grouping: state management operations
         - Cannot pass by omitting shortcuts - users need these operations
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -504,7 +503,7 @@ class TestFzfHeaderMultiline:
         - Verifies logical grouping: navigation/info on one line
         - Cannot pass by omitting shortcuts - users need to know how to exit
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -529,7 +528,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by removing shortcuts - breaks user workflow
         - Tests real user requirements from spec
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         # All required shortcuts from spec
@@ -561,7 +560,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by making header shorter - must contain all shortcuts
         - Tests the exact problem the fix is meant to solve
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         lines = header.split("\n")
@@ -587,7 +586,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by changing test - must match fzf API
         - Tests end-to-end flow: header -> command -> fzf
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
 
         # Header must be in command
         header_found = False
@@ -616,7 +615,7 @@ class TestFzfHeaderMultiline:
         - Cannot pass by faking - tests concrete fzf behavior
         - Ensures fix doesn't break existing fzf integration
         """
-        cmd = build_fzf_command()
+        cmd = _adapter()._build_fzf_command()
         header = self._extract_header_from_command(cmd)
 
         # fzf --header accepts strings with newlines
