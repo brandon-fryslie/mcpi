@@ -21,7 +21,7 @@ import json
 import pytest
 import warnings
 from pathlib import Path
-from mcpi.registry.catalog import ServerCatalog, MCPServer
+from mcpi.registry.catalog import ServerCatalog, MCPServer, StdioServer
 
 
 class TestServerCatalogDependencyInjection:
@@ -219,7 +219,7 @@ class TestServerCatalogDependencyInjection:
         assert len(servers) == 0, "Missing file should result in empty registry"
 
         # Should still be able to add servers
-        new_server = MCPServer(
+        new_server = StdioServer(
             description="Added after init", command="npx", args=["-y", "new-server"]
         )
         result = catalog.add_server("new-server", new_server)
@@ -281,7 +281,7 @@ class TestServerCatalogDependencyInjection:
         ), "Catalog 1 should not have Catalog 2's data"
 
         # Modify catalog1 - should not affect catalog2
-        new_server = MCPServer(
+        new_server = StdioServer(
             description="New server in catalog 1",
             command="npx",
             args=["-y", "new-package"],
@@ -400,7 +400,7 @@ class TestServerCatalogDependencyInjection:
         ), "search_servers() on empty registry should return empty list"
 
         # Should be able to add servers
-        new_server = MCPServer(
+        new_server = StdioServer(
             description="First server", command="npx", args=["-y", "first-package"]
         )
         result = catalog.add_server("first-server", new_server)

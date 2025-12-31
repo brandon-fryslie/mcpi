@@ -1,0 +1,21 @@
+{
+    "_comment": "MCP config with environment variables",
+    "mcpServers": {
+        "database": {
+            "command": "python",
+            "args": ["-m", "db_mcp_server"],
+            "env": {
+                "DATABASE_URL": "${DATABASE_URL}",
+                "LOG_LEVEL": "info"
+            }
+        },
+        "api-client": {
+            "command": "npx",
+            "args": ["-y", "@example/api-mcp-server"],
+            "env": {
+                "API_KEY": "${API_KEY}",
+                "API_BASE_URL": "https://api.example.com"
+            }
+        }
+    }
+}

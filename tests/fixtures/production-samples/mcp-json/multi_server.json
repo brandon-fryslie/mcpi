@@ -1,0 +1,25 @@
+{
+    "_comment": "MCP config with multiple servers including edge cases",
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+            "env": {}
+        },
+        "memory": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "env": {}
+        },
+        "server-with-spaces": {
+            "command": "/path/with spaces/to/server",
+            "args": ["--config", "/path/with spaces/config.json"],
+            "env": {
+                "PATH_VAR": "/some/path with spaces"
+            }
+        },
+        "minimal-server": {
+            "command": "minimal"
+        }
+    }
+}

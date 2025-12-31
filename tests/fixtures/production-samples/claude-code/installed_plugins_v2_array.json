@@ -1,0 +1,31 @@
+{
+    "_comment": "Current production format (v2) - plugins stored as arrays to support multiple installations/scopes",
+    "version": 2,
+    "plugins": {
+        "do@loom99": [
+            {
+                "scope": "user",
+                "installPath": "/Users/example/.claude/plugins/cache/loom99/do/1.2.0",
+                "version": "1.2.0",
+                "installedAt": "2025-01-15T10:30:00.000Z",
+                "lastUpdated": "2025-01-20T14:45:00.000Z"
+            }
+        ],
+        "multi-scope-plugin@marketplace": [
+            {
+                "scope": "project",
+                "installPath": "/path/to/project/.claude/plugins/cache/marketplace/multi-scope-plugin/2.0.0",
+                "version": "2.0.0",
+                "installedAt": "2025-02-01T09:00:00.000Z",
+                "lastUpdated": "2025-02-01T09:00:00.000Z"
+            },
+            {
+                "scope": "user",
+                "installPath": "/Users/example/.claude/plugins/cache/marketplace/multi-scope-plugin/1.5.0",
+                "version": "1.5.0",
+                "installedAt": "2025-01-10T08:00:00.000Z",
+                "lastUpdated": "2025-01-10T08:00:00.000Z"
+            }
+        ]
+    }
+}

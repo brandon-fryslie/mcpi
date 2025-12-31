@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from mcpi.installer.base import BaseInstaller, InstallationResult, InstallationStatus
 from mcpi.installer.claude_code import ClaudeCodeInstaller
 from mcpi.installer.npm import NPMInstaller
-from mcpi.registry.catalog import MCPServer
+from mcpi.registry.catalog import MCPServer, StdioServer
 
 
 class MockInstaller(BaseInstaller):
@@ -121,7 +121,7 @@ class TestBaseInstaller:
             "args": ["-y", "@test/mcp-server"],
         }
 
-        server = MCPServer(**server_data)
+        server = StdioServer(**server_data)
         errors = installer.validate_installation(server, "test_server")
 
         # Should have no errors - simplified validation just checks command exists
@@ -139,7 +139,7 @@ class TestBaseInstaller:
 
         # Should raise ValidationError during model creation
         with pytest.raises(ValidationError) as exc_info:
-            MCPServer(**server_data)
+            StdioServer(**server_data)
 
         # Verify error is about empty command
         assert "command" in str(exc_info.value).lower()
@@ -267,7 +267,7 @@ class TestClaudeCodeInstaller:
         installer = ClaudeCodeInstaller(config_path=config_path)
 
         # Create a simple server
-        server = MCPServer(
+        server = StdioServer(
             description="Test server",
             command="npx",
             args=["-y", "@test/mcp-server"],
@@ -293,7 +293,7 @@ class TestClaudeCodeInstaller:
 
         installer = ClaudeCodeInstaller(config_path=config_path)
 
-        server = MCPServer(
+        server = StdioServer(
             description="Existing server",
             command="npx",
             args=["-y", "existing-package"],
@@ -382,7 +382,7 @@ class TestNPMInstaller:
 @pytest.fixture
 def sample_server():
     """Fixture providing a sample MCP server with simplified schema."""
-    return MCPServer(
+    return StdioServer(
         description="A test MCP server",
         command="npx",
         args=["-y", "@test/mcp-server"],
@@ -394,7 +394,7 @@ def sample_server():
 @pytest.fixture
 def npm_server():
     """Fixture providing an npm-based MCP server with simplified schema."""
-    return MCPServer(
+    return StdioServer(
         description="NPM-based test server",
         command="npx",
         args=["-y", "@anthropic/mcp-server-test"],

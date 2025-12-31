@@ -1,0 +1,19 @@
+{
+    "_comment": "User-level settings from ~/.claude/settings.json or ~/.config/claude/settings.json",
+    "enabledPlugins": {
+        "do@loom99": true,
+        "disabled-plugin@marketplace": false
+    },
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/example/projects"],
+            "env": {}
+        },
+        "memory": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "env": {}
+        }
+    }
+}

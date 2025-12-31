@@ -1,0 +1,10 @@
+{
+    "_comment": "Legacy format (v1) - plugins stored as dicts, not arrays. Some old installations may still have this format.",
+    "version": 1,
+    "plugins": {
+        "sample-plugin@example-marketplace": {
+            "version": "1.0.0",
+            "installPath": "/path/to/plugins/cache/example-marketplace/sample-plugin/1.0.0"
+        }
+    }
+}

@@ -23,7 +23,7 @@ from mcpi.clients import MCPManager, ServerConfig
 from mcpi.clients.manager import create_default_manager
 from mcpi.clients.registry import ClientRegistry
 from mcpi.clients.types import ServerInfo, ServerState
-from mcpi.registry.catalog import MCPServer, ServerCatalog, create_in_memory_catalog
+from mcpi.registry.catalog import MCPServer, StdioServer, ServerCatalog, create_in_memory_catalog
 
 # Import CLI after checking if command exists
 from mcpi import cli
@@ -89,7 +89,7 @@ class TestReloadServerListFunction:
 
         # Create catalog with test data using the proper factory function
         real_catalog = create_in_memory_catalog({
-            "test-server": MCPServer(
+            "test-server": StdioServer(
                 description="Test server for reload",
                 command="npx",
                 args=["-y", "test"],
@@ -163,8 +163,8 @@ class TestReloadServerListFunction:
 
         # Create catalog with test data using the proper factory function
         real_catalog = create_in_memory_catalog({
-            "server1": MCPServer(description="Server One", command="npx"),
-            "server2": MCPServer(description="Server Two", command="node"),
+            "server1": StdioServer(description="Server One", command="npx"),
+            "server2": StdioServer(description="Server Two", command="node"),
         })
 
         # Get expected output from build_server_list
@@ -266,9 +266,9 @@ class TestReloadServerListFunction:
 
         # Create catalog with test data using the proper factory function
         real_catalog = create_in_memory_catalog({
-            "enabled-server": MCPServer(description="Enabled", command="npx"),
-            "disabled-server": MCPServer(description="Disabled", command="npx"),
-            "not-installed": MCPServer(description="Not Installed", command="npx"),
+            "enabled-server": StdioServer(description="Enabled", command="npx"),
+            "disabled-server": StdioServer(description="Disabled", command="npx"),
+            "not-installed": StdioServer(description="Not Installed", command="npx"),
         })
 
         # Call the function with our real instances
@@ -629,7 +629,7 @@ class TestFzfIntegrationWithReload:
 
         # Create catalog with test data using the proper factory function
         real_catalog = create_in_memory_catalog({
-            "test-server": MCPServer(
+            "test-server": StdioServer(
                 description="Test Server",
                 command="npx",
                 args=["-y", "test"],
@@ -768,7 +768,7 @@ class TestReloadPerformance:
 
         # Create catalog with test data using the proper factory function
         real_catalog = create_in_memory_catalog({
-            f"server-{i}": MCPServer(
+            f"server-{i}": StdioServer(
                 description=f"Test Server {i}",
                 command="npx",
             )

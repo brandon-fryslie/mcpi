@@ -69,11 +69,12 @@ class TestActualRegistryValidation:
         # Verify we loaded servers
         assert len(registry.servers) > 0, "Registry should contain at least one server"
 
-        # Verify each server is an MCPServer instance
+        # Verify each server is an MCPServerBase instance
+        from mcpi.registry.catalog import MCPServerBase
         for server_id, server in registry.servers.items():
             assert isinstance(
-                server, MCPServer
-            ), f"Server {server_id} is not an MCPServer instance"
+                server, MCPServerBase
+            ), f"Server {server_id} is not an MCPServerBase instance"
 
     def test_semantic_validation(self):
         """Layer 4: Validate business logic and semantic rules."""
@@ -104,25 +105,33 @@ class TestActualRegistryValidation:
 
     def test_all_servers_valid(self):
         """Layer 5: Validate each individual server entry."""
+        from mcpi.registry.catalog import StdioServer, HttpServer, parse_mcp_server
+
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             data = json.load(f)
 
-        registry = ServerRegistry(servers=data)
+        for server_id, server_data in data.items():
+            server = parse_mcp_server(server_data)
 
-        for server_id, server in registry.servers.items():
-            # Required fields
+            # Required fields for all server types
             assert server.description, f"Server {server_id} missing description"
             assert (
                 server.description.strip()
             ), f"Server {server_id} has empty description"
 
-            assert server.command, f"Server {server_id} missing command"
-            assert server.command.strip(), f"Server {server_id} has empty command"
-
-            # Args should be a list (can be empty)
-            assert isinstance(
-                server.args, list
-            ), f"Server {server_id} args must be a list"
+            # Type-specific validation
+            if isinstance(server, StdioServer):
+                assert server.command, f"Server {server_id} missing command"
+                assert server.command.strip(), f"Server {server_id} has empty command"
+                # Args should be a list (can be empty)
+                assert isinstance(
+                    server.args, list
+                ), f"Server {server_id} args must be a list"
+            elif isinstance(server, HttpServer):
+                assert server.url, f"Server {server_id} missing url"
+                assert server.url.startswith(
+                    ("http://", "https://")
+                ), f"Server {server_id} url must be a valid HTTP URL: {server.url}"
 
             # Repository is optional, but if present should be a string or None
             assert server.repository is None or isinstance(

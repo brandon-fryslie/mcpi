@@ -26,6 +26,7 @@ from pathlib import Path
 from mcpi.registry.catalog import (
     ServerCatalog,
     MCPServer,
+    StdioServer,
     ServerRegistry,
     create_default_catalog,
     create_test_catalog,
@@ -184,7 +185,7 @@ class TestCurrentRegistryBehavior:
         # AFTER RENAME: catalog.load_catalog()
 
         # Add a new server
-        new_server = MCPServer(
+        new_server = StdioServer(
             description="Third test server",
             command="node",
             args=["server.js"],
@@ -248,7 +249,7 @@ class TestCurrentRegistryBehavior:
         # AFTER RENAME: catalog.load_catalog()
 
         # Update a server
-        updated = MCPServer(
+        updated = StdioServer(
             description="Updated description",
             command="npx",
             args=["-y", "updated-package"],
@@ -281,7 +282,7 @@ class TestCurrentRegistryBehavior:
         # AFTER RENAME: catalog.load_catalog()
 
         # Add a server and save
-        new_server = MCPServer(
+        new_server = StdioServer(
             description="Server to persist",
             command="npx",
             args=["-y", "persist"],
@@ -488,13 +489,17 @@ class TestProductionDataIntegrity:
         servers = catalog.list_servers()
         assert len(servers) > 0, "Should load servers from production file"
 
-        # Verify all servers have required fields
+        # Verify all servers have required fields (type-aware)
+        from mcpi.registry.catalog import HttpServer
         for server_id, server in servers:
             assert server.description, f"Server {server_id} must have description"
-            assert server.command, f"Server {server_id} must have command"
-            assert isinstance(
-                server.args, list
-            ), f"Server {server_id} args must be list"
+            if isinstance(server, HttpServer):
+                assert server.url, f"Server {server_id} must have url"
+            else:
+                assert server.command, f"Server {server_id} must have command"
+                assert isinstance(
+                    server.args, list
+                ), f"Server {server_id} args must be list"
 
     def test_production_registry_all_servers_valid(self):
         """Verify all servers in production registry are valid.
@@ -515,15 +520,19 @@ class TestProductionDataIntegrity:
 
         servers = catalog.list_servers()
 
+        from mcpi.registry.catalog import HttpServer
         for server_id, server in servers:
-            # Required fields
+            # Required fields for all types
             assert (
                 server.description.strip()
             ), f"{server_id}: description cannot be empty"
-            assert server.command.strip(), f"{server_id}: command cannot be empty"
-
-            # Args must be list
-            assert isinstance(server.args, list), f"{server_id}: args must be a list"
+            # Type-specific required fields
+            if isinstance(server, HttpServer):
+                assert server.url.strip(), f"{server_id}: url cannot be empty"
+            else:
+                assert server.command.strip(), f"{server_id}: command cannot be empty"
+                # Args must be list (only for stdio servers)
+                assert isinstance(server.args, list), f"{server_id}: args must be a list"
 
             # Repository is optional but must be string or None
             assert server.repository is None or isinstance(
@@ -583,7 +592,7 @@ class TestEdgeCases:
         # AFTER RENAME: catalog.load_catalog()
 
         # Try to add server with existing ID
-        duplicate = MCPServer(description="Duplicate", command="npx", args=[])
+        duplicate = StdioServer(description="Duplicate", command="npx", args=[])
         result = catalog.add_server("existing", duplicate)
 
         assert result is False, "Should fail to add duplicate server ID"
@@ -623,7 +632,7 @@ class TestEdgeCases:
 
         # AFTER RENAME: catalog.load_catalog()
 
-        updated = MCPServer(description="Updated", command="npx", args=[])
+        updated = StdioServer(description="Updated", command="npx", args=[])
         result = catalog.update_server("nonexistent", updated)
         assert result is False, "Should fail to update non-existent server"
 

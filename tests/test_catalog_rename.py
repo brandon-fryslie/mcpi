@@ -24,6 +24,7 @@ import warnings
 
 from mcpi.registry.catalog import (
     MCPServer,
+    StdioServer,
     ServerCatalog,
     create_default_catalog,
     create_test_catalog,
@@ -186,7 +187,7 @@ class TestServerCatalogAPIRename:
             catalog.load_catalog()
 
             # Add a server
-            new_server = MCPServer(
+            new_server = StdioServer(
                 description="New test server", command="uvx", args=["test-server"]
             )
             catalog.add_server("new-server", new_server)
@@ -389,7 +390,7 @@ class TestCatalogValidation:
             catalog.load_catalog()
 
             # Add valid server
-            server = MCPServer(
+            server = StdioServer(
                 description="Valid server", command="node", args=["server.js"]
             )
             catalog.add_server("valid-server", server)
@@ -425,7 +426,7 @@ class TestNoRegressions:
             catalog.load_catalog()
 
             # Add server
-            server = MCPServer(
+            server = StdioServer(
                 description="Test server", command="python", args=["-m", "test"]
             )
             result = catalog.add_server("test-server", server)

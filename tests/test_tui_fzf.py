@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from mcpi.clients.types import ServerInfo, ServerState
-from mcpi.registry.catalog import MCPServer
+from mcpi.registry.catalog import MCPServer, StdioServer
 from mcpi.tui.adapters.fzf import FzfAdapter
 
 
@@ -98,7 +98,7 @@ class TestFormatServerLine:
 
     def test_format_enabled_server(self):
         """Test formatting an enabled server."""
-        server = MCPServer(
+        server = StdioServer(
             description="Test server description",
             command="npx",
             args=["test-server"],
@@ -126,7 +126,7 @@ class TestFormatServerLine:
 
     def test_format_disabled_server(self):
         """Test formatting a disabled server."""
-        server = MCPServer(
+        server = StdioServer(
             description="Test server description",
             command="npx",
             args=["test-server"],
@@ -154,7 +154,7 @@ class TestFormatServerLine:
 
     def test_format_not_installed_server(self):
         """Test formatting a not-installed server."""
-        server = MCPServer(
+        server = StdioServer(
             description="Test server description",
             command="npx",
             args=["test-server"],
@@ -174,7 +174,7 @@ class TestFormatServerLine:
 
     def test_format_line_truncates_long_description(self):
         """Test that long descriptions are truncated."""
-        server = MCPServer(
+        server = StdioServer(
             description="A" * 200,  # Very long description
             command="npx",
             args=["test-server"],
@@ -212,10 +212,10 @@ class TestBuildServerList:
         servers = [
             (
                 "not-installed-server",
-                MCPServer(description="Not installed", command="npx"),
+                StdioServer(description="Not installed", command="npx"),
             ),
-            ("enabled-server", MCPServer(description="Enabled", command="npx")),
-            ("disabled-server", MCPServer(description="Disabled", command="npx")),
+            ("enabled-server", StdioServer(description="Enabled", command="npx")),
+            ("disabled-server", StdioServer(description="Disabled", command="npx")),
         ]
 
         mock_catalog = Mock()
@@ -661,7 +661,7 @@ class TestLaunchFzfInterface:
         # Mock catalog with one server
         mock_catalog = Mock()
         mock_catalog.list_servers.return_value = [
-            ("test-server", MCPServer(description="Test", command="npx"))
+            ("test-server", StdioServer(description="Test", command="npx"))
         ]
 
         # Mock manager

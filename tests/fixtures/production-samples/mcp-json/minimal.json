@@ -1,0 +1,9 @@
+{
+    "_comment": "Minimal valid .mcp.json for project-level configuration",
+    "mcpServers": {
+        "example": {
+            "command": "node",
+            "args": ["server.js"]
+        }
+    }
+}

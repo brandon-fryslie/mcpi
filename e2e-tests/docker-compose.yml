@@ -1,0 +1,36 @@
+# Docker Compose for E2E Tests
+#
+# Usage:
+#   docker-compose -f e2e-tests/docker-compose.yml build
+#   docker-compose -f e2e-tests/docker-compose.yml run e2e-tests
+#   docker-compose -f e2e-tests/docker-compose.yml run e2e-tests e2e-tests/tier1/ -v
+
+services:
+  e2e-tests:
+    build:
+      context: ..
+      dockerfile: e2e-tests/Dockerfile
+    environment:
+      - MCPI_E2E_MODE=1
+      - HOME=/home/testuser
+    volumes:
+      # Cache npm packages between runs
+      - npm-cache:/home/testuser/.npm
+      # Cache uv packages between runs
+      - uv-cache:/home/testuser/.cache/uv
+    # Default: run all e2e tests
+    command: ["e2e-tests/", "-v", "--tb=short"]
+
+  # Tier 1 only (faster)
+  tier1:
+    extends: e2e-tests
+    command: ["e2e-tests/tier1/", "-v", "--tb=short"]
+
+  # Tier 2 only (server validation)
+  tier2:
+    extends: e2e-tests
+    command: ["e2e-tests/tier2/", "-v", "--tb=short"]
+
+volumes:
+  npm-cache:
+  uv-cache:
