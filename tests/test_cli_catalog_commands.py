@@ -144,8 +144,6 @@ class TestCatalogListCommand:
     def test_catalog_list_shows_both(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi catalog list shows both catalogs."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "list"])
@@ -157,8 +155,6 @@ class TestCatalogListCommand:
     def test_catalog_list_shows_servers(self, cli_runner, test_catalogs, monkeypatch):
         """Default behavior shows all servers from all catalogs."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "list"])
@@ -174,8 +170,6 @@ class TestCatalogListCommand:
     ):
         """--summary flag shows catalog metadata (old behavior)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "list", "--summary"])
@@ -190,8 +184,6 @@ class TestCatalogListCommand:
     def test_catalog_list_rich_table(self, cli_runner, test_catalogs, monkeypatch):
         """Output uses Rich table formatting."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "list"])
@@ -207,8 +199,6 @@ class TestCatalogInfoCommand:
     def test_catalog_info_official(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi catalog info official shows details."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "info", "official"])
@@ -221,8 +211,6 @@ class TestCatalogInfoCommand:
     def test_catalog_info_local(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi catalog info local shows details."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "info", "local"])
@@ -236,8 +224,6 @@ class TestCatalogInfoCommand:
     ):
         """Works with OFFICIAL, Official, etc."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
 
@@ -252,8 +238,6 @@ class TestCatalogInfoCommand:
     def test_catalog_info_unknown(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi catalog info unknown shows error."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["catalog", "info", "nonexistent"])
@@ -272,8 +256,6 @@ class TestSearchWithCatalog:
     def test_search_default_catalog(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi search <query> searches official by default (backward compat)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["search", "--query", "filesystem"])
@@ -286,8 +268,6 @@ class TestSearchWithCatalog:
     def test_search_with_catalog_official(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi search <query> --catalog official works."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(
@@ -300,8 +280,6 @@ class TestSearchWithCatalog:
     def test_search_with_catalog_local(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi search <query> --catalog local works."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(
@@ -318,8 +296,6 @@ class TestSearchWithCatalog:
     ):
         """--catalog OFFICIAL works (case-insensitive)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
 
@@ -336,8 +312,6 @@ class TestSearchWithCatalog:
     def test_search_unknown_catalog(self, cli_runner, test_catalogs, monkeypatch):
         """Unknown catalog name shows clear error."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(
@@ -358,8 +332,6 @@ class TestInfoWithCatalog:
     def test_info_default_catalog(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi info <server> searches official first (backward compat)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["info", "@anthropic/filesystem"])
@@ -370,8 +342,6 @@ class TestInfoWithCatalog:
     def test_info_with_catalog_official(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi info <server> --catalog official works."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["info", "github", "--catalog", "official"])
@@ -382,8 +352,6 @@ class TestInfoWithCatalog:
     def test_info_with_catalog_local(self, cli_runner, test_catalogs, monkeypatch):
         """mcpi info <server> --catalog local works."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["info", "custom-tool", "--catalog", "local"])
@@ -394,8 +362,6 @@ class TestInfoWithCatalog:
     def test_info_server_not_in_catalog(self, cli_runner, test_catalogs, monkeypatch):
         """Clear error when server not in specified catalog."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["info", "filesystem", "--catalog", "local"])
@@ -412,8 +378,6 @@ class TestAddWithCatalog:
     ):
         """mcpi add <server> uses official by default (backward compat)."""
         catalog_manager, _, _ = test_catalogs
-        if catalog_manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()
@@ -451,8 +415,6 @@ class TestAddWithCatalog:
     ):
         """mcpi add <server> --catalog local works."""
         catalog_manager, _, _ = test_catalogs
-        if catalog_manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()
@@ -527,8 +489,6 @@ class TestBackwardCompatibility:
     def test_search_without_flags(self, cli_runner, test_catalogs, monkeypatch):
         """Old: mcpi search <query> still works (searches official)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["search", "--query", "filesystem"])
@@ -539,8 +499,6 @@ class TestBackwardCompatibility:
     def test_info_without_flags(self, cli_runner, test_catalogs, monkeypatch):
         """Old: mcpi info <server> still works (searches official)."""
         manager, _, _ = test_catalogs
-        if manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         inject_catalog_manager_into_cli(manager, monkeypatch)
         result = cli_runner.invoke(cli, ["info", "github"])
@@ -557,8 +515,6 @@ class TestBackwardCompatibility:
     ):
         """Old: mcpi add <server> still works (uses official)."""
         catalog_manager, _, _ = test_catalogs
-        if catalog_manager is None:
-            pytest.skip("CatalogManager not implemented yet")
 
         # Setup: Create user-mcp scope file
         mcp_harness.setup_scope_files()

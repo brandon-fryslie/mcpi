@@ -34,20 +34,7 @@ from pathlib import Path
 
 import pytest
 
-# IMPORTANT: Import will fail until handler is implemented
-# This is EXPECTED - tests should fail until implementation exists
-try:
-    from mcpi.clients.enable_disable_handlers import (
-        ApprovalRequiredEnableDisableHandler,
-    )
-
-    HANDLER_IMPLEMENTED = True
-except ImportError:
-    HANDLER_IMPLEMENTED = False
-    pytestmark = pytest.mark.skip(
-        reason="ApprovalRequiredEnableDisableHandler not implemented yet"
-    )
-
+from mcpi.clients.enable_disable_handlers import ApprovalRequiredEnableDisableHandler
 from mcpi.clients.file_based import JSONFileReader, JSONFileWriter
 
 
@@ -70,9 +57,6 @@ def handler(tmp_files):
     Returns:
         ApprovalRequiredEnableDisableHandler instance
     """
-    if not HANDLER_IMPLEMENTED:
-        pytest.skip("Handler not implemented yet")
-
     mcp_json, settings_local = tmp_files
     reader = JSONFileReader()
     writer = JSONFileWriter()

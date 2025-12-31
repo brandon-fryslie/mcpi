@@ -232,41 +232,6 @@ class TestBundleWorkflows:
         # If no bundles exist, command should still succeed
         assert len(result.output.strip()) > 0, "Should have output"
 
-    @pytest.mark.skip(reason="Bundle install requires interactive prompts or --yes flag")
-    def test_bundle_install_workflow(self, mcp_harness):
-        """Test 'mcpi bundle install <bundle>' command workflow.
-
-        STATUS Gap: Cannot verify bundle installation
-        PLAN Item: P0-4 - Validate core functionality
-        Priority: HIGH
-
-        USER WORKFLOW:
-        1. User finds a bundle they want
-        2. User runs 'mcpi bundle install <bundle-name>'
-        3. System installs all servers in bundle
-        4. User verifies servers are configured
-
-        VALIDATION (what user observes):
-        - Command succeeds
-        - All servers in bundle are installed
-        - Files are created/modified
-        - Servers appear in 'mcpi list'
-
-        NOTE: Skipped because bundle install requires either:
-        - Interactive prompts for configuration
-        - --yes flag to skip prompts
-        - Template-based configuration
-
-        GAMING RESISTANCE:
-        - Uses real bundle YAML
-        - Verifies actual file changes
-        - Checks all servers installed
-        - Cannot pass without proper implementation
-        """
-        # This test would require mocking interactive prompts
-        # or creating a bundle with no required configuration
-        pass
-
 
 class TestCatalogIntegration:
     """Test catalog manager integration with CLI workflows.

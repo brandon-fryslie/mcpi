@@ -738,14 +738,6 @@ class TestReloadEdgeCases:
         except json.JSONDecodeError:
             pass  # May propagate, but shouldn't crash fzf
 
-    def test_reload_with_permission_error(self, tmp_path, monkeypatch):
-        """Verify reload handles permission errors gracefully.
-
-        If user lacks permission to read config, should fail gracefully.
-        """
-        # This test is platform-specific and may be skipped on some systems
-        pytest.skip("Permission testing requires platform-specific setup")
-
 
 class TestReloadPerformance:
     """Performance tests to ensure reload is fast enough for good UX.

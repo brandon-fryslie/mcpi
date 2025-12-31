@@ -598,15 +598,6 @@ class TestClaudeDesktopPlugin:
                 "Windows",
                 ["Claude", "claude_desktop_config.json"],
             ),
-            # Linux: ~/.config/Claude/claude_desktop_config.json
-            # NOTE: Claude Desktop is NOT officially supported on Linux.
-            # This path is for community builds (debian, AUR, etc.)
-            # Source: https://github.com/aaddrick/claude-desktop-debian
-            pytest.param(
-                "Linux",
-                [".config", "Claude", "claude_desktop_config.json"],
-                marks=pytest.mark.skip(reason="Linux not officially supported by Claude Desktop"),
-            ),
         ],
     )
     def test_platform_specific_default_paths(self, platform_name, expected_path_parts):

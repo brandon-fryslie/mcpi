@@ -681,30 +681,6 @@ class TestListServersWithCorrectState:
         )
 
 
-class TestOriginalBugClientInfo:
-    """Test BUG-ORIG: TypeError in `mcpi client info` command.
-
-    The original bug identified in the planning docs: client info command
-    throws TypeError when iterating over error response.
-    """
-
-    def test_client_info_with_error_response_no_typeerror(self):
-        """Test that client info handles error responses gracefully.
-
-        NOTE: This test would need to be in test_cli.py since it tests the CLI
-        command, not the plugin directly. Including here for completeness of
-        bug coverage documentation.
-
-        The bug occurs in cli.py line 560 when client_data contains an error
-        and the code tries to iterate over scopes that don't exist.
-        """
-        # This test is documented here but should be implemented in test_cli.py
-        # See BUG-FIX-PLAN-ENABLE-DISABLE.md for details
-        pytest.skip(
-            "This test belongs in test_cli.py - documented here for completeness"
-        )
-
-
 class TestUserInternalEnableDisable:
     """Test enable/disable for user-internal scope using file-move mechanism.
 

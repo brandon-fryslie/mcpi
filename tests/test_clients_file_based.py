@@ -185,13 +185,6 @@ class TestCommandLineExecutor:
         assert result["success"] is False
         assert result["returncode"] != 0
 
-    @pytest.mark.skip(reason="Platform-specific command availability")
-    def test_execute_nonexistent_command(self):
-        """Test executing a non-existent command."""
-        executor = CommandLineExecutor()
-        with pytest.raises(ValueError, match="Command execution failed"):
-            executor.execute("nonexistent_command_12345", [])
-
 
 class TestFileBasedScope:
     """Test FileBasedScope class."""
