@@ -3,12 +3,13 @@
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .cue_validator import CUEValidator
+from mcpi.utils.env_substitution import substitute_headers
 
 
 class InstallationMethod(str, Enum):
@@ -22,14 +23,63 @@ class InstallationMethod(str, Enum):
     DOCKER = "docker"  # For docker-based servers
 
 
-class MCPServer(BaseModel):
-    """MCP server registry entry."""
+class TransportType(str, Enum):
+    """MCP transport types."""
+
+    STDIO = "stdio"  # Local server spawned as subprocess
+    HTTP = "http"  # Remote server accessed via HTTP/SSE
+
+
+class MCPServerBase(BaseModel):
+    """Base class for all MCP server types.
+
+    This defines the common interface and shared fields for MCP servers.
+    Subclasses implement specific transport types (stdio, http).
+    """
 
     model_config = ConfigDict(use_enum_values=True)
 
-    # Core fields
+    # Common fields for all server types
+    type: str = Field(..., description="Transport type (stdio, http)")
     description: str = Field(
         ..., description="Brief description of server functionality"
+    )
+    repository: Optional[str] = Field(None, description="Git repository URL")
+    categories: List[str] = Field(
+        default_factory=list, description="Server categories for classification"
+    )
+
+    def get_install_command(self) -> List[str]:
+        """Get the full installation command.
+
+        Override in subclasses that require installation.
+        """
+        return []
+
+    def get_run_command(
+        self, config: Optional[Dict[str, Any]] = None, resolve_env: bool = False
+    ) -> Dict[str, Any]:
+        """Get the full run configuration for Claude Code.
+
+        Args:
+            config: Optional user configuration to merge
+            resolve_env: If True, substitute ${ENV_VAR} patterns in values
+                        (primarily relevant for HTTP headers with credentials)
+
+        Returns:
+            Dict with transport-specific configuration
+
+        Raises:
+            NotImplementedError: Subclasses must implement this method
+        """
+        raise NotImplementedError("Subclasses must implement get_run_command()")
+
+
+class StdioServer(MCPServerBase):
+    """MCP server using stdio transport (local subprocess)."""
+
+    type: Literal["stdio"] = Field(
+        default="stdio", description="Transport type: stdio for local subprocess"
     )
     command: str = Field(
         ...,
@@ -38,9 +88,8 @@ class MCPServer(BaseModel):
     args: List[str] = Field(
         default_factory=list, description="Arguments for the command"
     )
-    repository: Optional[str] = Field(None, description="Git repository URL")
-    categories: List[str] = Field(
-        default_factory=list, description="Server categories for classification"
+    env: Dict[str, str] = Field(
+        default_factory=dict, description="Environment variables"
     )
 
     @field_validator("command")
@@ -51,34 +100,103 @@ class MCPServer(BaseModel):
             raise ValueError("Command cannot be empty")
         return v.strip()
 
-    def get_install_command(self) -> List[str]:
-        """Get the full installation command."""
-        # For now, installation is handled by the command and args directly
-        # This method may be expanded in the future if needed
-        return []
-
     def get_run_command(
-        self, config: Optional[Dict[str, Any]] = None
+        self, config: Optional[Dict[str, Any]] = None, resolve_env: bool = False
     ) -> Dict[str, Any]:
         """Get the full run configuration for Claude Code.
 
         Args:
-            config: User configuration parameters
-
-        Returns:
-            Dict with 'command', 'args', and optionally 'env' keys
+            config: Optional user configuration to merge
+            resolve_env: Unused for stdio (no credential patterns to resolve)
         """
         if config is None:
             config = {}
 
-        # Start with base command and args
-        run_config = {"command": self.command, "args": self.args.copy()}
+        run_config: Dict[str, Any] = {
+            "type": "stdio",
+            "command": self.command,
+            "args": self.args.copy(),
+        }
 
-        # Add environment variables from config if provided
+        # Merge environment variables
+        env = {**self.env}
         if config.get("env"):
-            run_config["env"] = config["env"]
+            env.update(config["env"])
+        if env:
+            run_config["env"] = env
 
         return run_config
+
+
+class HttpServer(MCPServerBase):
+    """MCP server using HTTP transport (remote server)."""
+
+    type: Literal["http"] = Field(
+        default="http", description="Transport type: http for remote server"
+    )
+    url: str = Field(..., description="HTTP endpoint URL for the MCP server")
+    headers: Dict[str, str] = Field(
+        default_factory=dict,
+        description="HTTP headers (e.g., Authorization). Values can use ${ENV_VAR} syntax.",
+    )
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        """Ensure URL is not empty and looks like a URL."""
+        if not v or not v.strip():
+            raise ValueError("URL cannot be empty")
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
+
+    def get_run_command(
+        self, config: Optional[Dict[str, Any]] = None, resolve_env: bool = False
+    ) -> Dict[str, Any]:
+        """Get the full run configuration for Claude Code.
+
+        Args:
+            config: Optional user configuration to merge
+            resolve_env: If True, substitute ${ENV_VAR} patterns in headers
+                        with actual environment variable values
+
+        Returns:
+            Dict with http transport configuration
+        """
+        result: Dict[str, Any] = {
+            "type": "http",
+            "url": self.url,
+        }
+        if self.headers:
+            if resolve_env:
+                result["headers"] = substitute_headers(self.headers)
+            else:
+                result["headers"] = self.headers.copy()
+        return result
+
+
+# Type alias for backwards compatibility and type hints
+# Use MCPServerBase for isinstance() checks
+MCPServer = MCPServerBase
+
+# Discriminated union type for Pydantic parsing
+MCPServerUnion = Annotated[Union[StdioServer, HttpServer], Field(discriminator="type")]
+
+
+def parse_mcp_server(data: Dict[str, Any]) -> MCPServerBase:
+    """Parse a dictionary into the appropriate MCPServer subclass.
+
+    Args:
+        data: Dictionary with server configuration
+
+    Returns:
+        StdioServer or HttpServer based on the 'type' field
+    """
+    server_type = data.get("type", "stdio")  # Default to stdio for backwards compat
+    if server_type == "http":
+        return HttpServer(**data)
+    return StdioServer(**data)
 
 
 class ServerRegistry(BaseModel):
@@ -86,20 +204,20 @@ class ServerRegistry(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    # Direct mapping of server_id -> MCPServer (root model)
-    servers: Dict[str, MCPServer] = Field(
+    # Direct mapping of server_id -> MCPServer (uses discriminated union for parsing)
+    servers: Dict[str, MCPServerUnion] = Field(
         default_factory=dict, description="Server definitions"
     )
 
-    def get_server(self, server_id: str) -> Optional[MCPServer]:
+    def get_server(self, server_id: str) -> Optional[MCPServerBase]:
         """Get a server by ID."""
         return self.servers.get(server_id)
 
-    def list_servers(self) -> List[tuple[str, MCPServer]]:
+    def list_servers(self) -> List[tuple[str, MCPServerBase]]:
         """List all servers."""
         return sorted(self.servers.items(), key=lambda x: x[0])
 
-    def search_servers(self, query: str) -> List[tuple[str, MCPServer]]:
+    def search_servers(self, query: str) -> List[tuple[str, MCPServerBase]]:
         """Search servers by query."""
         query_lower = query.lower()
         results = []
@@ -186,8 +304,8 @@ class ServerCatalog:
         try:
             with open(self.catalog_path, encoding="utf-8") as f:
                 data = json.load(f)
-            # Convert flat dictionary to ServerRegistry format
-            servers = {k: MCPServer(**v) for k, v in data.items()}
+            # Convert flat dictionary to ServerRegistry format using discriminated parser
+            servers = {k: parse_mcp_server(v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
             raise RuntimeError(f"Failed to load catalog from {self.catalog_path}: {e}")
@@ -197,8 +315,8 @@ class ServerCatalog:
         try:
             with open(self.catalog_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            # Convert flat dictionary to ServerRegistry format
-            servers = {k: MCPServer(**v) for k, v in data.items()}
+            # Convert flat dictionary to ServerRegistry format using discriminated parser
+            servers = {k: parse_mcp_server(v) for k, v in data.items()}
             self._registry = ServerRegistry(servers=servers)
         except Exception as e:
             raise RuntimeError(
@@ -260,19 +378,19 @@ class ServerCatalog:
             print(f"Error saving YAML catalog: {e}")
             return False
 
-    def get_server(self, server_id: str) -> Optional[MCPServer]:
+    def get_server(self, server_id: str) -> Optional[MCPServerBase]:
         """Get server by ID."""
         if not self._loaded:
             self.load_catalog()
         return self._registry.get_server(server_id)
 
-    def list_servers(self) -> List[tuple[str, MCPServer]]:
+    def list_servers(self) -> List[tuple[str, MCPServerBase]]:
         """List all servers."""
         if not self._loaded:
             self.load_catalog()
         return self._registry.list_servers()
 
-    def search_servers(self, query: str) -> List[tuple[str, MCPServer]]:
+    def search_servers(self, query: str) -> List[tuple[str, MCPServerBase]]:
         """Search servers by query string."""
         if not self._loaded:
             self.load_catalog()
@@ -288,7 +406,7 @@ class ServerCatalog:
             self.load_catalog()
         return self._registry.list_categories()
 
-    def add_server(self, server_id: str, server: MCPServer) -> bool:
+    def add_server(self, server_id: str, server: MCPServerBase) -> bool:
         """Add a server to the catalog."""
         if not self._loaded:
             self.load_catalog()
@@ -310,7 +428,7 @@ class ServerCatalog:
         del self._registry.servers[server_id]
         return True
 
-    def update_server(self, server_id: str, server: MCPServer) -> bool:
+    def update_server(self, server_id: str, server: MCPServerBase) -> bool:
         """Update an existing server."""
         if not self._loaded:
             self.load_catalog()
@@ -378,27 +496,25 @@ def create_test_catalog(
     )
 
 
-def create_in_memory_catalog(servers: Dict[str, MCPServer]) -> ServerCatalog:
+def create_in_memory_catalog(servers: Dict[str, MCPServerBase]) -> ServerCatalog:
     """Create a ServerCatalog with in-memory test data (no file required).
 
     This is the preferred way to create test catalogs when you don't need
     file persistence. It properly initializes the internal registry structure.
 
     Args:
-        servers: Dictionary mapping server_id to MCPServer objects
+        servers: Dictionary mapping server_id to MCPServerBase subclass instances
 
     Returns:
         ServerCatalog instance with test data loaded
 
     Example:
         catalog = create_in_memory_catalog({
-            "test-server": MCPServer(description="Test", command="npx"),
+            "test-server": StdioServer(description="Test", command="npx"),
         })
     """
     # Use a dummy path since we won't be loading from file
-    catalog = ServerCatalog(
-        catalog_path=Path("/dev/null"), validate_with_cue=False
-    )
+    catalog = ServerCatalog(catalog_path=Path("/dev/null"), validate_with_cue=False)
     # Properly initialize the registry with test data
     catalog._registry = ServerRegistry(servers=servers)
     catalog._loaded = True

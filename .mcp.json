@@ -19,6 +19,15 @@
       ],
       "env": {},
       "type": "stdio"
+    },
+    "@modelcontextprotocol/server-filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "env": {},
+      "type": "stdio"
     }
   }
 }

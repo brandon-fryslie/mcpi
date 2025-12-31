@@ -1,7 +1,4 @@
-[servers.test-server]
-
-[servers.postgres]
-args = [ "-y", "@modelcontextprotocol/server-postgres",]
-
-[servers.postgres.env]
-POSTGRES_DB = "mydb"
+[servers]
+"@modelcontextprotocol/server-filesystem" = { command = "npx", args = ["-y", "@modelcontextprotocol/server-filesystem"] }
+test-server = { command = "npx" }
+postgres = { command = "npx", args = ["-y", "@modelcontextprotocol/server-postgres"], env = { POSTGRES_DB = "mydb" } }

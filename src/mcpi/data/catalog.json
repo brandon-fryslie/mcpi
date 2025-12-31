@@ -1,5 +1,6 @@
 {
   "@anthropic/filesystem": {
+    "type": "stdio",
     "description": "Access and manage local filesystem operations",
     "command": "npx",
     "args": [
@@ -9,6 +10,7 @@
     "repository": "https://github.com/anthropics/mcp-filesystem-server"
   },
   "@anthropic/brave-search": {
+    "type": "stdio",
     "description": "Search the web using Brave Search API",
     "command": "npx",
     "args": [
@@ -18,6 +20,7 @@
     "repository": "https://github.com/anthropics/mcp-brave-search"
   },
   "upstash/context7": {
+    "type": "stdio",
     "description": "Up-to-date code documentation for LLMs and AI code editors",
     "command": "npx",
     "args": [
@@ -27,6 +30,7 @@
     "repository": "https://github.com/upstash/context7"
   },
   "@anthropic/sqlite": {
+    "type": "stdio",
     "description": "Query and manage SQLite databases",
     "command": "npx",
     "args": [
@@ -36,6 +40,7 @@
     "repository": "https://github.com/anthropics/mcp-sqlite"
   },
   "@anthropic/fetch": {
+    "type": "stdio",
     "description": "Make HTTP requests and fetch web content",
     "command": "npx",
     "args": [
@@ -45,6 +50,7 @@
     "repository": "https://github.com/anthropics/mcp-fetch"
   },
   "modelcontextprotocol/github": {
+    "type": "stdio",
     "description": "Interact with GitHub repositories, issues, and pull requests",
     "command": "npx",
     "args": [
@@ -54,6 +60,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/gitlab": {
+    "type": "stdio",
     "description": "Interact with GitLab repositories and merge requests",
     "command": "npx",
     "args": [
@@ -63,6 +70,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/postgres": {
+    "type": "stdio",
     "description": "Query and manage PostgreSQL databases",
     "command": "npx",
     "args": [
@@ -72,6 +80,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/slack": {
+    "type": "stdio",
     "description": "Send and receive messages in Slack workspaces",
     "command": "npx",
     "args": [
@@ -81,6 +90,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/google-maps": {
+    "type": "stdio",
     "description": "Search locations and get directions using Google Maps",
     "command": "npx",
     "args": [
@@ -90,6 +100,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/puppeteer": {
+    "type": "stdio",
     "description": "Automate web browser interactions and scraping",
     "command": "npx",
     "args": [
@@ -99,6 +110,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/aws": {
+    "type": "stdio",
     "description": "Manage AWS resources and services",
     "command": "npx",
     "args": [
@@ -108,6 +120,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "@anthropic/memory": {
+    "type": "stdio",
     "description": "Simple key-value memory storage",
     "command": "npx",
     "args": [
@@ -117,6 +130,7 @@
     "repository": "https://github.com/anthropics/mcp-memory"
   },
   "ckreiling/docker": {
+    "type": "stdio",
     "description": "Manage Docker containers and images",
     "command": "npx",
     "args": [
@@ -126,6 +140,7 @@
     "repository": "https://github.com/ckreiling/mcp-server-docker"
   },
   "executeautomation/playwright": {
+    "type": "stdio",
     "description": "Browser automation and testing with Playwright",
     "command": "npx",
     "args": [
@@ -135,6 +150,7 @@
     "repository": "https://github.com/executeautomation/playwright-mcp-server"
   },
   "steipete/claude-code-mcp": {
+    "type": "stdio",
     "description": "Run Claude Code CLI in one-shot mode for coding tasks, file operations, and git workflows",
     "command": "npx",
     "args": [
@@ -144,6 +160,7 @@
     "repository": "https://github.com/steipete/claude-code-mcp"
   },
   "steipete/peekaboo": {
+    "type": "stdio",
     "description": "Peekaboo MCP server",
     "command": "npx",
     "args": [
@@ -153,6 +170,7 @@
     "repository": "https://github.com/steipete/Peekaboo"
   },
   "modelcontextprotocol/time": {
+    "type": "stdio",
     "description": "Get current time and timezone information",
     "command": "npx",
     "args": [
@@ -162,6 +180,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/everything": {
+    "type": "stdio",
     "description": "The ultimate MCP server with every tool",
     "command": "npx",
     "args": [
@@ -171,6 +190,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "modelcontextprotocol/sequentialthinking": {
+    "type": "stdio",
     "description": "Tools for systematic reasoning and problem solving",
     "command": "npx",
     "args": [
@@ -180,6 +200,7 @@
     "repository": "https://github.com/modelcontextprotocol/servers"
   },
   "bmf/design-patterns": {
+    "type": "stdio",
     "description": "Deterministic access to software design pattern documentation with section-addressable queries",
     "command": "node",
     "args": [
@@ -191,6 +212,7 @@
     }
   },
   "cameroncooke/xcodebuildmcp": {
+    "type": "stdio",
     "description": "Xcode project management, simulator control, and Swift package tools for AI assistants",
     "command": "npx",
     "args": [
@@ -200,6 +222,7 @@
     "repository": "https://github.com/cameroncooke/XcodeBuildMCP"
   },
   "r-huijts/xcode": {
+    "type": "stdio",
     "description": "Comprehensive Xcode project management with building, testing, CocoaPods, SPM, and iOS simulator control",
     "command": "npx",
     "args": [
@@ -209,6 +232,7 @@
     "repository": "https://github.com/r-huijts/xcode-mcp-server"
   },
   "nickgnd/tmux-mcp": {
+    "type": "stdio",
     "description": "Interact with and control tmux sessions, windows, and panes",
     "command": "npx",
     "args": [
@@ -218,6 +242,7 @@
     "repository": "https://github.com/nickgnd/tmux-mcp"
   },
   "brandon-fryslie/better-xcode-mcp": {
+    "type": "stdio",
     "description": "Enhanced Xcode integration with project management, iOS simulator control, CocoaPods, and Swift Package Manager support",
     "command": "npx",
     "args": [
@@ -227,6 +252,7 @@
     "repository": "https://github.com/brandon-fryslie/better-xcode-mcp"
   },
   "bigcodegen/mcp-neovim-server": {
+    "type": "stdio",
     "description": "Control Neovim using MCP with text editing, navigation, and Vim commands via node-client",
     "command": "npx",
     "args": [
@@ -236,6 +262,7 @@
     "repository": "https://github.com/bigcodegen/mcp-neovim-server"
   },
   "ahujasid/blender-mcp": {
+    "type": "stdio",
     "description": "AI-assisted 3D modeling in Blender with scene creation, object manipulation, materials, and Python script execution",
     "command": "uvx",
     "args": [
@@ -244,6 +271,7 @@
     "repository": "https://github.com/ahujasid/blender-mcp"
   },
   "chromedevtools/chrome-devtools-mcp": {
+    "type": "stdio",
     "description": "Control and inspect Chrome browser with DevTools capabilities for automation, performance tracing, and debugging",
     "command": "npx",
     "args": [
@@ -251,5 +279,37 @@
       "chrome-devtools-mcp@latest"
     ],
     "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+  },
+  "amaccormac/gemini-mcp-tool": {
+    "type": "stdio",
+    "description": "Google Gemini AI model integration with MCP compatibility for AI-powered conversations and tasks",
+    "command": "npx",
+    "args": [
+      "-y",
+      "gemini-mcp-tool"
+    ],
+    "repository": "https://github.com/amaccormac/gemini-mcp-tool"
+  },
+  "z-ai/web-search-prime": {
+    "type": "http",
+    "description": "Web search capabilities via Z.AI API for real-time information retrieval",
+    "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+    "repository": null,
+    "categories": [
+      "search",
+      "ai",
+      "tools"
+    ]
+  },
+  "z-ai/web-reader": {
+    "type": "http",
+    "description": "Read and extract content from web pages via Z.AI API with support for various content types and formats",
+    "url": "https://api.z.ai/api/mcp/web_reader/mcp",
+    "repository": null,
+    "categories": [
+      "web",
+      "content",
+      "tools"
+    ]
   }
 }

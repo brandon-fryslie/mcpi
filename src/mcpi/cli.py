@@ -20,7 +20,7 @@ from mcpi.bundles.catalog import BundleCatalog
 from mcpi.bundles.installer import BundleInstaller
 from mcpi.clients import ServerConfig, ServerState
 from mcpi.clients.manager import MCPManager, create_default_manager
-from mcpi.registry.catalog import MCPServer, ServerCatalog, create_default_catalog
+from mcpi.registry.catalog import MCPServer, StdioServer, ServerCatalog, create_default_catalog
 from mcpi.registry.catalog_manager import CatalogManager, create_default_catalog_manager
 
 console = Console()
@@ -76,7 +76,7 @@ def discover_server_via_claude(
     Returns:
         Tuple of (server_id, MCPServer, env_dict) with discovered information, or None if discovery fails
     """
-    from mcpi.registry.catalog import MCPServer
+    from mcpi.registry.catalog import StdioServer
 
     verbose = ctx.obj.get("verbose", False)
 
@@ -124,8 +124,8 @@ def discover_server_via_claude(
                     console.print(f"[bold]Repository:[/bold] {repository}")
                 console.print()
 
-                # Create MCPServer object
-                mcp_server = MCPServer(
+                # Create StdioServer object (discovery always returns stdio servers)
+                mcp_server = StdioServer(
                     description=description,
                     command=command,
                     args=args,
@@ -306,8 +306,8 @@ IMPORTANT:
             console.print(f"[bold]Repository:[/bold] {repository}")
         console.print()
 
-        # Create MCPServer object (without id and env, which are stored separately)
-        mcp_server = MCPServer(
+        # Create StdioServer object (without id and env, which are stored separately)
+        mcp_server = StdioServer(
             description=description,
             command=command,
             args=args,
@@ -315,7 +315,7 @@ IMPORTANT:
             categories=[],  # Discovery doesn't determine categories
         )
 
-        # Return tuple of (server_id, MCPServer, env_dict)
+        # Return tuple of (server_id, StdioServer, env_dict)
         return (server_id, mcp_server, env)
 
     except subprocess.TimeoutExpired:

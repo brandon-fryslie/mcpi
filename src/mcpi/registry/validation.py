@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 import yaml
 from pydantic import ValidationError
 
-from mcpi.registry.catalog import MCPServer, ServerRegistry
+from mcpi.registry.catalog import MCPServerBase, StdioServer, HttpServer, ServerRegistry, parse_mcp_server
 
 
 class RegistryValidator:
@@ -91,7 +91,7 @@ class RegistryValidator:
             True if valid, False otherwise
         """
         try:
-            server = MCPServer(**server_data)
+            server = parse_mcp_server(server_data)
             self._validate_server_semantics(server)
             return len(self.errors) == 0
 
@@ -104,29 +104,13 @@ class RegistryValidator:
             self.errors.append(f"Unexpected error validating server: {e}")
             return False
 
-    def _validate_server_semantics(self, server: MCPServer) -> None:
+    def _validate_server_semantics(self, server: MCPServerBase) -> None:
         """Perform semantic validation on a server.
 
         Args:
-            server: Validated MCPServer instance
+            server: Validated MCPServerBase subclass instance
         """
-        server_ref = f"Server '{server.id}'"
-
-        # Check command/package combinations
-        if server.command == "npx" and not server.package:
-            self.errors.append(f"{server_ref}: npx command requires a package")
-
-        # Validate npx usage
-        if server.install_method == "npx" and server.command != "npx":
-            self.warnings.append(
-                f"{server_ref}: install_method is 'npx' but command is '{server.command}'"
-            )
-
-        # Check for required config without defaults
-        if server.required_config and len(server.required_config) > 5:
-            self.warnings.append(
-                f"{server_ref}: Many required parameters ({len(server.required_config)})"
-            )
+        server_ref = f"Server (type={server.type})"
 
         # Validate repository URL
         if server.repository and not (
@@ -146,20 +130,25 @@ class RegistryValidator:
                 f"{server_ref}: Many categories ({len(server.categories)})"
             )
 
-        # Validate package names for known methods
-        if server.install_method == "npm" and server.package.startswith("pip:"):
-            self.errors.append(
-                f"{server_ref}: NPM package should not start with 'pip:'"
-            )
+        # Type-specific validation
+        if isinstance(server, StdioServer):
+            # Validate npx usage patterns
+            if server.command == "npx" and not server.args:
+                self.warnings.append(f"{server_ref}: npx command with no args")
 
-        if server.install_method == "pip" and server.package.startswith("@"):
-            self.warnings.append(f"{server_ref}: PIP package should not start with '@'")
+            # Check for valid command
+            valid_commands = {"npx", "uvx", "node", "python", "python3", "pip", "pip3"}
+            if server.command not in valid_commands:
+                self.warnings.append(
+                    f"{server_ref}: Unusual command '{server.command}' (expected: {', '.join(sorted(valid_commands))})"
+                )
 
-        # Check for conflicting configurations
-        if server.install_package and server.install_package == server.package:
-            self.warnings.append(
-                f"{server_ref}: install_package is same as package (redundant)"
-            )
+        elif isinstance(server, HttpServer):
+            # Validate URL scheme
+            if not server.url.startswith(("https://", "http://")):
+                self.errors.append(
+                    f"{server_ref}: URL must start with http:// or https://"
+                )
 
     def get_validation_report(self) -> Dict[str, Any]:
         """Get detailed validation report.

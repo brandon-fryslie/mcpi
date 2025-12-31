@@ -73,32 +73,99 @@ class ServerInfo:
 
 
 @dataclass
-class ServerConfig:
-    """MCP server configuration."""
+class ServerConfigBase:
+    """Base class for MCP server configurations.
 
-    command: str
+    This defines the common interface for server configurations.
+    Subclasses implement specific transport types (stdio, http).
+    """
+
+    type: str = field(default="stdio")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        raise NotImplementedError("Subclasses must implement to_dict()")
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ServerConfigBase":
+        """Create ServerConfig from dictionary."""
+        raise NotImplementedError("Subclasses must implement from_dict()")
+
+
+@dataclass
+class StdioServerConfig(ServerConfigBase):
+    """MCP server configuration for stdio transport (local subprocess)."""
+
+    command: str = ""
     args: List[str] = field(default_factory=list)
     env: Dict[str, str] = field(default_factory=dict)
-    type: str = "stdio"
+    type: str = field(default="stdio")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
+            "type": self.type,
             "command": self.command,
             "args": self.args,
             "env": self.env,
-            "type": self.type,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ServerConfig":
-        """Create ServerConfig from dictionary."""
+    def from_dict(cls, data: Dict[str, Any]) -> "StdioServerConfig":
+        """Create StdioServerConfig from dictionary."""
         return cls(
             command=data["command"],
             args=data.get("args", []),
             env=data.get("env", {}),
             type=data.get("type", "stdio"),
         )
+
+
+@dataclass
+class HttpServerConfig(ServerConfigBase):
+    """MCP server configuration for HTTP transport (remote server)."""
+
+    url: str = ""
+    headers: Dict[str, str] = field(default_factory=dict)
+    type: str = field(default="http")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result: Dict[str, Any] = {
+            "type": self.type,
+            "url": self.url,
+        }
+        if self.headers:
+            result["headers"] = self.headers
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "HttpServerConfig":
+        """Create HttpServerConfig from dictionary."""
+        return cls(
+            url=data["url"],
+            headers=data.get("headers", {}),
+            type=data.get("type", "http"),
+        )
+
+
+# Type alias for backwards compatibility
+ServerConfig = StdioServerConfig
+
+
+def parse_server_config(data: Dict[str, Any]) -> ServerConfigBase:
+    """Parse a dictionary into the appropriate ServerConfig subclass.
+
+    Args:
+        data: Dictionary with server configuration
+
+    Returns:
+        StdioServerConfig or HttpServerConfig based on the 'type' field
+    """
+    server_type = data.get("type", "stdio")
+    if server_type == "http":
+        return HttpServerConfig.from_dict(data)
+    return StdioServerConfig.from_dict(data)
 
 
 @dataclass
