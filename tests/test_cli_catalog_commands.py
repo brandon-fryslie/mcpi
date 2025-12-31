@@ -111,14 +111,10 @@ def test_catalogs(tmp_path: Path):
         },
     )
 
-    # Create test manager (will raise NotImplementedError until implemented)
-    try:
-        manager = create_test_catalog_manager(
-            official_path=official_path, local_path=local_path
-        )
-    except NotImplementedError:
-        # Expected until implementation exists
-        manager = None
+    # Create test manager
+    manager = create_test_catalog_manager(
+        official_path=official_path, local_path=local_path
+    )
 
     return manager, official_path, local_path
 

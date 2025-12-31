@@ -159,11 +159,10 @@ class TestInteractiveScopeSelection:
 
     @patch("mcpi.cli.get_catalog")
     @patch("mcpi.cli.get_mcp_manager")
-    @patch("mcpi.cli.Prompt.ask")
-    def test_add_command_interactive_scope_selection(
-        self, mock_prompt, mock_get_manager, mock_get_catalog
+    def test_add_command_defaults_to_project_mcp_scope(
+        self, mock_get_manager, mock_get_catalog
     ):
-        """Test interactive scope selection when no scope provided."""
+        """Test that add command defaults to project-mcp scope when no scope provided."""
         # Setup mock catalog with server
         mock_server = Mock()
         mock_server.id = "test-server"
@@ -179,43 +178,17 @@ class TestInteractiveScopeSelection:
         mock_catalog.get_server.return_value = mock_server
         mock_get_catalog.return_value = mock_catalog
 
-        # Setup mock manager with scopes
+        # Setup mock manager
         mock_manager = Mock()
         mock_manager.default_client = "claude-code"
-        mock_manager.get_scopes_for_client.return_value = [
-            {
-                "name": "user-internal",
-                "description": "User internal scope",
-                "is_user_level": True,
-                "exists": True,
-            },
-            {
-                "name": "project-mcp",
-                "description": "Project MCP scope",
-                "is_user_level": False,
-                "exists": False,
-            },
-        ]
         mock_manager.get_server_info.return_value = None  # Server doesn't exist yet
         mock_get_manager.return_value = mock_manager
 
-        # Mock user selecting option 2
-        mock_prompt.return_value = "2"
-
-        # Run command (will fail at actual add, but we're testing the selection)
+        # Run command without specifying scope
         result = self.runner.invoke(main, ["add", "test-server"], input="n\n")
 
-        # Check that scope selection was displayed
-        # CLI uses server ID in prompt, not server name
-        assert "Select a scope for 'test-server'" in result.output
-        assert "[1] user-internal - User scope ✓" in result.output
-        assert "[2] project-mcp - Project scope ✗" in result.output
-        assert "Selected scope: project-mcp" in result.output
-
-        # Verify prompt was called
-        mock_prompt.assert_called_once()
-        choices = mock_prompt.call_args[1]["choices"]
-        assert choices == ["1", "2"]
+        # Check that default scope project-mcp is used
+        assert "Target Scope: project-mcp" in result.output
 
     @patch("mcpi.cli.get_catalog")
     @patch("mcpi.cli.get_mcp_manager")
@@ -258,8 +231,10 @@ class TestInteractiveScopeSelection:
 
     @patch("mcpi.cli.get_catalog")
     @patch("mcpi.cli.get_mcp_manager")
-    def test_add_command_dry_run_auto_scope(self, mock_get_manager, mock_get_catalog):
-        """Test that dry-run mode auto-selects first scope."""
+    def test_add_command_dry_run_shows_default_scope(
+        self, mock_get_manager, mock_get_catalog
+    ):
+        """Test that dry-run mode shows default project-mcp scope."""
         # Setup mock catalog with server
         mock_server = Mock()
         mock_server.id = "test-server"
@@ -275,23 +250,9 @@ class TestInteractiveScopeSelection:
         mock_catalog.get_server.return_value = mock_server
         mock_get_catalog.return_value = mock_catalog
 
-        # Setup mock manager with scopes
+        # Setup mock manager
         mock_manager = Mock()
         mock_manager.default_client = "claude-code"
-        mock_manager.get_scopes_for_client.return_value = [
-            {
-                "name": "first-scope",
-                "description": "First scope",
-                "is_user_level": True,
-                "exists": True,
-            },
-            {
-                "name": "second-scope",
-                "description": "Second scope",
-                "is_user_level": False,
-                "exists": False,
-            },
-        ]
         mock_manager.get_server_info.return_value = None
         mock_manager.add_server = Mock()
         mock_get_manager.return_value = mock_manager
@@ -299,38 +260,48 @@ class TestInteractiveScopeSelection:
         # Run command in dry-run mode
         result = self.runner.invoke(main, ["add", "test-server", "--dry-run"])
 
-        # Check that it auto-selected first scope
-        assert "Dry-run: Would use scope 'first-scope'" in result.output
-        assert "Select a scope for" not in result.output  # No interactive menu
-        # CLI uses server ID in output, not server name
+        # Check dry-run output shows default scope
         assert "Would add: test-server" in result.output
-        assert "Scope: first-scope" in result.output
+        assert "Scope: project-mcp" in result.output
+        # Verify add_server was NOT called (dry run)
+        mock_manager.add_server.assert_not_called()
 
     @patch("mcpi.cli.get_catalog")
     @patch("mcpi.cli.get_mcp_manager")
-    def test_add_command_no_scopes_available(self, mock_get_manager, mock_get_catalog):
-        """Test handling when no scopes are available."""
+    def test_add_command_dry_run_with_explicit_scope(
+        self, mock_get_manager, mock_get_catalog
+    ):
+        """Test that dry-run with explicit scope shows that scope."""
         # Setup mock catalog with server
         mock_server = Mock()
         mock_server.id = "test-server"
         mock_server.name = "Test Server"
+        mock_server.description = "Test description"
+        mock_server.command = "npx"
+        mock_server.package = "test-package"
+        mock_server.args = []
+        mock_server.env = {}
+        mock_server.install_method = "npx"
 
         mock_catalog = Mock()
         mock_catalog.get_server.return_value = mock_server
         mock_get_catalog.return_value = mock_catalog
 
-        # Setup mock manager with no scopes
+        # Setup mock manager
         mock_manager = Mock()
         mock_manager.default_client = "claude-code"
-        mock_manager.get_scopes_for_client.return_value = []
+        mock_manager.get_server_info.return_value = None
+        mock_manager.add_server = Mock()
         mock_get_manager.return_value = mock_manager
 
-        # Run command
-        result = self.runner.invoke(main, ["add", "test-server"])
+        # Run command in dry-run mode with explicit scope
+        result = self.runner.invoke(
+            main, ["add", "test-server", "--dry-run", "--scope", "user-internal"]
+        )
 
-        # Should show error message
-        assert "No scopes available for client 'claude-code'" in result.output
-        assert result.exit_code != 0
+        # Check dry-run output shows explicit scope
+        assert "Would add: test-server" in result.output
+        assert "Scope: user-internal" in result.output
 
 
 class TestScopeCommandHelp:
