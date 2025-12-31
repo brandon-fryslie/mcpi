@@ -1,0 +1,15 @@
+Agent: iterative-implementer | 2025-12-09T10:47:29Z
+Completed: command tracking, inline TOML formatting | Files: 2 | Commits: 1
+Status: complete
+
+Implementation Details:
+- Added command parameter to config tracking functions
+- Implemented custom inline TOML formatter for clean output
+- All tests pass (1249 passed, 82 skipped)
+- Commit: 0d06ee7
+
+Files Modified:
+- /Users/bmf/code/mcpi/src/mcpi/config.py (218 lines changed)
+- /Users/bmf/code/mcpi/src/mcpi/cli.py (1 line changed)
+
+Next: Ready for testing and validation

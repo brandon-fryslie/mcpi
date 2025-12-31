@@ -1,0 +1,45 @@
+EXECUTION: 20251209-034127
+SEQUENCE: 1
+AGENT: iterative-implementer
+STARTED: 2025-12-09T10:30:00Z
+COMPLETED: 2025-12-09T10:47:29Z
+STATUS: success
+
+## Work Performed
+- Fixed mcpi.toml tracking to include command field
+- Implemented custom inline TOML formatting for cleaner output
+- Updated CLI to pass command parameter to tracking function
+- Added comprehensive TOML formatting functions (_format_toml_value, _format_servers_section, _format_disabled_section)
+- Modified save_config_file to use custom formatters for servers and disabled sections
+- Reordered server_entry fields in logical order (command, args, env)
+
+## Key Findings
+- Standard toml.dump() creates nested sections like [servers.postgres.env] which is ugly
+- Custom inline formatting produces clean output: `postgres = { command = "npx", args = [...], env = {...} }`
+- The toml library's InlineTableDict is just a sentinel class and doesn't work as expected
+- Manual string formatting is the most reliable approach for inline tables
+- All 1249 existing tests pass after changes
+- Black reformatting was required after implementation
+
+## Artifacts Created
+- Modified /Users/bmf/code/mcpi/src/mcpi/config.py:
+  - Added 3 new formatting helper functions (lines 102-186)
+  - Updated save_config_file() to use custom formatting (lines 189-226)
+  - Added command parameter to add_server_to_config() (lines 234-303)
+- Modified /Users/bmf/code/mcpi/src/mcpi/cli.py:
+  - Added command parameter to tracking call (line 1697)
+- Created git commit 0d06ee7
+
+## Issues Encountered
+- Initial attempt to use toml library's built-in inline formatting failed
+- Had to implement custom TOML formatter from scratch
+- Black reformatting changed some line numbers but didn't break functionality
+
+## Handoff Notes
+Implementation is complete and tested. All acceptance criteria met:
+- Command field is now tracked in mcpi.toml
+- TOML output uses clean inline table format
+- Existing functionality not broken (all tests pass)
+- Code properly formatted with Black
+
+Ready for evaluation and integration.
