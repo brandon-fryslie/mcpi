@@ -311,5 +311,14 @@
       "content",
       "tools"
     ]
+  },
+  "cherry-chrome": {
+    "type": "stdio",
+    "description": "Ice cold & refreshing Chrome Automation",
+    "repository": "https://github.com/brandon-fryslie/cherry-chrome-mcp",
+    "command": "npx",
+    "args": [
+      "github:brandon-fryslie/cherry-chrome-mcp"
+    ]
   }
 }
